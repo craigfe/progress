@@ -1,0 +1,3 @@
+(executable
+ (name stack)
+ (libraries progress unix))
