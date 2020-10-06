@@ -17,11 +17,14 @@ let bar width percentage =
   ^ String.init not_filled (fun _ -> '.')
   ^ "]"
 
-let default_columns () =
+let default_width () =
   match Terminal_size.get_columns () with Some c -> c | None -> 80
 
-let counter ~total ~sampling_interval ?(columns = default_columns ()) ~message
-    ?pp:(pp_count, count_width = (fmt_noop, 0)) () =
+let counter ~total ~message ?pp:(pp_count, count_width = (fmt_noop, 0))
+    ?(width = default_width ()) ?(sampling_interval = 1) () =
+  if sampling_interval <= 0 then
+    Format.kasprintf invalid_arg
+      "Invalid sampling_interval %d: must be a positive value" sampling_interval;
   let count = ref 0L in
   let percentage i =
     min (Float.trunc (Int64.to_float i *. 100. /. Int64.to_float total)) 100.
@@ -33,7 +36,7 @@ let counter ~total ~sampling_interval ?(columns = default_columns ()) ~message
       ticker := (!ticker + 1) mod sampling_interval;
       !ticker = 0
   in
-  let bar_width = columns - String.length message - count_width - 16 in
+  let bar_width = width - String.length message - count_width - 16 in
   if bar_width < 3 then invalid_arg "Not enough space for a progress bar";
   let update ppf =
     let seconds = Mtime_clock.count start_time |> Mtime.Span.to_s in

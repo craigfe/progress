@@ -10,7 +10,7 @@ let test_progress_bar_lifecycle () =
   let open Progress.Bytes in
   let report, _bar =
     Progress.start ~ppf:Format.str_formatter
-    @@ Progress.counter ~total:(gib 1) ~sampling_interval:1 ~columns:60
+    @@ Progress.counter ~total:(gib 1) ~sampling_interval:1 ~width:60
          ~message:"<msg>" ~pp:Progress.bytes ()
   in
   let check_bar expected =
@@ -43,30 +43,29 @@ let test_progress_bar_lifecycle () =
   ()
 
 let test_progress_bar_width () =
-  let check_width ~columns ~message ?pp () =
+  let check_width ~width ~message ?pp () =
     let _, _ =
       Progress.start ~ppf:Format.str_formatter
-      @@ Progress.counter ~total:1L ~sampling_interval:1 ~columns ~message ?pp
-           ()
+      @@ Progress.counter ~total:1L ~sampling_interval:1 ~width ~message ?pp ()
     in
 
     let count_width = match pp with Some (_, c) -> c | None -> 0 in
     String.length (read_bar ())
     |> Alcotest.(check int)
          (Fmt.str
-            "Expected width for configuration { columns = %d; count_width = \
-             %d; message = %s }"
-            columns count_width message)
-         columns
+            "Expected width for configuration { width = %d; count_width = %d; \
+             message = %s }"
+            width count_width message)
+         width
   in
-  check_width ~columns:80 ~message:"<msg>" ~pp:Progress.bytes ();
-  check_width ~columns:40 ~message:"" ~pp:(Fmt.(const string "XX"), 2) ();
-  check_width ~columns:40 ~message:"Very long message" ();
+  check_width ~width:80 ~message:"<msg>" ~pp:Progress.bytes ();
+  check_width ~width:40 ~message:"" ~pp:(Fmt.(const string "XX"), 2) ();
+  check_width ~width:40 ~message:"Very long message" ();
 
   Alcotest.check_raises "Overly small progress bar"
     (Invalid_argument "Not enough space for a progress bar") (fun () ->
       ignore
-        (Progress.counter ~total:1L ~sampling_interval:1 ~columns:18 ~message:""
+        (Progress.counter ~total:1L ~sampling_interval:1 ~width:18 ~message:""
            ()));
   ()
 
