@@ -1,8 +1,7 @@
 # progress
 
-<p align="center">🚧&nbsp;&nbsp;&nbsp;<b><i>Highly unstable and incomplete</i></b>&nbsp;&nbsp;&nbsp;🚧</p>
-
-Progress bar library for OCaml, supporting multiple progress bars.
+An extensible progress bar library for OCaml, supporting multiple simultaneous
+progress bars and various modes of operation.
 
 ```
 ❭ dune exec examples/stack.exe

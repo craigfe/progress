@@ -1,5 +1,7 @@
 (library
  (name progress)
  (public_name progress)
- (foreign_stubs (language c) (names progress_stubs))
+ (foreign_stubs
+  (language c)
+  (names progress_stubs))
  (libraries mtime mtime.clock mtime.clock.os terminal_size))

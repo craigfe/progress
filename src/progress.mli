@@ -14,10 +14,11 @@ type 'a t
     process. *)
 
 val counter :
+  mode:[ `ASCII | `UTF ] ->
   total:int64 ->
   message:string ->
   ?pp:int64 pp_fixed ->
-  ?width:int ref ->
+  ?width:int ->
   ?sampling_interval:int ->
   unit ->
   (int64 -> unit) t
@@ -42,7 +43,14 @@ val counter :
       is non-negligible. The default value is [1], meaning that all updates are
       displayed immediately. *)
 
-val ( <-> ) : 'a t -> 'b t -> ('a * 'b) t
+module Segment : sig
+  include Segment.S
+  (** @inline *)
+end
+
+val of_segment : 'a Segment.t -> init:'a -> ('a -> unit) t
+
+val ( / ) : 'a t -> 'b t -> ('a * 'b) t
 (** Stack progress bars vertically. [a <-> b] is a set with [a] stacked on top
     of [b]. The two bars have separate reporting functions (supplied as a pair). *)
 
