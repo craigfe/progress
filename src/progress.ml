@@ -9,19 +9,46 @@ type 'a t = Join_y : 'a t * 'b t -> ('a * 'b) t | Bar : 'a bar -> 'a t
 
 let ( <-> ) n s = Join_y (n, s)
 
+let pp_time ppf span =
+  let seconds = Mtime.Span.to_s span in
+  Format.fprintf ppf "%02.0f:%02.0f" (Float.div seconds 60.)
+    (Float.rem seconds 60.)
+
 let bar width percentage =
   let filled = Float.to_int (Float.of_int (width - 2) *. percentage /. 100.) in
   let not_filled = width - 2 - filled in
-  "["
-  ^ String.init filled (fun _ -> '#')
-  ^ String.init not_filled (fun _ -> '.')
-  ^ "]"
+  fun ppf ->
+    Format.pp_print_char ppf '[';
+    for _ = 1 to filled do
+      Format.pp_print_char ppf '#'
+    done;
+    for _ = 1 to not_filled do
+      Format.pp_print_char ppf '.'
+    done;
+    Format.pp_print_char ppf ']'
 
-let default_width () =
-  match Terminal_size.get_columns () with Some c -> c | None -> 80
+module Width = struct
+  external sigwinch : unit -> int = "ocaml_progress_sigwinch"
+
+  let default =
+    let get_winsize () =
+      match Terminal_size.get_columns () with Some c -> c | None -> 80
+    in
+    let columns = ref (get_winsize ()) in
+    Sys.set_signal (sigwinch ())
+      (Sys.Signal_handle (fun _ -> columns := get_winsize ()));
+    columns
+end
+
+(** [ticker n] is a function [f] that returns [true] on every [n]th call. *)
+let ticker interval : unit -> bool =
+  let ticker = ref 0 in
+  fun () ->
+    ticker := (!ticker + 1) mod interval;
+    !ticker = 0
 
 let counter ~total ~message ?pp:(pp_count, count_width = (fmt_noop, 0))
-    ?(width = default_width ()) ?(sampling_interval = 1) () =
+    ?(width = Width.default) ?(sampling_interval = 1) () =
   if sampling_interval <= 0 then
     Format.kasprintf invalid_arg
       "Invalid sampling_interval %d: must be a positive value" sampling_interval;
@@ -30,21 +57,19 @@ let counter ~total ~message ?pp:(pp_count, count_width = (fmt_noop, 0))
     min (Float.trunc (Int64.to_float i *. 100. /. Int64.to_float total)) 100.
   in
   let start_time = Mtime_clock.counter () in
-  let should_update : unit -> bool =
-    let ticker = ref 0 in
-    fun () ->
-      ticker := (!ticker + 1) mod sampling_interval;
-      !ticker = 0
+  let should_update = ticker sampling_interval in
+  let bar_width =
+    let rem = String.length message + count_width + 16 in
+    fun () -> !width - rem
   in
-  let bar_width = width - String.length message - count_width - 16 in
-  if bar_width < 3 then invalid_arg "Not enough space for a progress bar";
+  if bar_width () < 3 then invalid_arg "Not enough space for a progress bar";
   let update ppf =
-    let seconds = Mtime_clock.count start_time |> Mtime.Span.to_s in
+    let span = Mtime_clock.count start_time in
     let percentage = percentage !count in
-    (* if first then Format.pp_open_box ppf 0 else Format.fprintf ppf "\r"; *)
-    Format.fprintf ppf "%s  %a  %02.0f:%02.0f  %s %3.0f%%%!" message pp_count
-      !count (Float.div seconds 60.) (Float.rem seconds 60.)
-      (bar bar_width percentage) percentage
+    Format.fprintf ppf "%s  %a  %a  %t %3.0f%%%!" message pp_count !count
+      pp_time span
+      (bar (bar_width ()) percentage)
+      percentage
   in
   let report wrapper =
     let update = wrapper update in

@@ -17,7 +17,7 @@ val counter :
   total:int64 ->
   message:string ->
   ?pp:int64 pp_fixed ->
-  ?width:int ->
+  ?width:int ref ->
   ?sampling_interval:int ->
   unit ->
   (int64 -> unit) t
