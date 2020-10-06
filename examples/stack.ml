@@ -1,7 +1,7 @@
 let () =
   let bar message =
     Progress.counter ~total:1_000_000L ~sampling_interval:1 ~message
-      ~pp_count:Progress.pp_bytes ()
+      ~pp:Progress.bytes ()
   in
   Progress.(
     with_display

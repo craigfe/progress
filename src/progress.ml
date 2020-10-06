@@ -1,26 +1,4 @@
-type 'a fmt = Format.formatter -> 'a -> unit
-type 'a fixed_width_fmt = 'a fmt * int
-
 let fmt_noop _ _ = ()
-
-(* module HList = struct
- *   type 'a t = [] : unit t | ( :: ) : ('a * 'b t) -> ('a * 'b) t
- * end *)
-
-(** Pretty-printer for byte counts *)
-let pp_bytes : int64 fixed_width_fmt =
-  (* Round down to the nearest 0.1 *)
-  let trunc f = Float.trunc (f *. 10.) /. 10. in
-  let pp ppf i =
-    match Int64.to_float i with
-    | n when n < 1024. -> Format.fprintf ppf "%6.1f B  " (trunc n)
-    | n when n < 1024. ** 2. ->
-        Format.fprintf ppf "%6.1f KiB" (trunc (n /. 1024.))
-    | n when n < 1024. ** 3. ->
-        Format.fprintf ppf "%6.1f MiB" (trunc (n /. (1024. ** 2.)))
-    | n -> Format.fprintf ppf "%6.1f GiB" (trunc (n /. (1024. ** 3.)))
-  in
-  (pp, 10)
 
 type 'a bar = {
   update : Format.formatter -> unit as 't;
@@ -43,7 +21,7 @@ let default_columns () =
   match Terminal_size.get_columns () with Some c -> c | None -> 80
 
 let counter ~total ~sampling_interval ?(columns = default_columns ()) ~message
-    ?pp_count:(pp_count, count_width = (fmt_noop, 0)) () =
+    ?pp:(pp_count, count_width = (fmt_noop, 0)) () =
   let count = ref 0L in
   let percentage i =
     min (Float.trunc (Int64.to_float i *. 100. /. Int64.to_float total)) 100.
@@ -111,3 +89,7 @@ let with_display ?ppf t f =
   let x = f reporters in
   finalise display;
   x
+
+module Bytes = Bytes
+
+let bytes = Bytes.pp_fixed

@@ -1,17 +1,12 @@
 type 'a t
 (** The type of progress bars with reporting functions of type ['a]. *)
 
-type 'a fmt := Format.formatter -> 'a -> unit
-type 'a fixed_width_fmt := 'a fmt * int
-
-val pp_bytes : int64 fixed_width_fmt
-
 val counter :
   total:int64 ->
   sampling_interval:int ->
   ?columns:int ->
   message:string ->
-  ?pp_count:int64 fixed_width_fmt ->
+  ?pp:(Format.formatter -> int64 -> unit) * int ->
   unit ->
   (int64 -> unit) t
 (** Renders a progress bar of the form:
@@ -31,3 +26,7 @@ val with_display : ?ppf:Format.formatter -> 'a t -> ('a -> 'b) -> 'b
 
 val start : ?ppf:Format.formatter -> 'a t -> 'a * display
 val finalise : display -> unit
+
+module Bytes = Bytes
+
+val bytes : (Format.formatter -> int64 -> unit) * int

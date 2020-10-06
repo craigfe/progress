@@ -1,58 +1,56 @@
 open Astring
 
-let ( - ), ( * ), ( / ) = Int64.(sub, mul, div)
+let ( - ), ( / ) = Int64.(sub, div)
 
 let read_bar () =
   Format.flush_str_formatter ()
   |> String.trim ~drop:(function '\r' | '\n' -> true | _ -> false)
 
 let test_progress_bar_lifecycle () =
-  let k i = Int64.of_int i * 1024L in
-  let m i = k i * 1024L in
-  let g i = m i * 1024L in
+  let open Progress.Bytes in
   let report, _bar =
     Progress.start ~ppf:Format.str_formatter
-    @@ Progress.counter ~total:(g 1) ~sampling_interval:1 ~columns:60
-         ~message:"<msg>" ~pp_count:Progress.pp_bytes ()
+    @@ Progress.counter ~total:(gib 1) ~sampling_interval:1 ~columns:60
+         ~message:"<msg>" ~pp:Progress.bytes ()
   in
   let check_bar expected =
     read_bar ()
     |> Alcotest.(check string) ("Expected state: " ^ expected) expected
   in
   check_bar "<msg>     0.0 B    00:00  [...........................]   0%";
-  report (k 1 - 1L);
+  report (kib 1 - 1L);
   check_bar "<msg>  1023.0 B    00:00  [...........................]   0%";
   report 1L;
   check_bar "<msg>     1.0 KiB  00:00  [...........................]   0%";
-  report (m 1 - k 1 - 1L);
+  report (mib 1 - kib 1 - 1L);
   (* Should always round downwards. *)
   check_bar "<msg>  1023.9 KiB  00:00  [...........................]   0%";
   report 1L;
   check_bar "<msg>     1.0 MiB  00:00  [...........................]   0%";
-  report (m 49);
+  report (mib 49);
   check_bar "<msg>    50.0 MiB  00:00  [#..........................]   4%";
-  report (m 450);
+  report (mib 450);
   check_bar "<msg>   500.0 MiB  00:00  [############...............]  48%";
-  report (g 1 - m 500 - 1L);
+  report (gib 1 - mib 500 - 1L);
   (* 1 byte from completion. Should show 99% and not a full 1024 MiB. *)
   check_bar "<msg>  1023.9 MiB  00:00  [##########################.]  99%";
   report 1L;
   (* Now exactly complete *)
   check_bar "<msg>     1.0 GiB  00:00  [###########################] 100%";
   (* Subsequent reports don't overflow the bar *)
-  report (g 1 / 2L);
+  report (gib 1 / 2L);
   check_bar "<msg>     1.5 GiB  00:00  [###########################] 100%";
   ()
 
 let test_progress_bar_width () =
-  let check_width ~columns ~message ?pp_count () =
+  let check_width ~columns ~message ?pp () =
     let _, _ =
       Progress.start ~ppf:Format.str_formatter
-      @@ Progress.counter ~total:1L ~sampling_interval:1 ~columns ~message
-           ?pp_count ()
+      @@ Progress.counter ~total:1L ~sampling_interval:1 ~columns ~message ?pp
+           ()
     in
 
-    let count_width = match pp_count with Some (_, c) -> c | None -> 0 in
+    let count_width = match pp with Some (_, c) -> c | None -> 0 in
     String.length (read_bar ())
     |> Alcotest.(check int)
          (Fmt.str
@@ -61,8 +59,8 @@ let test_progress_bar_width () =
             columns count_width message)
          columns
   in
-  check_width ~columns:80 ~message:"<msg>" ~pp_count:Progress.pp_bytes ();
-  check_width ~columns:40 ~message:"" ~pp_count:(Fmt.(const string "XX"), 2) ();
+  check_width ~columns:80 ~message:"<msg>" ~pp:Progress.bytes ();
+  check_width ~columns:40 ~message:"" ~pp:(Fmt.(const string "XX"), 2) ();
   check_width ~columns:40 ~message:"Very long message" ();
 
   Alcotest.check_raises "Overly small progress bar"
