@@ -70,7 +70,8 @@ val ( / ) : 'a t -> 'b t -> ('a * 'b) t
 val with_display : ?ppf:Format.formatter -> 'a t -> ('a -> 'b) -> 'b
 (** Render a set of progress bars inside a continuation.
 
-    @param ppf Defaults to {!Format.err_formatter} *)
+    @param ppf Defaults to {!Format.err_formatter} if [stderr] is a TTY, and is
+    a noop formatter otherwise. *)
 
 (** Functions for explicitly starting and stopping the process of rendering a
     bar; useful when the code doing the progress reporting cannot be

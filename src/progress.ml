@@ -59,7 +59,12 @@ let rec count_bars : type a. a t -> int = function
   | Pair (a, b) -> count_bars a + count_bars b
   | Bar _ -> 1
 
-let start ?(ppf = Format.err_formatter) bars =
+let default_ppf =
+  lazy
+    ( if Unix.(isatty stderr) then Format.err_formatter
+    else Format.make_formatter (fun _ _ _ -> ()) (fun () -> ()) )
+
+let start ?(ppf = Lazy.force default_ppf) bars =
   Format.fprintf ppf "@[";
   let display = E { ppf; bars } in
   let count =

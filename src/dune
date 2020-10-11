@@ -4,4 +4,4 @@
  (foreign_stubs
   (language c)
   (names progress_stubs))
- (libraries mtime mtime.clock mtime.clock.os terminal_size))
+ (libraries mtime mtime.clock mtime.clock.os terminal_size unix))
