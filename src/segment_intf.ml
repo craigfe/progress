@@ -28,17 +28,19 @@ module type S = sig
 
       @raise Invalid_arg if [s] contains any newlines. *)
 
-  val fmt : (Format.formatter -> 'a -> unit) * int -> 'a t
-  (** [fmt pp] is a segment that uses the supplied fixed-width pretty-printer to
-      render the value. The formatter should ensure never to emit newlines. *)
+  val fmt : width:int -> (Format.formatter -> 'a -> unit) -> 'a t
+  (** [fmt ~width pp] is a segment that uses the supplied fixed-width
+      pretty-printer to render the value. The formatter should ensure never to
+      emit newlines. *)
 
   val periodic : int -> 'a t -> 'a t
-  (** [periodic n s] has the same output format as [s], but only updates on
-      every [n]-th call. This is useful when progress is being reported from a
-      hot-loop, where the cost of rendering is non-negligible. *)
+  (** [periodic n s] has the same output format as [s], but only passes reported
+      values down to [s] on every [n]-th call. This is useful when progress is
+      being reported from a hot-loop, where the cost of rendering is
+      non-negligible. *)
 
   val accumulator : ('a -> 'a -> 'a) -> 'a -> 'a t -> 'a t
-  (** [accumulator combine zero s] is a *)
+  (** [accumulator combine zero s] has the same output format [s]. *)
 
   (** {2 Dynamically-sized segments} *)
 
@@ -51,9 +53,9 @@ module type S = sig
   val ( <|> ) : 'a t -> 'a t -> 'a t
   (** Horizontally join two segments of the same reported value type. *)
 
-  val list : ?sep:string -> 'a t list -> 'a t
+  val list : ?sep:'a t -> 'a t list -> 'a t
   (** Horizontally join a list of segments, with a given separator. [sep]
-      defaults to [" "]. *)
+      defaults to [const " "]. *)
 
   val pair : ?sep:unit t -> 'a t -> 'b t -> ('a * 'b) t
   (** Horizontally join a pair of segments consuming different reported values
@@ -69,10 +71,9 @@ module type Segment = sig
 
   include S
 
-  type 'a unstaged
+  type 'a compiled
 
-  val unstage : 'a t -> 'a unstaged
-
-  (* val update : 'a unstaged -> Format.formatter -> unit *)
-  val report : 'a unstaged -> Format.formatter -> 'a -> unit
+  val compile : initial:'a -> 'a t -> 'a compiled
+  val update : 'a compiled -> Format.formatter -> unit
+  val report : 'a compiled -> Format.formatter -> 'a -> unit
 end

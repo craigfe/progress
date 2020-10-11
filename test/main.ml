@@ -39,15 +39,16 @@ let test_pair () =
   let bar =
     Progress.(
       Segment.(
-        pair (fmt (Format.pp_print_int, 1)) (fmt (Format.pp_print_string, 3)))
+        pair ~sep:(const ", ")
+          (fmt ~width:1 Format.pp_print_int)
+          (fmt ~width:3 Format.pp_print_string))
       |> of_segment ~init:(0, "foo"))
   in
   Progress.with_display ~ppf:Format.str_formatter bar (fun report ->
-      check_bar "0foo";
+      check_bar "0, foo";
       report (1, "bar");
-      check_bar "1bar");
-  (* TODO: keep last value in DSL *)
-  check_bar "0foo"
+      check_bar "1, bar");
+  check_bar "1, bar"
 
 let test_unicode_bar () =
   let report, _ =

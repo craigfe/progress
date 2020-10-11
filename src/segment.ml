@@ -1,5 +1,6 @@
 include Segment_intf
 open Utils
+open Staging
 
 module Width = struct
   external sigwinch : unit -> int = "ocaml_progress_sigwinch"
@@ -15,8 +16,9 @@ module Width = struct
 end
 
 type 'a t =
-  | Pp_unsized of { pp : (unit -> int) -> Format.formatter -> 'a -> unit }
-  | Pp_fixed of 'a pp_fixed
+  | Pp_unsized of { pp : width:(unit -> int) -> Format.formatter -> 'a -> unit }
+  | Pp_fixed of { pp : Format.formatter -> 'a -> unit; width : int }
+  | Const of { pp : Format.formatter -> unit; width : int }
   | Staged of (unit -> 'a t)
   | Contramap : 'a t * ('b -> 'a) -> 'b t
   | Cond of 'a t cond
@@ -24,16 +26,13 @@ type 'a t =
   | Group of 'a t array
   | Pair : { left : 'a t; sep : unit t; right : 'b t } -> ('a * 'b) t
 
-and 'a pp_fixed = { pp : Format.formatter -> 'a -> unit; width : int }
-
 and 'a cond = { if_ : unit -> bool; then_ : 'a }
 
-let const s =
-  let pp ppf _ = Format.pp_print_string ppf s in
-  let width = String.length s in
-  Pp_fixed { pp; width }
+let fmt ~width pp = Pp_fixed { pp; width }
+let fmt_const width pp = Const { pp; width }
 
-let fmt width pp = Pp_fixed { pp; width }
+let const s =
+  fmt_const (String.length s) (fun ppf -> Format.pp_print_string ppf s)
 
 let pp_time ppf span =
   let seconds = Mtime.Span.to_s span in
@@ -44,15 +43,15 @@ let time =
   Staged
     (fun () ->
       let start_time = Mtime_clock.counter () in
-      let pp ppf _ = pp_time ppf (Mtime_clock.count start_time) in
-      fmt 5 pp)
+      let pp ppf = pp_time ppf (Mtime_clock.count start_time) in
+      fmt_const 5 pp)
 
 let percentage =
   let pp ppf proportion =
     let percentage = min (Float.trunc (proportion *. 100.)) 100. in
     Format.fprintf ppf "%3.0f%%" percentage
   in
-  fmt 4 pp
+  fmt ~width:4 pp
 
 let utf8_chars =
   (* Characters: space @ [0x258F .. 0x2589] *)
@@ -106,9 +105,9 @@ let bar ~mode ?(width = `Expand) f =
   match width with
   | `Fixed width ->
       if width < 3 then failwith "Not enough space for a progress bar";
-      Contramap (fmt width (Fun.flip (bar ~mode (fun _ -> width))), f)
+      Contramap (fmt ~width (Fun.flip (bar ~mode (fun _ -> width))), f)
   | `Expand ->
-      let pp width = Fun.flip (bar ~mode width) in
+      let pp ~width = Fun.flip (bar ~mode width) in
       Contramap (Pp_unsized { pp } <|> const " " <|> percentage, f)
 
 (** [ticker n] is a function [f] that returns [true] on every [n]th call. *)
@@ -142,8 +141,8 @@ let box_fixed width = box_dynamic (ref width)
 let box_winsize s = box_dynamic Width.default s
 let pair ?(sep = const "") a b = Pair { left = a; sep; right = b }
 
-let list ?(sep = "  ") =
-  List.interleave ~sep:(const sep) >> Array.of_list >> fun xs -> Group xs
+let list ?(sep = const "  ") =
+  List.intersperse ~sep >> Array.of_list >> fun xs -> Group xs
 
 let contramap _ = assert false
 
@@ -157,7 +156,8 @@ let contramap _ = assert false
     - inline nested groupings to make printing more efficient. *)
 
 type 'a unstaged_node =
-  | Pp of { pp : Format.formatter -> 'a -> unit }
+  | Pp of { pp : Format.formatter -> 'a -> unit; mutable latest : 'a }
+  | Const of { pp : Format.formatter -> unit }
   | Contramap : 'a unstaged_node * ('b -> 'a) -> 'b unstaged_node
   | Cond of 'a unstaged_node cond
   | Group of 'a unstaged_node array
@@ -170,8 +170,14 @@ type 'a unstaged_node =
 
 (* | Unsized of ('a * int ref) unstaged_node *)
 
-type 'a unstaged = { ast : 'a unstaged_node }
-type state = { consumed : int; expand : unit -> int; expansion_occurred : bool }
+type 'a compiled = { ast : 'a unstaged_node }
+
+type 'a state = {
+  consumed : int;
+  expand : unit -> int;
+  expansion_occurred : bool;
+  initial : 'a;
+}
 
 let array_fold_left_map f acc input_array =
   let len = Array.length input_array in
@@ -187,19 +193,24 @@ let array_fold_left_map f acc input_array =
     done;
     (!acc, output_array)
 
-let unstage =
-  let rec inner : type a. state -> a t -> a unstaged * state =
+let compile =
+  let rec inner : type a. a state -> a t -> a compiled * a state =
    fun state -> function
+    | Const { pp; width } ->
+        ( { ast = Const { pp } },
+          { state with consumed = state.consumed + width } )
     | Pp_unsized { pp } ->
         if state.expansion_occurred then
           failwith "Multiple expansion points encountered";
-        ( { ast = Pp { pp = pp state.expand } },
+        ( { ast = Pp { pp = pp ~width:state.expand; latest = state.initial } },
           { state with expansion_occurred = true } )
     | Pp_fixed { pp; width } ->
-        ({ ast = Pp { pp } }, { state with consumed = state.consumed + width })
+        ( { ast = Pp { pp; latest = state.initial } },
+          { state with consumed = state.consumed + width } )
     | Contramap (t, f) ->
-        let inner, state = inner state t in
-        ({ ast = Contramap (inner.ast, f) }, state)
+        let initial_a = state.initial in
+        let inner, state = inner { state with initial = f initial_a } t in
+        ({ ast = Contramap (inner.ast, f) }, { state with initial = initial_a })
     | Cond { if_; then_ } ->
         let inner, state = inner state then_ in
         ({ ast = Cond { if_; then_ = inner.ast } }, state)
@@ -222,8 +233,9 @@ let unstage =
         in
         let rec aux :
             type a.
-            state -> a unstaged_node array -> state * a unstaged_node list list
-            =
+            a state ->
+            a unstaged_node array ->
+            a state * a unstaged_node list list =
          fun state g ->
           Array.fold_left
             (fun (state, acc) -> function
@@ -236,46 +248,68 @@ let unstage =
         let inners = inners |> List.rev |> List.concat |> Array.of_list in
         ({ ast = Group inners }, state)
     | Pair { left; sep; right } ->
-        let left, state = inner state left in
-        let sep, state = inner state sep in
-        let right, state = inner state right in
+        let initial = state.initial in
+        let left, state = inner { state with initial = fst initial } left in
+        let sep, state = inner { state with initial = () } sep in
+        let right, state = inner { state with initial = snd initial } right in
         ( { ast = Pair { left = left.ast; sep = sep.ast; right = right.ast } },
-          state )
+          { state with initial } )
   in
-  fun x ->
+  fun ~initial x ->
     inner
       {
         consumed = 0;
         expand = (fun () -> assert false);
         expansion_occurred = false;
+        initial;
       }
       x
     |> fst
 
 let report { ast } =
-  let rec inner : type a. a unstaged_node -> Format.formatter -> a -> unit =
+  let rec aux :
+      type a. a unstaged_node -> (Format.formatter -> a -> unit) staged =
     function
-    | Pp { pp } -> pp
+    | Const { pp } -> stage (fun ppf (_ : a) -> pp ppf)
+    | Pp pp ->
+        stage (fun ppf x ->
+            pp.latest <- x;
+            pp.pp ppf x)
     | Contramap (t, f) ->
-        let inner = inner t in
+        let$ inner = aux t in
         fun ppf a -> inner ppf (f a)
-    | Cond { if_; then_ } -> if if_ () then inner then_ else fun _ _ -> ()
+    | Cond { if_; then_ } ->
+        let$ then_ = aux then_ in
+        fun ppf x -> if if_ () then then_ ppf x else ()
     | Group g ->
-        let reporters = Array.map inner g in
-        fun ppf v -> Array.iter (fun f -> f ppf v) reporters
+        let reporters = Array.map (aux >> unstage) g in
+        stage (fun ppf v -> Array.iter (fun f -> f ppf v) reporters)
     | Pair { left; sep; right } ->
+        let$ left = aux left and$ sep = aux sep and$ right = aux right in
         fun ppf (v_left, v_right) ->
-          inner left ppf v_left;
-          inner sep ppf ();
-          inner right ppf v_right
+          left ppf v_left;
+          sep ppf ();
+          right ppf v_right
   in
-  fun ppf x -> Format.fprintf ppf "%a%!\r" (inner ast) x
+  let pp = unstage (aux ast) in
+  fun ppf x -> Format.fprintf ppf "%a\r%!" pp x
 
-(* let update { ast; _ } =
- *   let rec inner : type a. a unstaged_node -> Format.formatter -> unit =
- *     function
- *     | 
- *   in
- *   inner ast *)
-
-let fmt (a, b) = fmt b a
+let update { ast } =
+  let rec aux : type a. a unstaged_node -> (Format.formatter -> unit) staged =
+    function
+    | Const { pp } -> stage pp
+    | Pp pp -> stage (fun ppf -> pp.pp ppf pp.latest)
+    (* Updating happens unconditionally *)
+    | Cond { if_ = _; then_ } -> aux then_
+    | Contramap (inner, _) -> aux inner
+    | Group g ->
+        let updaters = Array.map (aux >> unstage) g in
+        stage (fun ppf -> Array.iter (fun f -> f ppf) updaters)
+    | Pair { left; sep; right } ->
+        let$ left = aux left and$ sep = aux sep and$ right = aux right in
+        fun ppf ->
+          left ppf;
+          sep ppf;
+          right ppf
+  in
+  unstage (aux ast)

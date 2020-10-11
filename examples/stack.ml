@@ -10,12 +10,11 @@ let () =
       / bar "img/puppies.jpg" ))
   @@ fun (((a, b), c), d) ->
   let pick_random () =
-    match Random.int 4 with
-    | 0 -> a
-    | 1 -> b
-    | 2 -> c
-    | 3 -> d
-    | _ -> assert false
+    match Random.int 100 with
+    | n when n < 19 -> a
+    | n when n < 58 -> b
+    | n when n < 70 -> c
+    | _ -> d
   in
   let random_progress () = Random.int64 1_000L in
   for _ = 1 to 10_000 do
