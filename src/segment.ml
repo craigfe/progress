@@ -296,8 +296,7 @@ let report { ast } =
           sep ppf ();
           right ppf v_right
   in
-  let pp = unstage (aux ast) in
-  fun ppf x -> Format.fprintf ppf "%a\r%!" pp x
+  unstage (aux ast)
 
 let update { ast } =
   let rec aux : type a. a unstaged_node -> (Format.formatter -> unit) staged =

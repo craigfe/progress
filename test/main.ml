@@ -12,6 +12,9 @@ let check_bar expected =
   read_bar ()
   |> Alcotest.(check string) ("Expected state: " ^ expected) expected
 
+let check_no_bar () =
+  Format.flush_str_formatter () |> Alcotest.(check string) "Expected no bar" ""
+
 let test_percentage () =
   let report, _ = Progress.(Segment.percentage |> v ~init:0. |> start ~ppf) in
   let expect s f =
@@ -164,6 +167,27 @@ let test_unsized_not_in_box () =
       let open Progress in
       ignore (Segment.(bar ~mode:`UTF Int64.to_float) |> v ~init:0L |> start))
 
+let test_periodic () =
+  Progress.(
+    Segment.(accumulator ( + ) 0 (periodic 3 (fmt ~width:1 Fmt.int)))
+    |> v ~init:0
+    |> with_display ~ppf)
+  @@ fun report ->
+  check_bar "0";
+  report 1;
+  check_no_bar ();
+  report 1;
+  check_no_bar ();
+  report 1;
+  check_bar "3";
+  report 10;
+  check_no_bar ();
+  report 10;
+  check_no_bar ();
+  report 10;
+  check_bar "33";
+  ()
+
 let () =
   let open Alcotest in
   run __FILE__
@@ -180,4 +204,5 @@ let () =
         [
           test_case "Unsized element not in box" `Quick test_unsized_not_in_box;
         ] );
+      ("periodic", [ test_case "Lifecycle" `Quick test_periodic ]);
     ]

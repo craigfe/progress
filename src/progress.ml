@@ -22,6 +22,7 @@ let v : type a. init:a -> a Segment.t -> (a -> unit) t =
        nothing to print. *)
     fun ppf (a : a) ->
       report ppf_buf a;
+      Format.pp_print_flush ppf_buf ();
       match Buffer.length buffer with
       | 0 -> ()
       | _ ->
