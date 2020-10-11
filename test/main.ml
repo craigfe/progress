@@ -2,6 +2,7 @@ open Astring
 
 let ( - ), ( / ) = Int64.(sub, div)
 let almost f = f -. Float.epsilon
+let ppf = Format.str_formatter
 
 let read_bar () =
   Format.flush_str_formatter ()
@@ -12,12 +13,7 @@ let check_bar expected =
   |> Alcotest.(check string) ("Expected state: " ^ expected) expected
 
 let test_percentage () =
-  let report, _ =
-    Progress.(
-      Segment.percentage
-      |> of_segment ~init:0.
-      |> start ~ppf:Format.str_formatter)
-  in
+  let report, _ = Progress.(Segment.percentage |> v ~init:0. |> start ~ppf) in
   let expect s f =
     report f;
     check_bar s
@@ -33,6 +29,7 @@ let test_percentage () =
   expect "100%" 1.;
   expect "100%" (1. +. Float.epsilon);
   expect "100%" 1.1;
+  expect "  0%" (-0.1);
   ()
 
 let test_pair () =
@@ -42,9 +39,9 @@ let test_pair () =
         pair ~sep:(const ", ")
           (fmt ~width:1 Format.pp_print_int)
           (fmt ~width:3 Format.pp_print_string))
-      |> of_segment ~init:(0, "foo"))
+      |> v ~init:(0, "foo"))
   in
-  Progress.with_display ~ppf:Format.str_formatter bar (fun report ->
+  Progress.with_display ~ppf bar (fun report ->
       check_bar "0, foo";
       report (1, "bar");
       check_bar "1, bar");
@@ -54,8 +51,8 @@ let test_unicode_bar () =
   let report, _ =
     Progress.(
       Segment.bar ~mode:`UTF ~width:(`Fixed 3) Fun.id
-      |> of_segment ~init:0.
-      |> start ~ppf:Format.str_formatter)
+      |> v ~init:0.
+      |> start ~ppf)
   in
   let expect s f =
     report f;
@@ -83,9 +80,9 @@ let test_unicode_bar () =
   expect "│█│" (1. +. (1. /. 8.));
   expect "│█│" (almost 2.);
   let report, _ =
-    Progress.(
-      Segment.bar ~mode:`UTF ~width:(`Fixed 5) Fun.id |> of_segment ~init:0.)
-    |> Progress.start ~ppf:Format.str_formatter
+    Progress.Segment.bar ~mode:`UTF ~width:(`Fixed 5) Fun.id
+    |> Progress.v ~init:0.
+    |> Progress.start ~ppf
   in
   let expect s f =
     report f;
@@ -101,7 +98,7 @@ let test_unicode_bar () =
 let test_progress_bar_lifecycle () =
   let open Progress.Bytes in
   let report, _bar =
-    Progress.start ~ppf:Format.str_formatter
+    Progress.start ~ppf
     @@ Progress.counter ~mode:`ASCII ~total:(gib 1) ~sampling_interval:1
          ~width:60 ~message:"<msg>" ~pp:Progress.bytes ()
   in
@@ -133,11 +130,10 @@ let test_progress_bar_lifecycle () =
 let test_progress_bar_width () =
   let check_width ~width ~message ?pp () =
     let _, _ =
-      Progress.start ~ppf:Format.str_formatter
-      @@ Progress.counter ~mode:`ASCII ~total:1L ~sampling_interval:1 ~width
-           ~message ?pp ()
+      Progress.start ~ppf
+        (Progress.counter ~mode:`ASCII ~total:1L ~sampling_interval:1 ~width
+           ~message ?pp ())
     in
-
     let count_width = match pp with Some (_, c) -> c | None -> 0 in
     String.length (read_bar ())
     |> Alcotest.(check int)
@@ -160,6 +156,14 @@ let test_progress_bar_width () =
    *          ())); *)
   ()
 
+let test_unsized_not_in_box () =
+  Alcotest.check_raises "Unsized element not contained in a box"
+    (Invalid_argument
+       "Encountered an expanding element that is not contained in a box")
+    (fun () ->
+      let open Progress in
+      ignore (Segment.(bar ~mode:`UTF Int64.to_float) |> v ~init:0L |> start))
+
 let () =
   let open Alcotest in
   run __FILE__
@@ -171,5 +175,9 @@ let () =
           test_case "Unicode bar" `Quick test_unicode_bar;
           test_case "Progress bar lifecycle" `Quick test_progress_bar_lifecycle;
           test_case "Progress bar width" `Quick test_progress_bar_width;
+        ] );
+      ( "boxes",
+        [
+          test_case "Unsized element not in box" `Quick test_unsized_not_in_box;
         ] );
     ]

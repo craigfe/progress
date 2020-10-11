@@ -10,8 +10,8 @@ type 'a t = Pair : 'a t * 'b t -> ('a * 'b) t | Bar : 'a bar -> 'a t
 
 let ( / ) top bottom = Pair (top, bottom)
 
-let of_segment : type a. a Segment.t -> init:a -> (a -> unit) t =
- fun s ~init ->
+let v : type a. init:a -> a Segment.t -> (a -> unit) t =
+ fun ~init s ->
   let s = Segment.compile ~initial:init s in
   let report = Segment.report s in
   let update = Segment.update s in
@@ -32,20 +32,20 @@ let of_segment : type a. a Segment.t -> init:a -> (a -> unit) t =
   in
   Bar { report; update }
 
-let counter ~mode ~total ~message ?pp ?width ?(sampling_interval = 1) () =
+let counter ~mode ~total ?message ?pp ?width ?(sampling_interval = 1) () =
   let open Segment in
-  let count_segment =
-    match pp with Some (p, width) -> [ fmt ~width p ] | None -> []
-  in
   let proportion =
     let total = Int64.to_float total in
     fun i -> Int64.to_float i /. total
   in
-  list ([ const message ] @ count_segment @ [ time; bar ~mode proportion ])
-  |> Option.fold width ~some:box_fixed ~none:box_winsize
+  list
+    ( Option.fold ~none:[] message ~some:(fun s -> [ const s ])
+    @ Option.fold ~none:[] pp ~some:(fun (p, width) -> [ fmt ~width p ])
+    @ [ time; bar ~mode proportion ] )
+  |> Option.fold width ~some:box_fixed ~none:(box_winsize ~fallback:80)
   |> periodic sampling_interval
   |> accumulator Int64.add 0L
-  |> of_segment ~init:0L
+  |> v ~init:0L
 
 type display = E : { ppf : Format.formatter; bars : _ t } -> display
 

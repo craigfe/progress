@@ -5,9 +5,9 @@ open Staging
 module Width = struct
   external sigwinch : unit -> int = "ocaml_progress_sigwinch"
 
-  let default =
+  let default ~fallback =
     let get_winsize () =
-      match Terminal_size.get_columns () with Some c -> c | None -> 80
+      match Terminal_size.get_columns () with Some c -> c | None -> fallback
     in
     let columns = ref (get_winsize ()) in
     Sys.set_signal (sigwinch ())
@@ -46,9 +46,11 @@ let time =
       let pp ppf = pp_time ppf (Mtime_clock.count start_time) in
       fmt_const 5 pp)
 
+let clamp (lower, upper) = Float.min upper >> Float.max lower
+
 let percentage =
   let pp ppf proportion =
-    let percentage = min (Float.trunc (proportion *. 100.)) 100. in
+    let percentage = clamp (0., 100.) (Float.trunc (proportion *. 100.)) in
     Format.fprintf ppf "%3.0f%%" percentage
   in
   fmt ~width:4 pp
@@ -138,13 +140,13 @@ let accumulator combine zero s =
 
 let box_dynamic width contents = Box { contents; width }
 let box_fixed width = box_dynamic (ref width)
-let box_winsize s = box_dynamic Width.default s
+let box_winsize ~fallback s = box_dynamic (Width.default ~fallback) s
 let pair ?(sep = const "") a b = Pair { left = a; sep; right = b }
 
 let list ?(sep = const "  ") =
   List.intersperse ~sep >> Array.of_list >> fun xs -> Group xs
 
-let contramap _ = assert false
+let using f t = Contramap (t, f)
 
 (** The [unstage] step transforms a pure [t] term in to a potentially-impure
     [unstaged] term to be used for a single display lifecycle. It has three
@@ -259,7 +261,10 @@ let compile =
     inner
       {
         consumed = 0;
-        expand = (fun () -> assert false);
+        expand =
+          (fun () ->
+            Format.kasprintf invalid_arg
+              "Encountered an expanding element that is not contained in a box");
         expansion_occurred = false;
         initial;
       }

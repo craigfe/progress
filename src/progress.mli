@@ -16,15 +16,17 @@ type 'a t
 val counter :
   mode:[ `ASCII | `UTF ] ->
   total:int64 ->
-  message:string ->
+  ?message:string ->
   ?pp:int64 pp_fixed ->
   ?width:int ->
   ?sampling_interval:int ->
   unit ->
   (int64 -> unit) t
-(** [counter ~total ~message ()] is a progress bar of the form:
+(** [counter ~total ()] is a progress bar of the form:
 
-    [<message> <count?> MM:SS \[########..............................\] XX%]
+    {[
+      <message?>  <count?>  MM:SS  [########..............................]  XX%
+    ]}
 
     where each reported value contributes cumulatively towards an eventual total
     of [total]. Optional parameters are as follows:
@@ -43,19 +45,21 @@ val counter :
       is non-negligible. The default value is [1], meaning that all updates are
       displayed immediately. *)
 
+(** [Segment] contains a DSL for defining custom progress bars. *)
 module Segment : sig
   include Segment.S
   (** @inline *)
 end
 
-val of_segment : 'a Segment.t -> init:'a -> ('a -> unit) t
+val v : init:'a -> 'a Segment.t -> ('a -> unit) t
+(** Define a new progress bar from a specification, with the given initial
+    value. *)
+
+(** {2 Multiple progress bars} *)
 
 val ( / ) : 'a t -> 'b t -> ('a * 'b) t
-(** Stack progress bars vertically. [a <-> b] is a set with [a] stacked on top
-    of [b]. The two bars have separate reporting functions (supplied as a pair). *)
-
-val bytes : int64 pp_fixed
-(** Fixed-width pretty-printer for counts in units of bytes. *)
+(** Stack progress bars vertically. [a / b] is a set with [a] stacked on top of
+    [b]. The two bars have separate reporting functions (supplied as a pair). *)
 
 (** {1 Rendering} *)
 
@@ -76,6 +80,9 @@ val start : ?ppf:Format.formatter -> 'a t -> 'a * display
 val finalise : display -> unit
 
 (** {1 Miscellaneous} *)
+
+val bytes : int64 pp_fixed
+(** Fixed-width pretty-printer for counts in units of bytes. *)
 
 module Bytes = Bytes
 (** Helpers for interpreting integer values as byte counts. *)
