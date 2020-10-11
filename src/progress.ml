@@ -33,7 +33,8 @@ let v : type a. init:a -> a Segment.t -> (a -> unit) t =
   in
   Bar { report; update }
 
-let counter ~mode ~total ?message ?pp ?width ?(sampling_interval = 1) () =
+let counter ~total ?(mode = `UTF8) ?message ?pp ?width ?(sampling_interval = 1)
+    () =
   let open Segment in
   let proportion =
     let total = Int64.to_float total in
@@ -41,7 +42,7 @@ let counter ~mode ~total ?message ?pp ?width ?(sampling_interval = 1) () =
   in
   list
     ( Option.fold ~none:[] message ~some:(fun s -> [ const s ])
-    @ Option.fold ~none:[] pp ~some:(fun (p, width) -> [ fmt ~width p ])
+    @ Option.fold ~none:[] pp ~some:(fun (p, width) -> [ fmt (p, width) ])
     @ [ time; bar ~mode proportion ] )
   |> Option.fold width ~some:box_fixed ~none:(box_winsize ~fallback:80)
   |> periodic sampling_interval
@@ -98,6 +99,4 @@ let with_display ?ppf t f =
   finalise display;
   x
 
-module Bytes = Bytes
-
-let bytes = Bytes.pp_fixed
+module Units = Units

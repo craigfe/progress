@@ -1,7 +1,7 @@
-(** A library for displaying progress bars, including support for multiple bars
-    displayed at once. Start by {{!description} describing} of a set of progress
-    bars, then begin {{!rendering} rendering} them to get access to their
-    respective reporting functions. *)
+(** A library for displaying progress bars, including support for rendering
+    multiple bars at once. Start by {{!description} describing} of a set of
+    progress bars, then begin {{!rendering} rendering} them to get access to
+    their respective reporting functions. *)
 
 type 'a pp := Format.formatter -> 'a -> unit
 type 'a pp_fixed := 'a pp * int
@@ -9,13 +9,13 @@ type 'a pp_fixed := 'a pp * int
 (** {1 Description} *)
 
 type 'a t
-(** The type of progress bars with reporting functions of type ['a]. The
-    reporting functions are supplied when beginning the {{!rendering} rendering}
-    process. *)
+(** The type of progress bars with reporting functions of type ['a]. You'll get
+    access to the reporting functions when beginning the {{!rendering}
+    rendering} process. *)
 
 val counter :
-  mode:[ `ASCII | `UTF ] ->
   total:int64 ->
+  ?mode:[ `ASCII | `UTF8 ] ->
   ?message:string ->
   ?pp:int64 pp_fixed ->
   ?width:int ->
@@ -31,9 +31,13 @@ val counter :
     where each reported value contributes cumulatively towards an eventual total
     of [total]. Optional parameters are as follows:
 
+    - [?mode] specifies whether to use a UTF-8 or an ASCII encoding for the
+      progress bar. The UTF-8 encoding shows a higher resolution of progress,
+      but may not be supported in all terminals. The default is [`UTF8].
+
     - [?pp] is used to pretty-print the [<count>] segment, if passed. For
-      example, {!bytes} can be used for totals measured in bytes. The default is
-      to not display this segment.
+      example, {!Units.bytes} can be used for totals measured in bytes. The
+      default is to not display this segment.
 
     - [?width] is the width of the bar in columns. Defaults to the width of
       [stdout], if it is a terminal.
@@ -81,8 +85,5 @@ val finalise : display -> unit
 
 (** {1 Miscellaneous} *)
 
-val bytes : int64 pp_fixed
-(** Fixed-width pretty-printer for counts in units of bytes. *)
-
-module Bytes = Bytes
-(** Helpers for interpreting integer values as byte counts. *)
+module Units = Units
+(** Helpers for printing values of various units. *)

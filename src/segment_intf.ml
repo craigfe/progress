@@ -9,25 +9,8 @@ module type S = sig
   val time : _ t
   (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
 
-  [@@@ocamlformat "parse-docstrings = false"]
-
-  val percentage : float t
-  (** Renders a proportion as a right-aligned percentage. e.g.
-
-      {[
-         0.     ↦  "  0%"
-         0.42   ↦  " 42%"
-         0.9999 ↦  " 99%"
-         1.     ↦  "100%"
-      ]}
-
-      Values will be clamped inside the range [\[0., 1.\]].
-  *)
-
-  [@@@ocamlformat "parse-docstrings = true"]
-
   val bar :
-    mode:[ `UTF | `ASCII ] ->
+    mode:[ `ASCII | `UTF8 ] ->
     ?width:[ `Fixed of int | `Expand ] ->
     ('a -> float) ->
     'a t
@@ -42,14 +25,13 @@ module type S = sig
       must be contained inside a {{!boxes} box} that determines its size. *)
 
   val const : string -> _ t
-  (** [const s] is the segment that always displays [s].
+  (** [const s] is the segment that always displays [s]. [s] must not contain
+      any newline characters. . *)
 
-      @raise Invalid_arg if [s] contains any newlines. *)
-
-  val fmt : width:int -> (Format.formatter -> 'a -> unit) -> 'a t
-  (** [fmt ~width pp] is a segment that uses the supplied fixed-width
-      pretty-printer to render the value. The formatter should ensure never to
-      emit newlines. *)
+  val fmt : (Format.formatter -> 'a -> unit) * int -> 'a t
+  (** [fmt (pp, width)] is a segment that uses the supplied fixed-width
+      pretty-printer to render the value. The formatter must never emit newline
+      characters. *)
 
   val periodic : int -> 'a t -> 'a t
   (** [periodic n s] has the same output format as [s], but only passes reported

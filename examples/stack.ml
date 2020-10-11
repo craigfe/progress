@@ -1,6 +1,7 @@
 let () =
   let bar message =
-    Progress.counter ~mode:`UTF ~total:1_000_000L ~message ~pp:Progress.bytes ()
+    Progress.counter ~mode:`ASCII ~total:1_000_000L ~message
+      ~pp:Progress.Units.bytes ()
   in
   Progress.(
     with_display
@@ -13,11 +14,11 @@ let () =
     match Random.int 100 with
     | n when n < 19 -> a
     | n when n < 58 -> b
-    | n when n < 70 -> c
+    | n when n < 74 -> c
     | _ -> d
   in
-  let random_progress () = Random.int64 1_000L in
-  for _ = 1 to 10_000 do
+  let random_progress () = Random.int64 10_000L in
+  for _ = 1 to 1_250 do
     (pick_random ()) (random_progress ());
-    Unix.sleepf 0.001
+    Unix.sleepf 0.01
   done

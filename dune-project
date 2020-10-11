@@ -9,9 +9,12 @@
 
 (package
  (name progress)
- (synopsis "Dynamic progress bars")
- (description "\
-Dynamic progress bars
-")
+ (synopsis "User-definable progress bars")
  (documentation https://CraigFe.github.io/progress/)
- (depends alcotest fmt logs))
+ (depends
+  (ocaml (>= "4.08.0"))
+  mtime
+  terminal_size
+  (alcotest (and (>= "1.1.0") :with-test))
+  (astring :with-test)
+  (fmt :with-test)))
