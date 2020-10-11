@@ -53,21 +53,32 @@ let positioned_at ~row t ppf =
   if row = 0 then Format.fprintf ppf "%t\r%!" t
   else Format.fprintf ppf "\027[%dA%t\027[%dB\r%!" row t row
 
+let rec count_bars : type a. a t -> int = function
+  | Pair (a, b) -> count_bars a + count_bars b
+  | Bar _ -> 1
+
 let start ?(ppf = Format.err_formatter) bars =
   Format.fprintf ppf "@[";
   let display = E { ppf; bars } in
-  let rec inner : type a. row:int -> a t -> a =
-   fun ~row -> function
+  let count =
+    (* It's convenient to traverse left-to-right, so that we can do the bar
+       initialisations in the correct order. However, the report functions need
+       to know how many bars are _beneath_ them, so we do a total count
+       first. *)
+    count_bars bars
+  in
+  let rec inner : type a. int -> a t -> int * a =
+   fun seen -> function
     | Pair (a, b) ->
-        let a = inner ~row:(succ row) a in
-        let b = inner ~row b in
-        (a, b)
+        let seen, a = inner seen a in
+        let seen, b = inner seen b in
+        (seen, (a, b))
     | Bar { report; update } ->
         update ppf;
-        Format.fprintf ppf (if row = 0 then "\r%!" else "\n");
-        report ~position:(positioned_at ~row) ppf
+        Format.fprintf ppf (if seen = count - 1 then "\r%!" else "\n");
+        (seen + 1, report ~position:(positioned_at ~row:(count - seen - 1)) ppf)
   in
-  (inner ~row:0 bars, display)
+  (inner 0 bars |> snd, display)
 
 let finalise (E { ppf; bars }) =
   let rec inner : type a. row:int -> a t -> unit =
