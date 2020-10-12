@@ -1,7 +1,11 @@
 type 'a pp := Format.formatter -> 'a -> unit
-type 'a pp_fixed := 'a pp * int
 
-val bytes : int64 pp_fixed
+type ('a, 'b) pp_fixed = (width:int -> 'a pp -> 'b) -> 'b
+(** A fixed-width pretty printer. Intended to be used to create progress bar
+    segments, e.g. {!bytes} {!Segment.of_pp} is a segment that pretty-prints
+    values as byte counts. *)
+
+val bytes : (int64, _) pp_fixed
 (** Prints a 64-bit integer as a byte count. e.g.
 
     {[
@@ -14,7 +18,7 @@ val bytes : int64 pp_fixed
 
 [@@@ocamlformat "parse-docstrings = false"]
 
-val percentage : float pp_fixed
+val percentage : (float, _) pp_fixed
 (** Prints a proportion as a percentage. e.g.
 
     {[
@@ -28,6 +32,9 @@ val percentage : float pp_fixed
 
 [@@@ocamlformat "parse-docstrings = true"]
 
+val seconds : (Mtime.Span.t, _) pp_fixed
+(** Renders a time span in fixed-width [MM:SS] form. *)
+
 (** {2 Assorted pretty-printing utilities} *)
 
 module Percentage : sig
@@ -35,7 +42,7 @@ module Percentage : sig
 
   val pp : t pp
 
-  val pp_fixed : t pp_fixed
+  val pp_fixed : t pp * int
   (** {!pp_fixed} is {!pp} with left-padding added to achieve fixed size. *)
 end
 
@@ -44,7 +51,7 @@ module Bytes : sig
 
   val pp : t pp
 
-  val pp_fixed : t pp_fixed
+  val pp_fixed : t pp * int
   (** {!pp_fixed} is {!pp} with padding added to achieve fixed size. *)
 
   (** Quick builders for base-2 byte counts *)

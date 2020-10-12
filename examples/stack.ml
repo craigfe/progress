@@ -1,9 +1,9 @@
 let () =
   let bar message =
-    Progress.counter ~mode:`ASCII ~total:1_000_000L ~message
+    Progress_unix.counter ~mode:`ASCII ~total:1_000_000L ~message
       ~pp:Progress.Units.bytes ()
   in
-  Progress.(
+  Progress_unix.(
     with_display
       ( bar "index.html     "
       / bar "sitemap.xml    "

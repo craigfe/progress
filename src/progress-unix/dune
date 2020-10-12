@@ -1,0 +1,4 @@
+(library
+ (name progress_unix)
+ (public_name progress.unix)
+ (libraries progress mtime.clock mtime.clock.os terminal_size unix))

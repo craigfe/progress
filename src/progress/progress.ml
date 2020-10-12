@@ -10,7 +10,7 @@ type 'a t = Pair : 'a t * 'b t -> ('a * 'b) t | Bar : 'a bar -> 'a t
 
 let ( / ) top bottom = Pair (top, bottom)
 
-let v : type a. init:a -> a Segment.t -> (a -> unit) t =
+let make : type a. init:a -> a Segment.t -> (a -> unit) t =
  fun ~init s ->
   let s = Segment.compile ~initial:init s in
   let report = Segment.report s in
@@ -33,21 +33,27 @@ let v : type a. init:a -> a Segment.t -> (a -> unit) t =
   in
   Bar { report; update }
 
-let counter ~total ?(mode = `UTF8) ?message ?pp ?width ?(sampling_interval = 1)
-    () =
-  let open Segment in
-  let proportion =
-    let total = Int64.to_float total in
-    fun i -> Int64.to_float i /. total
-  in
-  list
-    ( Option.fold ~none:[] message ~some:(fun s -> [ const s ])
-    @ Option.fold ~none:[] pp ~some:(fun (p, width) -> [ fmt (p, width) ])
-    @ [ time; bar ~mode proportion ] )
-  |> Option.fold width ~some:box_fixed ~none:(box_winsize ~fallback:80)
-  |> periodic sampling_interval
-  |> accumulator Int64.add 0L
-  |> v ~init:0L
+module Internal = struct
+  let counter ?prebar ~total ?(mode = `UTF8) ?message
+      ?(pp : (int64, int64 Segment.t) Units.pp_fixed option) ?width
+      ?(sampling_interval = 1) () =
+    let open Segment in
+    let proportion =
+      let total = Int64.to_float total in
+      fun i -> Int64.to_float i /. total
+    in
+    Segment.list
+      ( Option.fold ~none:[] message ~some:(fun s -> [ const s ])
+      @ Option.fold ~none:[] pp ~some:(fun f -> [ f of_pp ])
+      @ Option.fold ~none:[] prebar ~some:(fun s -> [ s ])
+      @ [ bar ~mode proportion ] )
+    |> Option.fold width ~some:box_fixed ~none:(box_winsize ~fallback:80)
+    |> periodic sampling_interval
+    |> accumulator Int64.add 0L
+    |> make ~init:0L
+end
+
+let counter = Internal.counter ?prebar:None
 
 type display = E : { ppf : Format.formatter; bars : _ t } -> display
 
@@ -59,12 +65,7 @@ let rec count_bars : type a. a t -> int = function
   | Pair (a, b) -> count_bars a + count_bars b
   | Bar _ -> 1
 
-let default_ppf =
-  lazy
-    ( if Unix.(isatty stderr) then Format.err_formatter
-    else Format.make_formatter (fun _ _ _ -> ()) (fun () -> ()) )
-
-let start ?(ppf = Lazy.force default_ppf) bars =
+let start ?(ppf = Format.err_formatter) bars =
   Format.fprintf ppf "@[";
   let display = E { ppf; bars } in
   let count =

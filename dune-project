@@ -10,6 +10,10 @@
 (package
  (name progress)
  (synopsis "User-definable progress bars")
+ (description "\
+A progress bar library for OCaml, featuring a DSL for declaratively specifying
+progress bar formats. Supports rendering multiple progress bars simultaneously.\
+")
  (documentation https://CraigFe.github.io/progress/)
  (depends
   (ocaml (>= "4.08.0"))

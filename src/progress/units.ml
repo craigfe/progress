@@ -52,5 +52,16 @@ module Bytes = struct
   let pp = trimmed pp_fixed
 end
 
-let percentage = Percentage.pp_fixed
-let bytes = Bytes.pp_fixed
+type ('a, 'b) pp_fixed =
+  (width:int -> (Format.formatter -> 'a -> unit) -> 'b) -> 'b
+
+let percentage f = f ~width:(snd Percentage.pp_fixed) (fst Percentage.pp_fixed)
+let bytes f = f ~width:(snd Bytes.pp_fixed) (fst Bytes.pp_fixed)
+
+let seconds f =
+  let pp ppf span =
+    let seconds = Mtime.Span.to_s span in
+    Format.fprintf ppf "%02.0f:%02.0f" (Float.div seconds 60.)
+      (Float.rem seconds 60.)
+  in
+  f ~width:5 pp

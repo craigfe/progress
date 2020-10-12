@@ -56,9 +56,9 @@ let test_pair () =
     Progress.(
       Segment.(
         pair ~sep:(const ", ")
-          (fmt (Format.pp_print_int, 1))
-          (fmt (Format.pp_print_string, 3)))
-      |> v ~init:(0, "foo"))
+          (of_pp ~width:1 Format.pp_print_int)
+          (of_pp ~width:1 Format.pp_print_string))
+      |> make ~init:(0, "foo"))
   in
   Progress.with_display ~ppf bar (fun report ->
       check_bar "0, foo";
@@ -70,7 +70,7 @@ let test_unicode_bar () =
   let report, _ =
     Progress.(
       Segment.bar ~mode:`UTF8 ~width:(`Fixed 3) Fun.id
-      |> v ~init:0.
+      |> make ~init:0.
       |> start ~ppf)
   in
   let expect s f =
@@ -100,7 +100,7 @@ let test_unicode_bar () =
   expect "│█│" (almost 2.);
   let report, _ =
     Progress.Segment.bar ~mode:`UTF8 ~width:(`Fixed 5) Fun.id
-    |> Progress.v ~init:0.
+    |> Progress.make ~init:0.
     |> Progress.start ~ppf
   in
   let expect s f =
@@ -119,41 +119,40 @@ let test_progress_bar_lifecycle () =
   let report, _bar =
     Progress.start ~ppf
     @@ Progress.counter ~mode:`ASCII ~total:(gib 1) ~sampling_interval:1
-         ~width:60 ~message:"<msg>" ~pp:Progress.Units.bytes ()
+         ~width:53 ~message:"<msg>" ~pp:Progress.Units.bytes ()
   in
-  check_bar "<msg>     0.0 B    00:00  [...........................]   0%";
+  check_bar "<msg>     0.0 B    [...........................]   0%";
   report (kib 1 - 1L);
-  check_bar "<msg>  1023.0 B    00:00  [...........................]   0%";
+  check_bar "<msg>  1023.0 B    [...........................]   0%";
   report 1L;
-  check_bar "<msg>     1.0 KiB  00:00  [...........................]   0%";
+  check_bar "<msg>     1.0 KiB  [...........................]   0%";
   report (mib 1 - kib 1 - 1L);
   (* Should always round downwards. *)
-  check_bar "<msg>  1023.9 KiB  00:00  [...........................]   0%";
+  check_bar "<msg>  1023.9 KiB  [...........................]   0%";
   report 1L;
-  check_bar "<msg>     1.0 MiB  00:00  [...........................]   0%";
+  check_bar "<msg>     1.0 MiB  [...........................]   0%";
   report (mib 49);
-  check_bar "<msg>    50.0 MiB  00:00  [#..........................]   4%";
+  check_bar "<msg>    50.0 MiB  [#..........................]   4%";
   report (mib 450);
-  check_bar "<msg>   500.0 MiB  00:00  [#############..............]  48%";
+  check_bar "<msg>   500.0 MiB  [#############..............]  48%";
   report (gib 1 - mib 500 - 1L);
   (* 1 byte from completion. Should show 99% and not a full 1024 MiB. *)
-  check_bar "<msg>  1023.9 MiB  00:00  [##########################.]  99%";
+  check_bar "<msg>  1023.9 MiB  [##########################.]  99%";
   report 1L;
   (* Now exactly complete *)
-  check_bar "<msg>     1.0 GiB  00:00  [###########################] 100%";
+  check_bar "<msg>     1.0 GiB  [###########################] 100%";
   (* Subsequent reports don't overflow the bar *)
   report (gib 1 / 2L);
-  check_bar "<msg>     1.5 GiB  00:00  [###########################] 100%";
+  check_bar "<msg>     1.5 GiB  [###########################] 100%";
   ()
 
 let test_progress_bar_width () =
-  let check_width ~width ~message ?pp () =
+  let check_width ~width ~message ?pp ~count_width () =
     let _, _ =
       Progress.start ~ppf
         (Progress.counter ~mode:`ASCII ~total:1L ~sampling_interval:1 ~width
            ~message ?pp ())
     in
-    let count_width = match pp with Some (_, c) -> c | None -> 0 in
     String.length (read_bar ())
     |> Alcotest.(check int)
          (Fmt.str
@@ -162,9 +161,12 @@ let test_progress_bar_width () =
             width count_width message)
          width
   in
-  check_width ~width:80 ~message:"<msg>" ~pp:Progress.Units.bytes ();
-  check_width ~width:40 ~message:"" ~pp:(Fmt.(const string "XX"), 2) ();
-  check_width ~width:40 ~message:"Very long message" ();
+  check_width ~width:80 ~message:"<msg>" ~pp:Progress.Units.bytes ~count_width:5
+    ();
+  check_width ~width:40 ~message:""
+    ~pp:(fun f -> f ~width:2 Fmt.(const string "XX"))
+    ~count_width:2 ();
+  check_width ~width:40 ~message:"Very long message" ~count_width:0 ();
 
   (* TODO: Static vs Dynamic distinction in expandable
    *
@@ -182,7 +184,7 @@ module Boxes = struct
          "Encountered an expanding element that is not contained in a box")
     @@ fun () ->
     let open Progress in
-    ignore (Segment.(bar ~mode:`UTF8 Fun.id) |> v ~init:0. |> start)
+    ignore (Segment.(bar ~mode:`UTF8 Fun.id) |> make ~init:0. |> start)
 
   let test_two_unsized_in_box () =
     Alcotest.check_raises "Two unsized elements in a box"
@@ -192,15 +194,15 @@ module Boxes = struct
     @@ fun () ->
     let open Progress in
     ignore
-      ( Segment.(bar ~mode:`UTF8 Fun.id <|> bar ~mode:`UTF8 Fun.id)
-      |> v ~init:0.
+      ( Segment.(bar ~mode:`UTF8 Fun.id ++ bar ~mode:`UTF8 Fun.id)
+      |> make ~init:0.
       |> start )
 end
 
 let test_periodic () =
   Progress.(
-    Segment.(accumulator ( + ) 0 (periodic 3 (fmt (Fmt.int, 1))))
-    |> v ~init:0
+    Segment.(accumulator ( + ) 0 (periodic 3 (of_pp ~width:1 Fmt.int)))
+    |> make ~init:0
     |> with_display ~ppf)
   @@ fun report ->
   check_bar "0";

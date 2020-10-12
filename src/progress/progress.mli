@@ -1,10 +1,9 @@
 (** A library for displaying progress bars, including support for rendering
     multiple bars at once. Start by {{!description} describing} of a set of
     progress bars, then begin {{!rendering} rendering} them to get access to
-    their respective reporting functions. *)
+    their respective reporting functions.
 
-type 'a pp := Format.formatter -> 'a -> unit
-type 'a pp_fixed := 'a pp * int
+    See {!Progress_unix} for access to Unix-specific utilities. *)
 
 (** {1 Description} *)
 
@@ -17,16 +16,14 @@ val counter :
   total:int64 ->
   ?mode:[ `ASCII | `UTF8 ] ->
   ?message:string ->
-  ?pp:int64 pp_fixed ->
+  ?pp:(int64, int64 Segment.t) Units.pp_fixed ->
   ?width:int ->
   ?sampling_interval:int ->
   unit ->
   (int64 -> unit) t
 (** [counter ~total ()] is a progress bar of the form:
 
-    {[
-      <message?>  <count?>  MM:SS  [########..............................]  XX%
-    ]}
+    {[ <message?>  <count?>  [########..............................]  XX% ]}
 
     where each reported value contributes cumulatively towards an eventual total
     of [total]. Optional parameters are as follows:
@@ -47,7 +44,9 @@ val counter :
       finalisation, which always occurs). This is useful when progress is being
       reported from a hot-loop, where the cost of re-displaying the progress bar
       is non-negligible. The default value is [1], meaning that all updates are
-      displayed immediately. *)
+      displayed immediately.
+
+    See {!Progress_unix.counter} for an equivalent that contains a timer. *)
 
 (** [Segment] contains a DSL for defining custom progress bars. *)
 module Segment : sig
@@ -55,7 +54,7 @@ module Segment : sig
   (** @inline *)
 end
 
-val v : init:'a -> 'a Segment.t -> ('a -> unit) t
+val make : init:'a -> 'a Segment.t -> ('a -> unit) t
 (** Define a new progress bar from a specification, with the given initial
     value. *)
 
@@ -88,3 +87,19 @@ val finalise : display -> unit
 
 module Units = Units
 (** Helpers for printing values of various units. *)
+
+(** Internals of the library exported to be used in sibling packages and in
+    testing. Not intended for public consumption, and does not provide a stable
+    API. *)
+module Internal : sig
+  val counter :
+    ?prebar:int64 Segment.t ->
+    total:int64 ->
+    ?mode:[ `ASCII | `UTF8 ] ->
+    ?message:string ->
+    ?pp:(int64, int64 Segment.t) Units.pp_fixed ->
+    ?width:int ->
+    ?sampling_interval:int ->
+    unit ->
+    (int64 -> unit) t
+end

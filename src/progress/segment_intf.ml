@@ -1,3 +1,10 @@
+module type Counter = sig
+  type t
+
+  val counter : unit -> t
+  val count : t -> Mtime.span
+end
+
 (** The DSL of progress bar segments. *)
 module type S = sig
   type 'a t
@@ -5,9 +12,6 @@ module type S = sig
       ['a]. *)
 
   (** {2 Pre-provided segments} *)
-
-  val time : _ t
-  (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
 
   val bar :
     mode:[ `ASCII | `UTF8 ] ->
@@ -26,12 +30,18 @@ module type S = sig
 
   val const : string -> _ t
   (** [const s] is the segment that always displays [s]. [s] must not contain
-      any newline characters. . *)
+      any newline characters. *)
 
-  val fmt : (Format.formatter -> 'a -> unit) * int -> 'a t
-  (** [fmt (pp, width)] is a segment that uses the supplied fixed-width
-      pretty-printer to render the value. The formatter must never emit newline
-      characters. *)
+  val const_fmt : width:int -> (Format.formatter -> unit) -> _ t
+  (** {!const_fmt} is a variant of {!const} that takes a fixed-width
+      pretty-printer rather than a string. *)
+
+  val of_pp : width:int -> (Format.formatter -> 'a -> unit) -> 'a t
+  (** [of_pp ~width pp] is a segment that uses the supplied fixed-width
+      pretty-printer to render the value. The pretty-printer must never emit
+      newline characters. *)
+
+  (** {2:stateful Stateful segments} *)
 
   val periodic : int -> 'a t -> 'a t
   (** [periodic n s] has the same output format as [s], but only passes reported
@@ -41,6 +51,11 @@ module type S = sig
 
   val accumulator : ('a -> 'a -> 'a) -> 'a -> 'a t -> 'a t
   (** [accumulator combine zero s] has the same output format [s]. *)
+
+  val stateful : (unit -> 'a t) -> 'a t
+  (** [stateful f] is a segment that behaves as [f ()] for any given render,
+      allowing [f] to initialise any display state at the start of the rendering
+      process. *)
 
   (** {2:boxes Dynamically-sized segments} *)
 
@@ -60,7 +75,7 @@ module type S = sig
 
   (** {2 Combining segments} *)
 
-  val ( <|> ) : 'a t -> 'a t -> 'a t
+  val ( ++ ) : 'a t -> 'a t -> 'a t
   (** Horizontally join two segments of the same reported value type. *)
 
   val list : ?sep:'a t -> 'a t list -> 'a t

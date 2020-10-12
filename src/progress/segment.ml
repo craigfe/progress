@@ -5,12 +5,14 @@ open Staging
 module Width = struct
   external sigwinch : unit -> int = "ocaml_progress_sigwinch"
 
+  let sigwinch = lazy (sigwinch ())
+
   let default ~fallback =
     let get_winsize () =
       match Terminal_size.get_columns () with Some c -> c | None -> fallback
     in
     let columns = ref (get_winsize ()) in
-    Sys.set_signal (sigwinch ())
+    Sys.set_signal (Lazy.force sigwinch)
       (Sys.Signal_handle (fun _ -> columns := get_winsize ()));
     columns
 end
@@ -28,23 +30,11 @@ type 'a t =
 
 and 'a cond = { if_ : unit -> bool; then_ : 'a }
 
-let fmt (pp, width) = Pp_fixed { pp; width }
-let fmt_const width pp = Const { pp; width }
+let of_pp ~width pp = Pp_fixed { pp; width }
+let const_fmt ~width pp = Const { pp; width }
 
 let const s =
-  fmt_const (String.length s) (fun ppf -> Format.pp_print_string ppf s)
-
-let pp_time ppf span =
-  let seconds = Mtime.Span.to_s span in
-  Format.fprintf ppf "%02.0f:%02.0f" (Float.div seconds 60.)
-    (Float.rem seconds 60.)
-
-let time =
-  Staged
-    (fun () ->
-      let start_time = Mtime_clock.counter () in
-      let pp ppf = pp_time ppf (Mtime_clock.count start_time) in
-      fmt_const 5 pp)
+  const_fmt ~width:(String.length s) (fun ppf -> Format.pp_print_string ppf s)
 
 let utf8_chars =
   (* Characters: space @ [0x258F .. 0x2589] *)
@@ -92,16 +82,16 @@ let bar_ascii width proportion ppf =
   Format.fprintf ppf "]"
 
 let bar ~mode = match mode with `UTF8 -> bar_unicode | `ASCII -> bar_ascii
-let ( <|> ) a b = Group [| a; b |]
+let ( ++ ) a b = Group [| a; b |]
 
 let bar ~mode ?(width = `Expand) f =
   match width with
   | `Fixed width ->
       if width < 3 then failwith "Not enough space for a progress bar";
-      Contramap (fmt (Fun.flip (bar ~mode (fun _ -> width)), width), f)
+      Contramap (of_pp ~width (Fun.flip (bar ~mode (fun _ -> width))), f)
   | `Expand ->
       let pp ~width = Fun.flip (bar ~mode width) in
-      Contramap (Pp_unsized { pp } <|> const " " <|> fmt Units.percentage, f)
+      Contramap (Pp_unsized { pp } ++ const " " ++ Units.percentage of_pp, f)
 
 (** [ticker n] is a function [f] that returns [true] on every [n]th call. *)
 let ticker interval : unit -> bool =
@@ -110,19 +100,19 @@ let ticker interval : unit -> bool =
     ticker := (!ticker + 1) mod interval;
     !ticker = 0
 
+let stateful f = Staged f
+
 let periodic interval t =
   match interval with
   | n when n <= 0 -> Format.kasprintf invalid_arg "Non-positive interval: %d" n
   | 1 -> t
   | _ ->
-      Staged
-        (fun () ->
+      stateful (fun () ->
           let should_update = ticker interval in
           Cond { if_ = should_update; then_ = t })
 
 let accumulator combine zero s =
-  Staged
-    (fun () ->
+  stateful (fun () ->
       let state = ref zero in
       Contramap
         ( s,
@@ -187,6 +177,7 @@ let compile =
   let rec inner : type a. a state -> a t -> a compiled * a state =
    fun state -> function
     | Const { pp; width } ->
+        (* TODO: join adjacent [Const] nodes as an optimisation step*)
         (Const { pp }, { state with consumed = state.consumed + width })
     | Pp_unsized { pp } ->
         if state.expansion_occurred then
