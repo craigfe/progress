@@ -62,9 +62,9 @@ module type S = sig
   (** Certain segments can have their size determined dynamically by being
       wrapped inside one of the following boxes: *)
 
-  val box_dynamic : int ref -> 'a t -> 'a t
+  val box_dynamic : (unit -> int) -> 'a t -> 'a t
   (** [box w] is a box that wraps a dynamically-sized segment and sets it to
-      have size [w]. *)
+      have size [w ()] on each tick. *)
 
   val box_winsize : fallback:int -> 'a t -> 'a t
   (** A box that takes on the current size of the terminal (or [fallback] if

@@ -5,16 +5,16 @@ open Staging
 module Width = struct
   external sigwinch : unit -> int = "ocaml_progress_sigwinch"
 
-  let sigwinch = lazy (sigwinch ())
+  let terminal_size =
+    lazy
+      (let columns = ref (Terminal_size.get_columns ()) in
+       Sys.set_signal (sigwinch ())
+         (Sys.Signal_handle (fun _ -> columns := Terminal_size.get_columns ()));
+       columns)
 
   let default ~fallback =
-    let get_winsize () =
-      match Terminal_size.get_columns () with Some c -> c | None -> fallback
-    in
-    let columns = ref (get_winsize ()) in
-    Sys.set_signal (Lazy.force sigwinch)
-      (Sys.Signal_handle (fun _ -> columns := get_winsize ()));
-    columns
+    let terminal_size = Lazy.force terminal_size in
+    fun () -> Option.fold ~some:Fun.id ~none:fallback !terminal_size
 end
 
 type 'a t =
@@ -24,7 +24,7 @@ type 'a t =
   | Staged of (unit -> 'a t)
   | Contramap : 'a t * ('b -> 'a) -> 'b t
   | Cond of 'a t cond
-  | Box of { contents : 'a t; width : int ref }
+  | Box of { contents : 'a t; width : unit -> int }
   | Group of 'a t array
   | Pair : { left : 'a t; sep : unit t; right : 'b t } -> ('a * 'b) t
 
@@ -121,7 +121,7 @@ let accumulator combine zero s =
             !state ))
 
 let box_dynamic width contents = Box { contents; width }
-let box_fixed width = box_dynamic (ref width)
+let box_fixed width = box_dynamic (fun () -> width)
 let box_winsize ~fallback s = box_dynamic (Width.default ~fallback) s
 let pair ?(sep = const "") a b = Pair { left = a; sep; right = b }
 
@@ -203,7 +203,7 @@ let compile =
         let inner, state =
           inner { state with expand; expansion_occurred = false } contents
         in
-        (f := fun () -> !width - state.consumed);
+        (f := fun () -> width () - state.consumed);
         (inner, { state with expansion_occurred = true })
     | Group g ->
         let state, g =
