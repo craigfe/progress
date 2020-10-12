@@ -4,7 +4,7 @@
 
 (** {2 Time-sensitive segments} *)
 
-val stopwatch : 'a Progress.Segment.t
+val stopwatch : unit -> 'a Progress.Segment.t
 (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
 
 val counter :
