@@ -60,7 +60,7 @@ let test_pair () =
           (of_pp ~width:1 Format.pp_print_string))
       |> make ~init:(0, "foo"))
   in
-  Progress.with_display ~ppf bar (fun report ->
+  Progress.with_reporters ~ppf bar (fun report ->
       check_bar "0, foo";
       report (1, "bar");
       check_bar "1, bar");
@@ -203,7 +203,7 @@ let test_periodic () =
   Progress.(
     Segment.(accumulator ( + ) 0 (periodic 3 (of_pp ~width:1 Fmt.int)))
     |> make ~init:0
-    |> with_display ~ppf)
+    |> with_reporters ~ppf)
   @@ fun report ->
   check_bar "0";
   report 1;

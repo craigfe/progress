@@ -21,5 +21,3 @@ A progress bar library for OCaml.
 ```
 opam install progress
 ```
-
-

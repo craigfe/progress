@@ -66,7 +66,7 @@ val ( / ) : 'a t -> 'b t -> ('a * 'b) t
 
 (** {1 Rendering} *)
 
-val with_display : ?ppf:Format.formatter -> 'a t -> ('a -> 'b) -> 'b
+val with_reporters : ?ppf:Format.formatter -> 'a t -> ('a -> 'b) -> 'b
 (** Render a set of progress bars inside a continuation.
 
     @param ppf Defaults to {!Format.err_formatter} if [stderr] is a TTY, and is

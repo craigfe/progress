@@ -4,7 +4,7 @@ let () =
       ~pp:Progress.Units.bytes ()
   in
   Progress_unix.(
-    with_display
+    with_reporters
       ( bar "index.html     "
       / bar "sitemap.xml    "
       / bar "img/kittens.jpg"

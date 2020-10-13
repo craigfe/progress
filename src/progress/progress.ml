@@ -99,7 +99,7 @@ let finalise (E { ppf; bars }) =
   inner ~row:0 bars;
   Format.fprintf ppf "@,@]%!"
 
-let with_display ?ppf t f =
+let with_reporters ?ppf t f =
   let reporters, display = start ?ppf t in
   let x = f reporters in
   finalise display;

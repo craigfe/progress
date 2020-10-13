@@ -1,5 +1,7 @@
 ### Unreleased
 
+- Rename `Progress.with_display` to `Progress.with_reporters`. (#3, @CraigFe)
+
 - Change the default display mode of progress bars to `ASCII` rather than
   `UTF8`. (#2, @CraigFe)
 
