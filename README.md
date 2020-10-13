@@ -1,5 +1,8 @@
 ## Progress — user-definable progress bars for OCaml
 
+[![OCaml-CI Build Status](https://img.shields.io/endpoint?url=https%3A%2F%2Fci.ocamllabs.io%2Fbadge%2FCraigFe%2Fprogress%2Fmain&logo=ocaml)](https://ci.ocamllabs.io/github/CraigFe/progress)
+[![Documentation](https://img.shields.io/badge/doc-online-blue.svg)][docs]
+
 A progress bar library for OCaml.
 
 <p align="center">
@@ -12,7 +15,9 @@ A progress bar library for OCaml.
 - supports rendering multiple progress bars simultaneously;
 - dynamically responds to changes in terminal size.
 
-[![OCaml-CI Build Status](https://img.shields.io/endpoint?url=https%3A%2F%2Fci.ocamllabs.io%2Fbadge%2FCraigFe%2Fprogress%2Fmaster&logo=ocaml)](https://ci.ocamllabs.io/github/CraigFe/progress)
+The documentation is available [online][docs].
+
+[docs]: https://craigfe.github.io/progress/progress/index.html
 
 ### Installation
 
