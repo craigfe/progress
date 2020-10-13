@@ -34,7 +34,7 @@ let make : type a. init:a -> a Segment.t -> (a -> unit) t =
   Bar { report; update }
 
 module Internal = struct
-  let counter ?prebar ~total ?(mode = `UTF8) ?message
+  let counter ?prebar ~total ?(mode = `ASCII) ?message
       ?(pp : (int64, int64 Segment.t) Units.pp_fixed option) ?width
       ?(sampling_interval = 1) () =
     let open Segment in
