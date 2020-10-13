@@ -1,5 +1,8 @@
 ### Unreleased
 
+- Change the default display mode of progress bars to `ASCII` rather than
+  `UTF8`. (#2, @CraigFe)
+
 - Change `Segment.box_dynamic` to take a function rather than a reference. (#1,
   @CraigFe)
 

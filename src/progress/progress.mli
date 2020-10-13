@@ -30,7 +30,7 @@ val counter :
 
     - [?mode] specifies whether to use a UTF-8 or an ASCII encoding for the
       progress bar. The UTF-8 encoding shows a higher resolution of progress,
-      but may not be supported in all terminals. The default is [`UTF8].
+      but may not be supported in all terminals. The default is [`ASCII].
 
     - [?pp] is used to pretty-print the [<count>] segment, if passed. For
       example, {!Units.bytes} can be used for totals measured in bytes. The
