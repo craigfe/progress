@@ -61,7 +61,8 @@ let bytes f = f ~width:(snd Bytes.pp_fixed) (fst Bytes.pp_fixed)
 let seconds f =
   let pp ppf span =
     let seconds = Mtime.Span.to_s span in
-    Format.fprintf ppf "%02.0f:%02.0f" (Float.div seconds 60.)
-      (Float.rem seconds 60.)
+    Format.fprintf ppf "%02.0f:%02.0f"
+      (Float.div seconds 60. |> Float.floor)
+      (Float.rem seconds 60. |> Float.floor)
   in
   f ~width:5 pp

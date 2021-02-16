@@ -1,3 +1,8 @@
+### Unreleased
+
+- Fix the display of minutes and seconds of `Progress.Units.seconds` and
+  `Progress_unix.counter`. (#6, @Ngoguey42)
+
 ### 0.1.1 (2020-10-13)
 
 - Rename `Progress.with_display` to `Progress.with_reporters`. (#3, @CraigFe)
