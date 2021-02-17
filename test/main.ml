@@ -49,6 +49,20 @@ module Units = struct
     expect "   1.0 PiB" (pib 1);
     expect "   1.0 EiB" (pib 1024);
     ()
+
+  let test_seconds () =
+    let pp ppf span =
+      Progress.Units.seconds (fun ~width:_ pp_time -> pp_time ppf span)
+    in
+    let expect = expect_pp_fixed (pp, 5) in
+    expect "00:00" (Mtime.Span.of_uint64_ns 0L);
+    expect "00:29" (Mtime.Span.of_uint64_ns 29_600_000_000L);
+    expect "00:30" (Mtime.Span.of_uint64_ns 30_000_000_000L);
+    expect "00:30" (Mtime.Span.of_uint64_ns 30_400_000_000L);
+    expect "00:59" (Mtime.Span.of_uint64_ns 59_600_000_000L);
+    expect "01:00" (Mtime.Span.of_uint64_ns 60_000_000_000L);
+    expect "01:00" (Mtime.Span.of_uint64_ns 60_400_000_000L);
+    ()
 end
 
 let test_pair () =
@@ -243,5 +257,6 @@ let () =
         [
           test_case "percentage" `Quick Units.test_percentage;
           test_case "bytes" `Quick Units.test_bytes;
+          test_case "seconds" `Quick Units.test_seconds;
         ] );
     ]
