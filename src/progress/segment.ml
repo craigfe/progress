@@ -55,15 +55,15 @@ let bar_unicode width proportion ppf =
   for _ = 1 to filled do
     Format.pp_print_string ppf utf8_chars.(utf_num)
   done;
-  ( if filled <> bar_width then
-    let () =
-      let chunks = Float.to_int (squaresf *. Float.of_int utf_num) in
-      let index = chunks - (filled * utf_num) in
-      if index < utf_num then Format.pp_print_string ppf utf8_chars.(index)
-    in
-    for _ = 1 to not_filled do
-      Format.pp_print_string ppf utf8_chars.(0)
-    done );
+  (if filled <> bar_width then
+   let () =
+     let chunks = Float.to_int (squaresf *. Float.of_int utf_num) in
+     let index = chunks - (filled * utf_num) in
+     if index < utf_num then Format.pp_print_string ppf utf8_chars.(index)
+   in
+   for _ = 1 to not_filled do
+     Format.pp_print_string ppf utf8_chars.(0)
+   done);
   Format.pp_print_string ppf "│"
 
 let bar_ascii width proportion ppf =
@@ -221,7 +221,8 @@ let compile =
             (fun (state, acc) -> function
               | Group g ->
                   let state, acc' = aux state g in
-                  (state, acc' @ acc) | a -> (state, [ a ] :: acc))
+                  (state, acc' @ acc)
+              | a -> (state, [ a ] :: acc))
             (state, []) g
         in
         let state, inners = g |> aux state in

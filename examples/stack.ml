@@ -5,10 +5,10 @@ let () =
   in
   Progress_unix.(
     with_reporters
-      ( bar "index.html     "
+      (bar "index.html     "
       / bar "sitemap.xml    "
       / bar "img/kittens.jpg"
-      / bar "img/puppies.jpg" ))
+      / bar "img/puppies.jpg"))
   @@ fun (((a, b), c), d) ->
   let pick_random () =
     match Random.int 100 with

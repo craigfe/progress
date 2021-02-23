@@ -43,10 +43,10 @@ module Internal = struct
       fun i -> Int64.to_float i /. total
     in
     Segment.list
-      ( Option.fold ~none:[] message ~some:(fun s -> [ const s ])
+      (Option.fold ~none:[] message ~some:(fun s -> [ const s ])
       @ Option.fold ~none:[] pp ~some:(fun f -> [ f of_pp ])
       @ Option.fold ~none:[] prebar ~some:(fun s -> [ s ])
-      @ [ bar ~mode proportion ] )
+      @ [ bar ~mode proportion ])
     |> Option.fold width ~some:box_fixed ~none:(box_winsize ~fallback:80)
     |> periodic sampling_interval
     |> accumulator Int64.add 0L

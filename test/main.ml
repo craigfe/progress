@@ -208,9 +208,9 @@ module Boxes = struct
     @@ fun () ->
     let open Progress in
     ignore
-      ( Segment.(bar ~mode:`UTF8 Fun.id ++ bar ~mode:`UTF8 Fun.id)
+      (Segment.(bar ~mode:`UTF8 Fun.id ++ bar ~mode:`UTF8 Fun.id)
       |> make ~init:0.
-      |> start )
+      |> start)
 end
 
 let test_periodic () =
