@@ -3,6 +3,11 @@
 - Fix the display of minutes and seconds of `Progress.Units.seconds` and
   `Progress_unix.counter`. (#6, @Ngoguey42)
 
+- Hide the terminal cursor during rendering. (#8, @CraigFe)
+
+- Raise an exception when attempting to run separate render processes
+  simultaneously. (#8, @CraigFe)
+
 ### 0.1.1 (2020-10-13)
 
 - Rename `Progress.with_display` to `Progress.with_reporters`. (#3, @CraigFe)

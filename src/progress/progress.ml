@@ -42,7 +42,7 @@ module Internal = struct
       let total = Int64.to_float total in
       fun i -> Int64.to_float i /. total
     in
-    Segment.list
+    list
       (Option.fold ~none:[] message ~some:(fun s -> [ const s ])
       @ Option.fold ~none:[] pp ~some:(fun f -> [ f of_pp ])
       @ Option.fold ~none:[] prebar ~some:(fun s -> [ s ])
@@ -57,16 +57,72 @@ let counter = Internal.counter ?prebar:None
 
 type display = E : { ppf : Format.formatter; bars : _ t } -> display
 
+module Ansi = struct
+  let show_cursor = "\x1b[?25h"
+  let hide_cursor = "\x1b[?25l"
+  let move_up ppf d = Format.fprintf ppf "\x1b[%dA" d
+  let move_down ppf d = Format.fprintf ppf "\x1b[%dB" d
+end
+
+module Global : sig
+  val is_active : unit -> bool
+  val set_active : Format.formatter -> unit
+  val set_inactive : unit -> unit
+end = struct
+  type runtime = {
+    (* Race conditions over this field are not handled, but protection against
+       concurrent usage is best-effort anyway. *)
+    mutable ppf : Format.formatter option;
+    displaced_handlers : (int, Sys.signal_behavior) Hashtbl.t;
+  }
+
+  let runtime = { ppf = None; displaced_handlers = Hashtbl.create 0 }
+  let is_active () = Option.is_some runtime.ppf
+
+  let cleanup () =
+    match runtime.ppf with
+    | None -> ()
+    | Some ppf -> Format.fprintf ppf "\n%s%!" Ansi.show_cursor
+
+  let () = at_exit cleanup
+
+  let handle_signal code =
+    cleanup ();
+    match Hashtbl.find_opt runtime.displaced_handlers code with
+    | Some (Signal_handle f) -> f code
+    | Some Signal_default -> exit 100
+    | Some Signal_ignore | None -> ()
+
+  let set_active ppf =
+    ListLabels.iter
+      Sys.[ sigint; sigquit; sigterm; sigsegv ]
+      ~f:(fun code ->
+        let prev_handler = Sys.signal code (Signal_handle handle_signal) in
+        (* Until the previous signal is added to the hashtable, there's a short
+           period of time in which the {i previous} signal handler might be
+           ignored. Not much we can do about that, unfortunately. *)
+        Hashtbl.add runtime.displaced_handlers code prev_handler);
+    runtime.ppf <- Some ppf
+
+  let set_inactive () =
+    Hashtbl.iter Sys.set_signal runtime.displaced_handlers;
+    Hashtbl.clear runtime.displaced_handlers;
+    runtime.ppf <- None
+end
+
 let positioned_at ~row t ppf =
   if row = 0 then Format.fprintf ppf "%t\r%!" t
-  else Format.fprintf ppf "\027[%dA%t\027[%dB\r%!" row t row
+  else Format.fprintf ppf "%a%t%a\r%!" Ansi.move_up row t Ansi.move_down row
 
 let rec count_bars : type a. a t -> int = function
   | Pair (a, b) -> count_bars a + count_bars b
   | Bar _ -> 1
 
 let start ?(ppf = Format.err_formatter) bars =
-  Format.fprintf ppf "@[";
+  if Global.is_active () then
+    failwith "Can't run more then one progress bar renderer simultaneously";
+  Global.set_active ppf;
+  Format.fprintf ppf "@[%s" Ansi.hide_cursor;
   let display = E { ppf; bars } in
   let count =
     (* It's convenient to traverse left-to-right, so that we can do the bar
@@ -97,7 +153,8 @@ let finalise (E { ppf; bars }) =
         inner ~row b
   in
   inner ~row:0 bars;
-  Format.fprintf ppf "@,@]%!"
+  Format.fprintf ppf "@,@]%s%!" Ansi.show_cursor;
+  Global.set_inactive ()
 
 let with_reporters ?ppf t f =
   let reporters, display = start ?ppf t in
