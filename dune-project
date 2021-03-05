@@ -21,4 +21,7 @@ progress bar formats. Supports rendering multiple progress bars simultaneously.\
   terminal_size
   (alcotest (and (>= "1.1.0") :with-test))
   (astring :with-test)
-  (fmt :with-test)))
+  (fmt :with-test))
+ (depopts
+  logs
+  fmt))

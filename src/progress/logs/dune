@@ -1,0 +1,5 @@
+(library
+ (name progress_logs)
+ (public_name progress.logs)
+ (optional)
+ (libraries progress logs logs.fmt fmt))
