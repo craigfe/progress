@@ -1,5 +1,6 @@
 open! Utils
 module Segment = Segment
+module Units = Units
 
 type 'a bar = {
   update : Format.formatter -> unit as 't;
@@ -55,34 +56,59 @@ end
 
 let counter = Internal.counter ?prebar:None
 
-type display = E : { ppf : Format.formatter; bars : _ t } -> display
-
 module Ansi = struct
   let show_cursor = "\x1b[?25h"
   let hide_cursor = "\x1b[?25l"
+  let erase_line = "\x1b[K"
   let move_up ppf d = Format.fprintf ppf "\x1b[%dA" d
   let move_down ppf d = Format.fprintf ppf "\x1b[%dB" d
 end
 
+module Uid : sig
+  type t
+
+  val create : unit -> t
+  val equal : t -> t -> bool
+end = struct
+  type t = unit ref
+
+  let create = ref
+  let equal = ( == )
+end
+
+module Display = struct
+  type 'a bar_group = 'a t
+
+  type t =
+    | E : {
+        ppf : Format.formatter;
+        bars : _ bar_group;
+        bar_count : int;
+        uid : Uid.t;
+      }
+        -> t
+end
+
 module Global : sig
-  val is_active : unit -> bool
-  val set_active : Format.formatter -> unit
+  val active_display : unit -> Display.t option
+  val set_active_exn : Display.t -> unit
   val set_inactive : unit -> unit
 end = struct
   type runtime = {
-    (* Race conditions over this field are not handled, but protection against
+    (* Race conditions over these fields are not handled, but protection against
        concurrent usage is best-effort anyway. *)
-    mutable ppf : Format.formatter option;
+    mutable active_display : Display.t option;
     displaced_handlers : (int, Sys.signal_behavior) Hashtbl.t;
   }
 
-  let runtime = { ppf = None; displaced_handlers = Hashtbl.create 0 }
-  let is_active () = Option.is_some runtime.ppf
+  let runtime = { active_display = None; displaced_handlers = Hashtbl.create 0 }
+  let is_active () = Option.is_some runtime.active_display
+  let active_display () = runtime.active_display
 
   let cleanup () =
-    match runtime.ppf with
+    match runtime.active_display with
     | None -> ()
-    | Some ppf -> Format.fprintf ppf "\n%s%!" Ansi.show_cursor
+    | Some (E { ppf; _ }) -> Format.fprintf ppf "\n%s%!" Ansi.show_cursor
 
   let () = at_exit cleanup
 
@@ -93,7 +119,10 @@ end = struct
     | Some Signal_default -> exit 100
     | Some Signal_ignore | None -> ()
 
-  let set_active ppf =
+  let set_active_exn display =
+    if is_active () then
+      failwith "Can't run more then one progress bar renderer simultaneously";
+
     ListLabels.iter
       Sys.[ sigint; sigquit; sigterm; sigsegv ]
       ~f:(fun code ->
@@ -102,13 +131,19 @@ end = struct
            period of time in which the {i previous} signal handler might be
            ignored. Not much we can do about that, unfortunately. *)
         Hashtbl.add runtime.displaced_handlers code prev_handler);
-    runtime.ppf <- Some ppf
+    runtime.active_display <- Some display
 
   let set_inactive () =
     Hashtbl.iter Sys.set_signal runtime.displaced_handlers;
     Hashtbl.clear runtime.displaced_handlers;
-    runtime.ppf <- None
+    runtime.active_display <- None
 end
+
+(* From the user's perspective, this is a handle to the currently-active
+   display. We don't need one of those, since internally we always have a
+   reference via [Global], but we keep track of identifiers anyway to ensure
+   hygiene. *)
+type display = Uid.t
 
 let positioned_at ~row t ppf =
   if row = 0 then Format.fprintf ppf "%t\r%!" t
@@ -119,18 +154,11 @@ let rec count_bars : type a. a t -> int = function
   | Bar _ -> 1
 
 let start ?(ppf = Format.err_formatter) bars =
-  if Global.is_active () then
-    failwith "Can't run more then one progress bar renderer simultaneously";
-  Global.set_active ppf;
+  let bar_count = count_bars bars in
+  let uid = Uid.create () in
+  let display = Display.E { ppf; bars; bar_count; uid } in
+  Global.set_active_exn display;
   Format.fprintf ppf "@[%s" Ansi.hide_cursor;
-  let display = E { ppf; bars } in
-  let count =
-    (* It's convenient to traverse left-to-right, so that we can do the bar
-       initialisations in the correct order. However, the report functions need
-       to know how many bars are _beneath_ them, so we do a total count
-       first. *)
-    count_bars bars
-  in
   let rec inner : type a. int -> a t -> int * a =
    fun seen -> function
     | Pair (a, b) ->
@@ -139,27 +167,52 @@ let start ?(ppf = Format.err_formatter) bars =
         (seen, (a, b))
     | Bar { report; update } ->
         update ppf;
-        Format.fprintf ppf (if seen = count - 1 then "\r%!" else "\n");
-        (seen + 1, report ~position:(positioned_at ~row:(count - seen - 1)) ppf)
+        Format.fprintf ppf (if seen = bar_count - 1 then "\r%!" else "\n");
+        ( seen + 1,
+          report ~position:(positioned_at ~row:(bar_count - seen - 1)) ppf )
   in
-  (inner 0 bars |> snd, display)
+  (inner 0 bars |> snd, uid)
 
-let finalise (E { ppf; bars }) =
-  let rec inner : type a. row:int -> a t -> unit =
-   fun ~row -> function
-    | Bar { update; _ } -> positioned_at ~row update ppf
-    | Pair (a, b) ->
-        inner ~row:(succ row) a;
-        inner ~row b
+let rerender_all (Display.E { ppf; bars; bar_count; _ }) =
+  let rec inner : type a. int -> a t -> int =
+   fun seen -> function
+    | Pair (a, b) -> inner (inner seen a) b
+    | Bar { update; _ } ->
+        update ppf;
+        Format.fprintf ppf (if seen = bar_count - 1 then "\r%!" else "\n");
+        (* Unix.sleepf 1. ; *)
+        seen + 1
   in
-  inner ~row:0 bars;
-  Format.fprintf ppf "@,@]%s%!" Ansi.show_cursor;
-  Global.set_inactive ()
+  ignore (inner 0 bars : int)
+
+let finalise uid' =
+  match Global.active_display () with
+  | None -> failwith "Display already finalised"
+  | Some (E { ppf; bars; uid; _ }) ->
+      if not (Uid.equal uid uid') then failwith "Display already finalised";
+      let rec inner : type a. row:int -> a t -> unit =
+       fun ~row -> function
+        | Bar { update; _ } -> positioned_at ~row update ppf
+        | Pair (a, b) ->
+            inner ~row:(succ row) a;
+            inner ~row b
+      in
+      inner ~row:0 bars;
+      Format.fprintf ppf "@,@]%s%!" Ansi.show_cursor;
+      Global.set_inactive ()
+
+let interject_with : 'a. (unit -> 'a) -> 'a =
+ fun f ->
+  match Global.active_display () with
+  | None -> f ()
+  | Some (E { ppf; bar_count; _ } as t) ->
+      Format.fprintf ppf "%a%s%!" Ansi.move_up (bar_count - 1) Ansi.erase_line;
+      let a = f () in
+      rerender_all t;
+      a
 
 let with_reporters ?ppf t f =
   let reporters, display = start ?ppf t in
   let x = f reporters in
   finalise display;
   x
-
-module Units = Units

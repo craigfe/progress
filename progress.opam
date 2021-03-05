@@ -19,6 +19,7 @@ depends: [
   "fmt" {with-test}
   "odoc" {with-doc}
 ]
+depopts: ["logs" "fmt"]
 build: [
   ["dune" "subst"] {dev}
   [

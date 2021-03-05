@@ -81,7 +81,25 @@ val with_reporters : ?ppf:Format.formatter -> 'a t -> ('a -> 'b) -> 'b
 type display
 
 val start : ?ppf:Format.formatter -> 'a t -> 'a * display
+(** Initiate rendering of a progress bar display.
+
+    @raise Failure if there is already an active progress bar display. *)
+
 val finalise : display -> unit
+(** Terminate the given progress bar display.
+
+    @raise Failure if the display has already been finalised. *)
+
+val interject_with : (unit -> 'a) -> 'a
+(** [interject_with f] executes the function [f] while temporarily suspending
+    the rendering of any active progress bar display. This can be useful when
+    printing to [stdout] / [stderr], to avoid any interference from the
+    rendering of progress bars. If using the [Logs] library, consider using
+    {!Progress_logs} instead.
+
+    {b Note}: the caller must ensure that the terminal cursor is left in an
+    appropriate position to resume rendering. In practice, this means that any
+    printing to the terminal should be terminated with a newline character. *)
 
 (** {1 Miscellaneous} *)
 
