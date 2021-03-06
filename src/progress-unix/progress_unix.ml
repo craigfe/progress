@@ -1,9 +1,11 @@
+open Progress
+
 let stopwatch () =
-  Progress.Segment.stateful (fun () ->
+  Segment.stateful (fun () ->
       let start_time = Mtime_clock.counter () in
-      Progress.Units.seconds (fun ~width pp_time ->
+      Units.seconds (fun ~width pp_time ->
           let pp ppf = pp_time ppf (Mtime_clock.count start_time) in
-          Progress.Segment.const_fmt ~width pp))
+          Segment.const_fmt ~width pp))
 
 let counter_prebar = stopwatch ()
 
