@@ -197,8 +197,7 @@ module Boxes = struct
       (Invalid_argument
          "Encountered an expanding element that is not contained in a box")
     @@ fun () ->
-    let open Progress in
-    ignore (Segment.(bar ~mode:`UTF8 Fun.id) |> make ~init:0. |> start)
+    ignore Progress.(make ~init:0. Segment.(bar ~mode:`UTF8 Fun.id))
 
   let test_two_unsized_in_box () =
     Alcotest.check_raises "Two unsized elements in a box"
@@ -207,10 +206,8 @@ module Boxes = struct
           segments in a single box.")
     @@ fun () ->
     let open Progress in
-    ignore
-      (Segment.(bar ~mode:`UTF8 Fun.id ++ bar ~mode:`UTF8 Fun.id)
-      |> make ~init:0.
-      |> start)
+    let unsized = Segment.bar ~mode:`UTF8 Fun.id in
+    ignore (make ~init:0. Segment.(box_fixed 10 (unsized ++ unsized)))
 end
 
 let test_periodic () =
