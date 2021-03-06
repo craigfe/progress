@@ -9,7 +9,7 @@ let main () =
       / bar "sitemap.xml    "
       / bar "img/kittens.jpg"
       / bar "img/puppies.jpg"))
-  @@ fun (((a, b), c), d) ->
+  @@ fun a b c d ->
   let pick_random () =
     match Random.int 100 with
     | n when n < 19 -> a

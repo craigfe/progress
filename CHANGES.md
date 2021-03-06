@@ -12,6 +12,10 @@
   the `progress.logs` for pre-packaged `Progress`-aware `Logs` reporters.
   (#9, @CraigFe)
 
+- Multi-line progress bar layouts now have their reporters passed as separate
+  arguments to `Progress.with_reporters`, rather than a single nested tuple.
+  (#TODO, @CraigFe)
+
 ### 0.1.1 (2020-10-13)
 
 - Rename `Progress.with_display` to `Progress.with_reporters`. (#3, @CraigFe)

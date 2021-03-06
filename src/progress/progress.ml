@@ -2,16 +2,34 @@ open! Utils
 module Segment = Segment
 module Units = Units
 
-type 'a bar = {
-  update : Format.formatter -> unit as 't;
-  report : position:('t -> 't) -> Format.formatter -> 'a;
-}
+module Bar = struct
+  type 'a t = {
+    update : Format.formatter -> unit as 't;
+    report : position:('t -> 't) -> Format.formatter -> 'a;
+  }
 
-type 'a t = Pair : 'a t * 'b t -> ('a * 'b) t | Bar : 'a bar -> 'a t
+  module List = struct
+    type 'a bar = 'a t
 
-let ( / ) top bottom = Pair (top, bottom)
+    type (_, _) t =
+      | [] : ('a, 'a) t
+      | ( :: ) : 'a bar * ('b, 'c) t -> ('a -> 'b, 'c) t
 
-let make : type a. init:a -> a Segment.t -> (a -> unit) t =
+    let rec append : type a b c. (a, b) t -> (b, c) t -> (a, c) t =
+     fun x y -> match x with [] -> y | x :: xs -> x :: append xs y
+
+    let rec length : type a b. (a, b) t -> int = function
+      | _ :: xs -> 1 + length xs
+      | [] -> 0
+  end
+end
+
+type 'a reporter = 'a -> unit
+type ('a, 'b) t = ('a, 'b) Bar.List.t
+
+let ( / ) top bottom = Bar.List.append top bottom
+
+let make : type a b. init:a -> a Segment.t -> ((a -> unit) -> b, b) Bar.List.t =
  fun ~init s ->
   let s = Segment.compile ~initial:init s in
   let report = Segment.report s in
@@ -32,7 +50,7 @@ let make : type a. init:a -> a Segment.t -> (a -> unit) t =
             ppf;
           Buffer.clear buffer
   in
-  Bar { report; update }
+  Bar.[ { report; update } ]
 
 module Internal = struct
   let counter ?prebar ~total ?(mode = `ASCII) ?message
@@ -54,14 +72,16 @@ module Internal = struct
     |> make ~init:0L
 end
 
-let counter = Internal.counter ?prebar:None
+let counter ~total ?mode ?message ?pp ?width ?sampling_interval () =
+  Internal.counter ?prebar:None ~total ?mode ?message ?pp ?width
+    ?sampling_interval ()
 
 module Ansi = struct
   let show_cursor = "\x1b[?25h"
   let hide_cursor = "\x1b[?25l"
   let erase_line = "\x1b[K"
-  let move_up ppf d = Format.fprintf ppf "\x1b[%dA" d
-  let move_down ppf d = Format.fprintf ppf "\x1b[%dB" d
+  let move_up ppf = function 0 -> () | n -> Format.fprintf ppf "\x1b[%dA" n
+  let move_down ppf = function 0 -> () | n -> Format.fprintf ppf "\x1b[%dB" n
 end
 
 module Uid : sig
@@ -76,13 +96,18 @@ end = struct
   let equal = ( == )
 end
 
-module Display = struct
-  type 'a bar_group = 'a t
+module Config = struct
+  type t = { ppf : Format.formatter; hide_cursor : bool }
 
+  let create ?(ppf = Format.err_formatter) ?(hide_cursor = true) () =
+    { ppf; hide_cursor }
+end
+
+module Display = struct
   type t =
     | E : {
-        ppf : Format.formatter;
-        bars : _ bar_group;
+        config : Config.t;
+        bars : (_, _) Bar.List.t;
         bar_count : int;
         uid : Uid.t;
       }
@@ -107,8 +132,9 @@ end = struct
 
   let cleanup () =
     match runtime.active_display with
-    | None -> ()
-    | Some (E { ppf; _ }) -> Format.fprintf ppf "\n%s%!" Ansi.show_cursor
+    | Some (E { config = { hide_cursor = true; ppf }; _ }) ->
+        Format.fprintf ppf "\n%s%!" Ansi.show_cursor
+    | _ -> ()
 
   let () = at_exit cleanup
 
@@ -121,7 +147,7 @@ end = struct
 
   let set_active_exn display =
     if is_active () then
-      failwith "Can't run more then one progress bar renderer simultaneously";
+      failwith "Can't run more than one progress bar renderer simultaneously";
 
     ListLabels.iter
       Sys.[ sigint; sigquit; sigterm; sigsegv ]
@@ -146,73 +172,87 @@ end
 type display = Uid.t
 
 let positioned_at ~row t ppf =
-  if row = 0 then Format.fprintf ppf "%t\r%!" t
-  else Format.fprintf ppf "%a%t%a\r%!" Ansi.move_up row t Ansi.move_down row
+  Format.fprintf ppf "%a%t%a\r%!" Ansi.move_up row t Ansi.move_down row
 
-let rec count_bars : type a. a t -> int = function
-  | Pair (a, b) -> count_bars a + count_bars b
-  | Bar _ -> 1
+let rerender_all (Display.E { config = { ppf; _ }; bars; _ }) =
+  let rec inner : type a b. (a, b) Bar.List.t -> unit = function
+    | [] -> ()
+    | [ { update; _ } ] ->
+        update ppf;
+        Format.fprintf ppf "\r%!"
+    | { update; _ } :: bs ->
+        update ppf;
+        Format.pp_force_newline ppf ();
+        inner bs
+  in
+  inner bars
 
-let start ?(ppf = Format.err_formatter) bars =
-  let bar_count = count_bars bars in
+module Hlist = struct
+  (* ['a] and ['b] correspond to parameters of [Bar.List.t]. *)
+  type (_, _) t =
+    | [] : ('a, 'a) t
+    | ( :: ) : 'a * ('b, 'c) t -> ('a -> 'b, 'c) t
+
+  let rec apply_all : type a b. a -> (a, b) t -> b =
+   fun f -> function [] -> f | x :: xs -> apply_all (f x) xs
+end
+
+let start : 'a 'b. ?config:Config.t -> ('a, 'b) t -> ('a, 'b) Hlist.t * display
+    =
+ fun ?(config = Config.create ()) bars ->
+  let ppf = config.ppf in
+  let bar_count = Bar.List.length bars in
   let uid = Uid.create () in
-  let display = Display.E { ppf; bars; bar_count; uid } in
+  let display = Display.E { config; bars; bar_count; uid } in
   Global.set_active_exn display;
-  Format.fprintf ppf "@[%s" Ansi.hide_cursor;
-  let rec inner : type a. int -> a t -> int * a =
+  Format.pp_open_box ppf 0;
+  if config.hide_cursor then Format.pp_print_string ppf Ansi.hide_cursor;
+  rerender_all display;
+  let rec inner : type a b. int -> (a, b) t -> (a, b) Hlist.t =
    fun seen -> function
-    | Pair (a, b) ->
-        let seen, a = inner seen a in
-        let seen, b = inner seen b in
-        (seen, (a, b))
-    | Bar { report; update } ->
-        update ppf;
-        Format.fprintf ppf (if seen = bar_count - 1 then "\r%!" else "\n");
-        ( seen + 1,
-          report ~position:(positioned_at ~row:(bar_count - seen - 1)) ppf )
+    | [] -> []
+    | { report; _ } :: bs ->
+        let reporter =
+          report ~position:(positioned_at ~row:(bar_count - seen - 1)) ppf
+        in
+        reporter :: inner (succ seen) bs
   in
-  (inner 0 bars |> snd, uid)
-
-let rerender_all (Display.E { ppf; bars; bar_count; _ }) =
-  let rec inner : type a. int -> a t -> int =
-   fun seen -> function
-    | Pair (a, b) -> inner (inner seen a) b
-    | Bar { update; _ } ->
-        update ppf;
-        Format.fprintf ppf (if seen = bar_count - 1 then "\r%!" else "\n");
-        (* Unix.sleepf 1. ; *)
-        seen + 1
-  in
-  ignore (inner 0 bars : int)
+  (inner 0 bars, uid)
 
 let finalise uid' =
   match Global.active_display () with
   | None -> failwith "Display already finalised"
-  | Some (E { ppf; bars; uid; _ }) ->
+  | Some (E { config = { ppf; hide_cursor }; uid; bar_count; _ } as display) ->
       if not (Uid.equal uid uid') then failwith "Display already finalised";
-      let rec inner : type a. row:int -> a t -> unit =
-       fun ~row -> function
-        | Bar { update; _ } -> positioned_at ~row update ppf
-        | Pair (a, b) ->
-            inner ~row:(succ row) a;
-            inner ~row b
-      in
-      inner ~row:0 bars;
-      Format.fprintf ppf "@,@]%s%!" Ansi.show_cursor;
+      Ansi.move_up ppf (bar_count - 1);
+      rerender_all display;
+      if hide_cursor then Format.fprintf ppf "@,@]%s%!" Ansi.show_cursor;
       Global.set_inactive ()
 
 let interject_with : 'a. (unit -> 'a) -> 'a =
  fun f ->
   match Global.active_display () with
   | None -> f ()
-  | Some (E { ppf; bar_count; _ } as t) ->
+  | Some (E { config = { ppf; _ }; bar_count; _ } as t) ->
       Format.fprintf ppf "%a%s%!" Ansi.move_up (bar_count - 1) Ansi.erase_line;
-      let a = f () in
-      rerender_all t;
-      a
+      Fun.protect f ~finally:(fun () -> rerender_all t)
 
-let with_reporters ?ppf t f =
-  let reporters, display = start ?ppf t in
-  let x = f reporters in
-  finalise display;
-  x
+let with_reporters ?config t f =
+  let reporters, display = start ?config t in
+  Fun.protect
+    (fun () -> Hlist.apply_all f reporters)
+    ~finally:(fun () -> finalise display)
+
+(* Present a slightly simpler type of heterogeneous lists to the user for use
+   with [start], since they don't need to concatenate them. *)
+module Reporters = struct
+  type _ t = [] : unit t | ( :: ) : 'a * 'b t -> ('a -> 'b) t
+
+  let rec of_hlist : type a. (a, unit) Hlist.t -> a t = function
+    | [] -> []
+    | x :: xs -> x :: of_hlist xs
+end
+
+let start ?config t =
+  let hlist, reporters = start ?config t in
+  (Reporters.of_hlist hlist, reporters)

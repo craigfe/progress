@@ -1,15 +1,33 @@
 (** A library for displaying progress bars, including support for rendering
-    multiple bars at once. Start by {{!description} describing} of a set of
+    multiple bars at once. Start by {{!description} describing} of a sequence of
     progress bars, then begin {{!rendering} rendering} them to get access to
     their respective reporting functions.
 
-    See {!Progress_unix} for access to Unix-specific utilities. *)
+    - See {!Progress_unix} for access to Unix-specific utilities.
+    - See {!Progress_logs} for related extensions to the
+      {{:https://erratique.ch/software/logs} Logs} library. *)
 
 (** {1 Description} *)
 
-type 'a t
-(** The type of progress bars with reporting functions of type ['a]. You'll get
-    access to the reporting functions when beginning the {{!rendering}
+type 'a reporter = 'a -> unit
+(** A {i reporter} for values of type ['a]. In this library, each progress bar
+    has its own reporting function. *)
+
+type ('a, 'b) t
+(** The type of sequences of progress bars. The parameter ['a] stores a list of
+    the reporting functions associated with each bar, terminating with ['b]. For
+    example:
+
+    {[
+      (* Single progress bar, taking a [float] value. *)
+      (float reporter -> 'b, 'b) t
+
+      (* A two-bar layout, where the top bar takes [int64]s and the bottom one
+         takes [string * float] pairs. *)
+      (int64 reporter -> (string * float) reporter -> 'b, 'b) t
+    ]}
+
+    These reporting functions are supplied when beginning the {{!rendering}
     rendering} process. *)
 
 val counter :
@@ -20,7 +38,7 @@ val counter :
   ?width:int ->
   ?sampling_interval:int ->
   unit ->
-  (int64 -> unit) t
+  (int64 reporter -> 'a, 'a) t
 (** [counter ~total ()] is a progress bar of the form:
 
     {[ <message?>  <count?>  [########..............................]  XX% ]}
@@ -54,41 +72,60 @@ module Segment : sig
   (** @inline *)
 end
 
-val make : init:'a -> 'a Segment.t -> ('a -> unit) t
+val make : init:'a -> 'a Segment.t -> ('a reporter -> 'b, 'b) t
 (** Define a new progress bar from a specification, with the given initial
     value. *)
 
 (** {2 Multiple progress bars} *)
 
-val ( / ) : 'a t -> 'b t -> ('a * 'b) t
+val ( / ) : ('a, 'b) t -> ('b, 'c) t -> ('a, 'c) t
 (** Stack progress bars vertically. [a / b] is a set with [a] stacked on top of
-    [b]. The two bars have separate reporting functions (supplied as a pair). *)
+    [b]. The two bars have separate reporting functions, passed consecutively to
+    the {!with_reporters} continuation when rendering. *)
 
 (** {1 Rendering} *)
 
-val with_reporters : ?ppf:Format.formatter -> 'a t -> ('a -> 'b) -> 'b
-(** Render a set of progress bars inside a continuation.
+(** Configuration for progress bar rendering. *)
+module Config : sig
+  type t
 
-    @param ppf Defaults to {!Format.err_formatter} if [stderr] is a TTY, and is
-    a noop formatter otherwise. *)
+  val create : ?ppf:Format.formatter -> ?hide_cursor:bool -> unit -> t
+  (** @param ppf The formatter to use for rendering. Defaults to
+      [Format.err_formatter].
+      @param hide_cursor Whether or not to hide the terminal cursor (using the
+      {{:https://en.wikipedia.org/wiki/ANSI_escape_code} [DECTCEM]} ANSI escape
+      codes) during progress bar rendering. Defaults to [true]. *)
+end
 
-(** Functions for explicitly starting and stopping the process of rendering a
-    bar; useful when the code doing the progress reporting cannot be
-    conveniently delimited inside {!with_display}. All {!display}s must be
-    properly {!finalise}d, and it is not possible to interleave rendering of
-    displays. *)
+val with_reporters : ?config:Config.t -> ('a, 'b) t -> 'a -> 'b
+(** [with_reporters bars f] renders [bars] inside the continuation [f], after
+    supplying [f] with the necessary reporting functions. For example:
 
-type display
+    {[
+      (** Reading a file into memory with a single progress bar. *)
+      let read_file path buffer =
+        let total = file_size path and in_channel = open_in path in
+        try
+          with_reporters (counter ~total ()) @@ fun report ->
+          let rec aux offset =
+            let bytes_read = really_read buffer offset in
+            report bytes_read;
+            aux (offset + bytes_read)
+          in
+          aux 0
+        with End_of_file -> close_in in_channel
 
-val start : ?ppf:Format.formatter -> 'a t -> 'a * display
-(** Initiate rendering of a progress bar display.
-
-    @raise Failure if there is already an active progress bar display. *)
-
-val finalise : display -> unit
-(** Terminate the given progress bar display.
-
-    @raise Failure if the display has already been finalised. *)
+      (** Sending data to multiple clients, with one progress bar each. *)
+      let multi_bar_rendering () =
+        with_reporters
+          (bar_a / bar_b / bar_c)
+          (fun report_a report_b report_c ->
+            for i = 1 to 1000 do
+              report_a (transfer_bytes client_a);
+              report_b (transfer_bytes client_b);
+              report_c (transfer_bytes client_c)
+            done)
+    ]} *)
 
 val interject_with : (unit -> 'a) -> 'a
 (** [interject_with f] executes the function [f] while temporarily suspending
@@ -100,6 +137,27 @@ val interject_with : (unit -> 'a) -> 'a
     {b Note}: the caller must ensure that the terminal cursor is left in an
     appropriate position to resume rendering. In practice, this means that any
     printing to the terminal should be terminated with a newline character. *)
+
+type display
+(** Functions for explicitly starting and stopping the process of rendering a
+    bar; useful when the code doing the progress reporting cannot be
+    conveniently delimited inside {!with_display}. All {!display}s must be
+    properly {!finalise}d, and it is not possible to interleave rendering of
+    displays. *)
+
+module Reporters : sig
+  type 'a t = [] : unit t | ( :: ) : 'a * 'b t -> ('a -> 'b) t
+end
+
+val start : ?config:Config.t -> ('a, unit) t -> 'a Reporters.t * display
+(** Initiate rendering of a progress bar display.
+
+    @raise Failure if there is already an active progress bar display. *)
+
+val finalise : display -> unit
+(** Terminate the given progress bar display.
+
+    @raise Failure if the display has already been finalised. *)
 
 (** {1 Miscellaneous} *)
 
@@ -119,5 +177,5 @@ module Internal : sig
     ?width:int ->
     ?sampling_interval:int ->
     unit ->
-    (int64 -> unit) t
+    (int64 reporter -> 'a, 'a) t
 end

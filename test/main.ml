@@ -2,15 +2,21 @@ open Astring
 
 let ( - ), ( / ) = Int64.(sub, div)
 let almost f = f -. Float.epsilon
-let ppf = Format.str_formatter
+let ( let@ ) f x = f x
+
+let config =
+  Progress.Config.create ~ppf:Format.str_formatter ~hide_cursor:false ()
 
 let read_bar () =
   Format.flush_str_formatter ()
   |> String.trim ~drop:(function '\r' | '\n' -> true | _ -> false)
 
 let check_bar expected =
-  read_bar ()
-  |> Alcotest.(check string) ("Expected state: " ^ expected) expected
+  Alcotest.check Alcotest.string
+    ("Expected state: " ^ expected)
+    expected (read_bar ())
+
+let clear_test_state () = ignore (Format.flush_str_formatter () : string)
 
 let check_no_bar () =
   Format.flush_str_formatter () |> Alcotest.(check string) "Expected no bar" ""
@@ -74,66 +80,73 @@ let test_pair () =
           (of_pp ~width:1 Format.pp_print_string))
       |> make ~init:(0, "foo"))
   in
-  Progress.with_reporters ~ppf bar (fun report ->
-      check_bar "0, foo";
-      report (1, "bar");
-      check_bar "1, bar");
+  let () =
+    let@ report = Progress.with_reporters ~config bar in
+    check_bar "0, foo";
+    report (1, "bar");
+    check_bar "1, bar"
+  in
   check_bar "1, bar"
 
 let test_unicode_bar () =
-  let report, _ =
-    Progress.(
-      Segment.bar ~mode:`UTF8 ~width:(`Fixed 3) Fun.id
-      |> make ~init:0.
-      |> start ~ppf)
+  let () =
+    let@ report =
+      Progress.(
+        Segment.bar ~mode:`UTF8 ~width:(`Fixed 3) Fun.id
+        |> make ~init:0.
+        |> with_reporters ~config)
+    in
+    let expect s f =
+      report f;
+      check_bar s
+    in
+    check_bar "│ │";
+    expect "│ │" 0.;
+    expect "│ │" (almost (1. /. 8.));
+    expect "│▏│" (1. /. 8.);
+    expect "│▏│" (almost (2. /. 8.));
+    expect "│▎│" (2. /. 8.);
+    expect "│▎│" (almost (3. /. 8.));
+    expect "│▍│" (3. /. 8.);
+    expect "│▍│" (almost (4. /. 8.));
+    expect "│▌│" (4. /. 8.);
+    expect "│▌│" (almost (5. /. 8.));
+    expect "│▋│" (5. /. 8.);
+    expect "│▋│" (almost (6. /. 8.));
+    expect "│▊│" (6. /. 8.);
+    expect "│▊│" (almost (7. /. 8.));
+    expect "│▉│" (7. /. 8.);
+    expect "│▉│" (almost 1.);
+    expect "│█│" 1.;
+    expect "│█│" (1. +. Float.epsilon);
+    expect "│█│" (1. +. (1. /. 8.));
+    expect "│█│" (almost 2.)
   in
-  let expect s f =
-    report f;
-    check_bar s
+  clear_test_state ();
+  let () =
+    let@ report =
+      Progress.Segment.bar ~mode:`UTF8 ~width:(`Fixed 5) Fun.id
+      |> Progress.make ~init:0.
+      |> Progress.with_reporters ~config
+    in
+    let expect s f =
+      report f;
+      check_bar s
+    in
+    check_bar "│   │";
+    expect "│   │" 0.;
+    expect "│█▌ │" 0.5;
+    expect "│██▉│" (almost 1.);
+    expect "│███│" 1.
   in
-  check_bar "│ │";
-  expect "│ │" 0.;
-  expect "│ │" (almost (1. /. 8.));
-  expect "│▏│" (1. /. 8.);
-  expect "│▏│" (almost (2. /. 8.));
-  expect "│▎│" (2. /. 8.);
-  expect "│▎│" (almost (3. /. 8.));
-  expect "│▍│" (3. /. 8.);
-  expect "│▍│" (almost (4. /. 8.));
-  expect "│▌│" (4. /. 8.);
-  expect "│▌│" (almost (5. /. 8.));
-  expect "│▋│" (5. /. 8.);
-  expect "│▋│" (almost (6. /. 8.));
-  expect "│▊│" (6. /. 8.);
-  expect "│▊│" (almost (7. /. 8.));
-  expect "│▉│" (7. /. 8.);
-  expect "│▉│" (almost 1.);
-  expect "│█│" 1.;
-  expect "│█│" (1. +. Float.epsilon);
-  expect "│█│" (1. +. (1. /. 8.));
-  expect "│█│" (almost 2.);
-  let report, _ =
-    Progress.Segment.bar ~mode:`UTF8 ~width:(`Fixed 5) Fun.id
-    |> Progress.make ~init:0.
-    |> Progress.start ~ppf
-  in
-  let expect s f =
-    report f;
-    check_bar s
-  in
-  check_bar "│   │";
-  expect "│   │" 0.;
-  expect "│█▌ │" 0.5;
-  expect "│██▉│" (almost 1.);
-  expect "│███│" 1.;
   ()
 
 let test_progress_bar_lifecycle () =
   let open Progress.Units.Bytes in
-  let report, _bar =
-    Progress.start ~ppf
-    @@ Progress.counter ~mode:`ASCII ~total:(gib 1) ~sampling_interval:1
-         ~width:53 ~message:"<msg>" ~pp:Progress.Units.bytes ()
+  let@ report =
+    Progress.counter ~mode:`ASCII ~total:(gib 1) ~sampling_interval:1 ~width:53
+      ~message:"<msg>" ~pp:Progress.Units.bytes ()
+    |> Progress.with_reporters ~config
   in
   check_bar "<msg>     0.0 B    [...........................]   0%";
   report (kib 1 - 1L);
@@ -162,8 +175,8 @@ let test_progress_bar_lifecycle () =
 
 let test_progress_bar_width () =
   let check_width ~width ~message ?pp ~count_width () =
-    let _, _ =
-      Progress.start ~ppf
+    let@ _report =
+      Progress.with_reporters ~config
         (Progress.counter ~mode:`ASCII ~total:1L ~sampling_interval:1 ~width
            ~message ?pp ())
     in
@@ -171,15 +184,17 @@ let test_progress_bar_width () =
     |> Alcotest.(check int)
          (Fmt.str
             "Expected width for configuration { width = %d; count_width = %d; \
-             message = %s }"
+             message = %S }"
             width count_width message)
          width
   in
   check_width ~width:80 ~message:"<msg>" ~pp:Progress.Units.bytes ~count_width:5
     ();
+  clear_test_state ();
   check_width ~width:40 ~message:""
     ~pp:(fun f -> f ~width:2 Fmt.(const string "XX"))
     ~count_width:2 ();
+  clear_test_state ();
   check_width ~width:40 ~message:"Very long message" ~count_width:0 ();
 
   (* TODO: Static vs Dynamic distinction in expandable
@@ -210,26 +225,29 @@ module Boxes = struct
     ignore (make ~init:0. Segment.(box_fixed 10 (unsized ++ unsized)))
 end
 
-let test_periodic () =
-  Progress.(
-    Segment.(accumulator ( + ) 0 (periodic 3 (of_pp ~width:1 Fmt.int)))
-    |> make ~init:0
-    |> with_reporters ~ppf)
-  @@ fun report ->
-  check_bar "0";
-  report 1;
-  check_no_bar ();
-  report 1;
-  check_no_bar ();
-  report 1;
-  check_bar "3";
-  report 10;
-  check_no_bar ();
-  report 10;
-  check_no_bar ();
-  report 10;
-  check_bar "33";
-  ()
+module Stateful = struct
+  let test_periodic () =
+    let@ report =
+      Progress.(
+        Segment.(accumulator ( + ) 0 (periodic 3 (of_pp ~width:1 Fmt.int)))
+        |> make ~init:0
+        |> with_reporters ~config)
+    in
+    check_bar "0";
+    report 1;
+    check_no_bar ();
+    report 1;
+    check_no_bar ();
+    report 1;
+    check_bar "3";
+    report 10;
+    check_no_bar ();
+    report 10;
+    check_no_bar ();
+    report 10;
+    check_bar "33";
+    ()
+end
 
 let () =
   let open Alcotest in
@@ -249,7 +267,7 @@ let () =
           test_case "Two unsized elements in box" `Quick
             Boxes.test_two_unsized_in_box;
         ] );
-      ("periodic", [ test_case "Lifecycle" `Quick test_periodic ]);
+      ("stateful", [ test_case "periodic" `Quick Stateful.test_periodic ]);
       ( "units",
         [
           test_case "percentage" `Quick Units.test_percentage;

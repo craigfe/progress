@@ -15,7 +15,7 @@ val counter :
   ?width:int ->
   ?sampling_interval:int ->
   unit ->
-  (int64 -> unit) Progress.t
+  (int64 Progress.reporter -> 'a, 'a) Progress.t
 (** [counter ~total ()] is a progress bar of the form:
 
     {[
@@ -33,12 +33,12 @@ val stderr_if_tty : Format.formatter
 
 (** Renderers that use {!stderr_if_tty} as an output formatter. *)
 
-val with_reporters : 'a Progress.t -> ('a -> 'b) -> 'b
-val start : 'a Progress.t -> 'a * Progress.display
+val with_reporters : ('a, 'b) Progress.t -> 'a -> 'b
+val start : ('a, unit) Progress.t -> 'a Progress.Reporters.t * Progress.display
 val finalise : Progress.display -> unit
 
 (** {2 Re-exports}
 
     Convenient aliases to functions defined in {!Progress}. *)
 
-val ( / ) : 'a Progress.t -> 'b Progress.t -> ('a * 'b) Progress.t
+val ( / ) : ('a, 'b) Progress.t -> ('b, 'c) Progress.t -> ('a, 'c) Progress.t
