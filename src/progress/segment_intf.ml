@@ -99,6 +99,6 @@ module type Segment = sig
   type 'a compiled
 
   val compile : initial:'a -> 'a t -> 'a compiled
-  val update : 'a compiled -> Format.formatter -> unit
-  val report : 'a compiled -> Format.formatter -> 'a -> unit
+  val update : 'a compiled -> Format.formatter -> int
+  val report : 'a compiled -> Format.formatter -> 'a -> int
 end

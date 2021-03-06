@@ -16,6 +16,12 @@
   arguments to `Progress.with_reporters`, rather than a single nested tuple.
   (#TODO, @CraigFe)
 
+- Improve handling of terminal size changes. Reducing the width of the terminal
+  during progress bar rendering now more cleanly. (#TODO, @CraigFe)
+
+- Improve behaviour when user attempts to write into the terminal while
+  progress bars are being rendered. (#TODO, @CraigFe)
+
 ### 0.1.1 (2020-10-13)
 
 - Rename `Progress.with_display` to `Progress.with_reporters`. (#3, @CraigFe)

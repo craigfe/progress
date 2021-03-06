@@ -2,39 +2,29 @@ include Segment_intf
 open Utils
 open Staging
 
-module Width = struct
-  external sigwinch : unit -> int = "ocaml_progress_sigwinch"
-
-  let terminal_size =
-    lazy
-      (let columns = ref (Terminal_size.get_columns ()) in
-       Sys.set_signal (sigwinch ())
-         (Sys.Signal_handle (fun _ -> columns := Terminal_size.get_columns ()));
-       columns)
-
-  let default ~fallback =
-    let terminal_size = Lazy.force terminal_size in
-    fun () -> Option.fold ~some:Fun.id ~none:fallback !terminal_size
-end
+type 'a sized_pp = Format.formatter -> 'a -> int
 
 type 'a t =
-  | Pp_unsized of { pp : width:(unit -> int) -> Format.formatter -> 'a -> unit }
+  | Pp_unsized of { pp : width:(unit -> int) -> 'a sized_pp }
   | Pp_fixed of { pp : Format.formatter -> 'a -> unit; width : int }
   | Const of { pp : Format.formatter -> unit; width : int }
   | Staged of (unit -> 'a t)
   | Contramap : 'a t * ('b -> 'a) -> 'b t
-  | Cond of 'a t cond
+  | Cond of ('a, 'a t) cond
   | Box of { contents : 'a t; width : unit -> int }
   | Group of 'a t array
   | Pair : { left : 'a t; sep : unit t; right : 'b t } -> ('a * 'b) t
 
-and 'a cond = { if_ : unit -> bool; then_ : 'a }
+and ('a, 'b) cond = { if_ : 'a -> bool; then_ : 'b }
 
 let of_pp ~width pp = Pp_fixed { pp; width }
 let const_fmt ~width pp = Const { pp; width }
 
 let const s =
   const_fmt ~width:(String.length s) (fun ppf -> Format.pp_print_string ppf s)
+
+let conditional pred s = Cond { if_ = pred; then_ = s }
+let contramap ~f x = Contramap (x, f)
 
 let utf8_chars =
   (* Characters: space @ [0x258F .. 0x2589] *)
@@ -43,10 +33,8 @@ let utf8_chars =
 let utf_num = Array.length utf8_chars - 1
 
 let bar_unicode width proportion ppf =
-  let bar_width =
-    let width = width () in
-    width - 2
-  in
+  let width = width () in
+  let bar_width = width - 2 in
   let squaresf = Float.of_int bar_width *. proportion in
   let squares = Float.to_int squaresf in
   let filled = min squares bar_width in
@@ -59,15 +47,18 @@ let bar_unicode width proportion ppf =
    let () =
      let chunks = Float.to_int (squaresf *. Float.of_int utf_num) in
      let index = chunks - (filled * utf_num) in
-     if index < utf_num then Format.pp_print_string ppf utf8_chars.(index)
+     if index >= 0 && index < utf_num then
+       Format.pp_print_string ppf utf8_chars.(index)
    in
    for _ = 1 to not_filled do
      Format.pp_print_string ppf utf8_chars.(0)
    done);
-  Format.pp_print_string ppf "│"
+  Format.pp_print_string ppf "│";
+  width
 
 let bar_ascii width proportion ppf =
-  let bar_width = width () - 2 in
+  let width = width () in
+  let bar_width = width - 2 in
   let filled =
     min (Float.to_int (Float.of_int bar_width *. proportion)) bar_width
   in
@@ -79,19 +70,22 @@ let bar_ascii width proportion ppf =
   for _ = 1 to not_filled do
     Format.pp_print_char ppf '.'
   done;
-  Format.fprintf ppf "]"
+  Format.fprintf ppf "]";
+  width
 
 let bar ~mode = match mode with `UTF8 -> bar_unicode | `ASCII -> bar_ascii
 let ( ++ ) a b = Group [| a; b |]
 
 let bar ~mode ?(width = `Expand) f =
-  match width with
-  | `Fixed width ->
-      if width < 3 then failwith "Not enough space for a progress bar";
-      Contramap (of_pp ~width (Fun.flip (bar ~mode (fun _ -> width))), f)
-  | `Expand ->
-      let pp ~width = Fun.flip (bar ~mode width) in
-      Contramap (Pp_unsized { pp } ++ const " " ++ Units.percentage of_pp, f)
+  contramap ~f
+    (match width with
+    | `Fixed width ->
+        if width < 3 then failwith "Not enough space for a progress bar";
+        of_pp ~width (fun ppf x ->
+            ignore (bar ~mode (fun _ -> width) x ppf : int))
+    | `Expand ->
+        let pp ~width ppf x = bar ~mode width x ppf in
+        Pp_unsized { pp } ++ const " " ++ Units.percentage of_pp)
 
 (** [ticker n] is a function [f] that returns [true] on every [n]th call. *)
 let ticker interval : unit -> bool =
@@ -109,7 +103,7 @@ let periodic interval t =
   | _ ->
       stateful (fun () ->
           let should_update = ticker interval in
-          Cond { if_ = should_update; then_ = t })
+          conditional (fun _ -> should_update ()) t)
 
 let accumulator combine zero s =
   stateful (fun () ->
@@ -122,7 +116,10 @@ let accumulator combine zero s =
 
 let box_dynamic width contents = Box { contents; width }
 let box_fixed width = box_dynamic (fun () -> width)
-let box_winsize ~fallback s = box_dynamic (Width.default ~fallback) s
+
+let box_winsize ~fallback s =
+  box_dynamic (fun () -> Option.value ~default:fallback (Width.columns ())) s
+
 let pair ?(sep = const "") a b = Pair { left = a; sep; right = b }
 
 let list ?(sep = const "  ") =
@@ -140,10 +137,10 @@ let using f t = Contramap (t, f)
     - inline nested groupings to make printing more efficient. *)
 
 type 'a compiled =
-  | Pp of { pp : Format.formatter -> 'a -> unit; mutable latest : 'a }
-  | Const of { pp : Format.formatter -> unit }
+  | Pp of { pp : 'a sized_pp; mutable latest : 'a }
+  | Const of { pp : Format.formatter -> int }
   | Contramap : 'a compiled * ('b -> 'a) -> 'b compiled
-  | Cond of 'a compiled cond
+  | Cond of ('a, 'a compiled) cond
   | Group of 'a compiled array
   | Pair : {
       left : 'a compiled;
@@ -182,12 +179,21 @@ let compile =
    fun state -> function
     | Const { pp; width } ->
         (* TODO: join adjacent [Const] nodes as an optimisation step *)
+        let pp ppf =
+          pp ppf;
+          width
+        in
         (Const { pp }, { state with consumed = state.consumed + width })
     | Pp_unsized { pp } ->
         let width = Result.get_or_invalid_arg state.expand in
-        ( Pp { pp = pp ~width; latest = state.initial },
+        let pp ppf x = pp ~width ppf x in
+        ( Pp { pp; latest = state.initial },
           { state with expand = expansion_occurred } )
     | Pp_fixed { pp; width } ->
+        let pp ppf x =
+          pp ppf x;
+          width
+        in
         ( Pp { pp; latest = state.initial },
           { state with consumed = state.consumed + width } )
     | Contramap (t, f) ->
@@ -247,7 +253,7 @@ let compile =
     |> fst
 
 let report compiled =
-  let rec aux : type a. a compiled -> (Format.formatter -> a -> unit) staged =
+  let rec aux : type a. a compiled -> (Format.formatter -> a -> int) staged =
     function
     | Const { pp } -> stage (fun ppf (_ : a) -> pp ppf)
     | Pp pp ->
@@ -259,21 +265,24 @@ let report compiled =
         fun ppf a -> inner ppf (f a)
     | Cond { if_; then_ } ->
         let$ then_ = aux then_ in
-        fun ppf x -> if if_ () then then_ ppf x else ()
+        (* TODO: revise handling of conditional segments *)
+        fun ppf x -> if if_ x then then_ ppf x else 0
     | Group g ->
         let reporters = Array.map (aux >> unstage) g in
-        stage (fun ppf v -> Array.iter (fun f -> f ppf v) reporters)
+        stage (fun ppf v ->
+            Array.fold_left (fun a f -> a + f ppf v) 0 reporters)
     | Pair { left; sep; right } ->
         let$ left = aux left and$ sep = aux sep and$ right = aux right in
         fun ppf (v_left, v_right) ->
-          left ppf v_left;
-          sep ppf ();
-          right ppf v_right
+          let x = left ppf v_left in
+          let y = sep ppf () in
+          let z = right ppf v_right in
+          x + y + z
   in
   unstage (aux compiled)
 
 let update compiled =
-  let rec aux : type a. a compiled -> (Format.formatter -> unit) staged =
+  let rec aux : type a. a compiled -> (Format.formatter -> int) staged =
     function
     | Const { pp } -> stage pp
     | Pp pp -> stage (fun ppf -> pp.pp ppf pp.latest)
@@ -282,12 +291,13 @@ let update compiled =
     | Contramap (inner, _) -> aux inner
     | Group g ->
         let updaters = Array.map (aux >> unstage) g in
-        stage (fun ppf -> Array.iter (fun f -> f ppf) updaters)
+        stage (fun ppf -> Array.fold_left (fun a f -> a + f ppf) 0 updaters)
     | Pair { left; sep; right } ->
         let$ left = aux left and$ sep = aux sep and$ right = aux right in
         fun ppf ->
-          left ppf;
-          sep ppf;
-          right ppf
+          let x = left ppf in
+          let y = sep ppf in
+          let z = right ppf in
+          x + y + z
   in
   unstage (aux compiled)
