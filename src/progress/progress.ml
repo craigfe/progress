@@ -4,6 +4,19 @@ module Units = Units
 
 type 'a reporter = 'a -> unit
 
+module Segment_list = struct
+  type 'a elt = { segment : 'a Segment.t; init : 'a }
+
+  type (_, _) t =
+    | [] : ('a, 'a) t
+    | ( :: ) : 'a elt * ('b, 'c) t -> ('a reporter -> 'b, 'c) t
+
+  let rec append : type a b c. (a, b) t -> (b, c) t -> (a, c) t =
+   fun x y -> match x with [] -> y | x :: xs -> x :: append xs y
+end
+
+type ('a, 'b) t = ('a, 'b) Segment_list.t
+
 module Bar = struct
   type 'a t = {
     update : Format.formatter -> int;
@@ -14,45 +27,16 @@ module Bar = struct
       int;
   }
 
-  module List = struct
-    type 'a bar = 'a t
-
-    module Staged = struct
-      type (_, _) t =
-        | [] : ('a, 'a) t
-        | ( :: ) : (unit -> 'a bar) * ('b, 'c) t -> ('a reporter -> 'b, 'c) t
-
-      let rec append : type a b c. (a, b) t -> (b, c) t -> (a, c) t =
-       fun x y -> match x with [] -> y | x :: xs -> x :: append xs y
-    end
-
-    type (_, _) t =
-      | [] : ('a, 'a) t
-      | ( :: ) : 'a bar * ('b, 'c) t -> ('a reporter -> 'b, 'c) t
-
-    let rec unstage : type a b. (a, b) Staged.t -> (a, b) t = function
-      | [] -> []
-      | f :: fs -> f () :: unstage fs
-
-    let rec length : type a b. (a, b) t -> int = function
-      | _ :: xs -> 1 + length xs
-      | [] -> 0
-  end
-end
-
-type ('a, 'b) t = ('a, 'b) Bar.List.Staged.t
-
-let make : type a b. init:a -> a Segment.t -> ((a -> unit) -> b, b) t =
- fun ~init s ->
-  let bar () =
-    let s = Segment.compile ~initial:init s in
+  let of_segment : type a. a Segment_list.elt -> a t =
+   fun { segment; init } ->
+    let s = Segment.compile ~initial:init segment in
     let report = Segment.report s in
     let update = Segment.update s in
     let report ~position : Format.formatter -> a -> int =
       let buffer = Buffer.create 0 in
       let ppf_buf = Format.formatter_of_buffer buffer in
       (* Print via a buffer to avoid positioning to the correct row if there is
-         nothing to print. *)
+          nothing to print. *)
       fun ppf (a : a) ->
         let width = report ppf_buf a in
         Format.pp_print_flush ppf_buf ();
@@ -65,9 +49,27 @@ let make : type a b. init:a -> a Segment.t -> ((a -> unit) -> b, b) t =
             Buffer.clear buffer;
             width
     in
-    { Bar.report; update }
-  in
-  [ bar ]
+    { report; update }
+
+  module List = struct
+    type 'a bar = 'a t
+
+    type (_, _) t =
+      | [] : ('a, 'a) t
+      | ( :: ) : 'a bar * ('b, 'c) t -> ('a reporter -> 'b, 'c) t
+
+    let rec of_segments : type a b. (a, b) Segment_list.t -> (a, b) t = function
+      | [] -> []
+      | x :: xs -> of_segment x :: of_segments xs
+
+    let rec length : type a b. (a, b) t -> int = function
+      | _ :: xs -> 1 + length xs
+      | [] -> 0
+  end
+end
+
+let make : type a b. init:a -> a Segment.t -> ((a -> unit) -> b, b) t =
+ fun ~init segment -> [ { segment; init } ]
 
 module Internal = struct
   let counter ?prebar ~total ?(mode = `ASCII) ?message
@@ -295,7 +297,7 @@ let start : 'a 'b. ?config:Config.t -> ('a, 'b) t -> ('a, 'b) Hlist.t * display
     =
  fun ?(config = Config.create ()) bars ->
   let config = Config.to_internal config in
-  let bars = Bar.List.unstage bars in
+  let bars = Bar.List.of_segments bars in
   let ppf = config.ppf in
   let bar_count = Bar.List.length bars in
   let display = Display.create ~config bars in
@@ -338,7 +340,7 @@ let with_reporters ?config t f =
     (fun () -> Hlist.apply_all f reporters)
     ~finally:(fun () -> finalise display)
 
-let ( / ) top bottom = Bar.List.Staged.append top bottom
+let ( / ) top bottom = Segment_list.append top bottom
 
 (* Present a slightly simpler type of heterogeneous lists to the user for use
    with [start], since they don't need to concatenate them. *)
