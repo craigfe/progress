@@ -1,5 +1,13 @@
 let ( >> ) f g x = g (f x)
 
+module Result = struct
+  let get_or_invalid_arg = function
+    | Ok x -> x
+    | Error (`Msg s) -> invalid_arg s
+
+  let errorf fmt = Format.kasprintf (fun s -> Error (`Msg s)) fmt
+end
+
 module List = struct
   include List
 

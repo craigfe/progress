@@ -154,8 +154,7 @@ type 'a compiled =
 
 type 'a state = {
   consumed : int;
-  expand : unit -> int;
-  expansion_occurred : bool;
+  expand : (unit -> int, [ `Msg of string ]) result;
   initial : 'a;
 }
 
@@ -173,19 +172,21 @@ let array_fold_left_map f acc input_array =
     done;
     (!acc, output_array)
 
+let expansion_occurred =
+  Result.errorf
+    "Multiple expansion points encountered. Cannot pack two unsized segments \
+     in a single box."
+
 let compile =
   let rec inner : type a. a state -> a t -> a compiled * a state =
    fun state -> function
     | Const { pp; width } ->
-        (* TODO: join adjacent [Const] nodes as an optimisation step*)
+        (* TODO: join adjacent [Const] nodes as an optimisation step *)
         (Const { pp }, { state with consumed = state.consumed + width })
     | Pp_unsized { pp } ->
-        if state.expansion_occurred then
-          invalid_arg
-            "Multiple expansion points encountered. Cannot pack two unsized \
-             segments in a single box.";
-        ( Pp { pp = pp ~width:state.expand; latest = state.initial },
-          { state with expansion_occurred = true } )
+        let width = Result.get_or_invalid_arg state.expand in
+        ( Pp { pp = pp ~width; latest = state.initial },
+          { state with expand = expansion_occurred } )
     | Pp_fixed { pp; width } ->
         ( Pp { pp; latest = state.initial },
           { state with consumed = state.consumed + width } )
@@ -199,12 +200,10 @@ let compile =
     | Staged s -> inner state (s ())
     | Box { contents; width } ->
         let f = ref (fun () -> assert false) in
-        let expand () = !f () in
-        let inner, state =
-          inner { state with expand; expansion_occurred = false } contents
-        in
+        let expand = Ok (fun () -> !f ()) in
+        let inner, state = inner { state with expand } contents in
         (f := fun () -> width () - state.consumed);
-        (inner, { state with expansion_occurred = true })
+        (inner, { state with expand = expansion_occurred })
     | Group g ->
         let state, g =
           array_fold_left_map
@@ -240,10 +239,8 @@ let compile =
       {
         consumed = 0;
         expand =
-          (fun () ->
-            Format.kasprintf invalid_arg
-              "Encountered an expanding element that is not contained in a box");
-        expansion_occurred = false;
+          Result.errorf
+            "Encountered an expanding element that is not contained in a box";
         initial;
       }
       x
