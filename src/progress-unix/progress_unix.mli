@@ -33,8 +33,14 @@ val stderr_if_tty : Format.formatter
 
 (** Renderers that use {!stderr_if_tty} as an output formatter. *)
 
-val with_reporters : ('a, 'b) Progress.t -> 'a -> 'b
-val start : ('a, unit) Progress.t -> 'a Progress.Reporters.t * Progress.display
+val with_reporters :
+  ?config:Progress.Config.t -> ('a, 'b) Progress.t -> 'a -> 'b
+
+val start :
+  ?config:Progress.Config.t ->
+  ('a, unit) Progress.t ->
+  'a Progress.Reporters.t * Progress.display
+
 val finalise : Progress.display -> unit
 
 (** {2 Re-exports}

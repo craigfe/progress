@@ -95,6 +95,8 @@ module Config : sig
       @param hide_cursor Whether or not to hide the terminal cursor (using the
       {{:https://en.wikipedia.org/wiki/ANSI_escape_code} [DECTCEM]} ANSI escape
       codes) during progress bar rendering. Defaults to [true]. *)
+
+  val ( || ) : t -> t -> t
 end
 
 val with_reporters : ?config:Config.t -> ('a, 'b) t -> 'a -> 'b

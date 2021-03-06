@@ -15,8 +15,13 @@ let stderr_if_tty =
   if Unix.(isatty stderr) then Format.err_formatter
   else Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
 
-let config = Config.create ~ppf:stderr_if_tty ()
-let with_reporters x = with_reporters ~config x
-let start x = start ~config x
+let default_config = Config.create ~ppf:stderr_if_tty ()
+
+let with_reporters ?(config = Config.create ()) x =
+  with_reporters ~config:Config.(config || default_config) x
+
+let start ?(config = Config.create ()) x =
+  start ~config:Config.(config || default_config) x
+
 let finalise = finalise
 let ( / ) = ( / )
