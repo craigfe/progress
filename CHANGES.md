@@ -8,6 +8,10 @@
 - Raise an exception when attempting to run separate render processes
   simultaneously. (#8, @CraigFe)
 
+- Add `Progress.interject_with` for interleaving logging with rendering, and
+  the `progress.logs` for pre-packaged `Progress`-aware `Logs` reporters.
+  (#9, @CraigFe)
+
 ### 0.1.1 (2020-10-13)
 
 - Rename `Progress.with_display` to `Progress.with_reporters`. (#3, @CraigFe)
