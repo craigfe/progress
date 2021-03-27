@@ -143,7 +143,7 @@ let accumulator combine zero s =
 let box_dynamic width contents = Box { contents; width }
 let box_fixed width = box_dynamic (fun () -> width)
 
-let box_winsize ?max ~fallback s =
+let box_winsize ?max ?(fallback = 80) s =
   let get_width () =
     match max with
     | None -> Option.value ~default:fallback (Width.columns ())
