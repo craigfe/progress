@@ -1,4 +1,4 @@
-open Utils
+open! Import
 
 let trimmed pp_fixed ppf =
   Format.asprintf "%a" (fst pp_fixed)

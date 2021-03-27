@@ -83,13 +83,22 @@ val ( / ) : ('a, 'b) t -> ('b, 'c) t -> ('a, 'c) t
     [b]. The two bars have separate reporting functions, passed consecutively to
     the {!with_reporters} continuation when rendering. *)
 
+(** A list of reporters of differing types. *)
+module Reporters : sig
+  type 'a t = [] : unit t | ( :: ) : 'a * 'b t -> ('a -> 'b) t
+end
+
+val list : ('a, unit) t list -> ('a Reporters.t list -> 'b, 'b) t
+(** TODO *)
+
 (** {1 Rendering} *)
 
 (** Configuration for progress bar rendering. *)
 module Config : sig
   type t
 
-  val create : ?ppf:Format.formatter -> ?hide_cursor:bool -> unit -> t
+  val create :
+    ?ppf:Format.formatter -> ?hide_cursor:bool -> ?persistent:bool -> unit -> t
   (** @param ppf The formatter to use for rendering. Defaults to
       [Format.err_formatter].
       @param hide_cursor Whether or not to hide the terminal cursor (using the
@@ -146,10 +155,6 @@ type display
     conveniently delimited inside {!with_display}. All {!display}s must be
     properly {!finalise}d, and it is not possible to interleave rendering of
     displays. *)
-
-module Reporters : sig
-  type 'a t = [] : unit t | ( :: ) : 'a * 'b t -> ('a -> 'b) t
-end
 
 val start : ?config:Config.t -> ('a, unit) t -> 'a Reporters.t * display
 (** Initiate rendering of a progress bar display.

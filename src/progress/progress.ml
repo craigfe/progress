@@ -1,4 +1,4 @@
-open! Utils
+open! Import
 module Segment = Segment
 module Units = Units
 
@@ -22,9 +22,7 @@ module Bar = struct
     update : Format.formatter -> int;
     report :
       position:((Format.formatter -> unit) -> Format.formatter -> unit) ->
-      Format.formatter ->
-      'a ->
-      int;
+      (Format.formatter -> 'a -> int) Staged.t;
   }
 
   let of_segment : type a. a Segment_list.elt -> a t =
@@ -32,22 +30,23 @@ module Bar = struct
     let s = Segment.compile ~initial:init segment in
     let report = Segment.report s in
     let update = Segment.update s in
-    let report ~position : Format.formatter -> a -> int =
+    let report ~position =
       let buffer = Buffer.create 0 in
       let ppf_buf = Format.formatter_of_buffer buffer in
+      Fmt.set_style_renderer ppf_buf `Ansi_tty;
       (* Print via a buffer to avoid positioning to the correct row if there is
           nothing to print. *)
-      fun ppf (a : a) ->
-        let width = report ppf_buf a in
-        Format.pp_print_flush ppf_buf ();
-        match Buffer.length buffer with
-        | 0 -> width
-        | _ ->
-            position
-              (fun ppf -> Format.pp_print_string ppf (Buffer.contents buffer))
-              ppf;
-            Buffer.clear buffer;
-            width
+      Staged.inj (fun ppf (a : a) ->
+          let width = report ppf_buf a in
+          Format.pp_print_flush ppf_buf ();
+          match Buffer.length buffer with
+          | 0 -> width
+          | _ ->
+              position
+                (fun ppf -> Format.pp_print_string ppf (Buffer.contents buffer))
+                ppf;
+              Buffer.clear buffer;
+              width)
     in
     { report; update }
 
@@ -85,7 +84,8 @@ module Internal = struct
       @ Option.fold ~none:[] pp ~some:(fun f -> [ f of_pp ])
       @ Option.fold ~none:[] prebar ~some:(fun s -> [ s ])
       @ [ bar ~mode proportion ])
-    |> Option.fold width ~some:box_fixed ~none:(box_winsize ~fallback:80)
+    |> Option.fold width ~some:box_fixed ~none:(fun s ->
+           box_winsize ~fallback:80 s)
     |> periodic sampling_interval
     |> accumulator Int64.add 0L
     |> make ~init:0L
@@ -117,9 +117,13 @@ end = struct
 end
 
 module Config = struct
-  type t = { ppf : Format.formatter option; hide_cursor : bool option }
+  type t = {
+    ppf : Format.formatter option;
+    hide_cursor : bool option;
+    persistent : bool option;
+  }
 
-  let create ?ppf ?hide_cursor () = { ppf; hide_cursor }
+  let create ?ppf ?hide_cursor ?persistent () = { ppf; hide_cursor; persistent }
 
   (* Merge two ['a option]s with a left [Some] taking priority *)
   let merge_on ~f a b =
@@ -129,15 +133,21 @@ module Config = struct
     {
       ppf = merge_on a b ~f:(fun x -> x.ppf);
       hide_cursor = merge_on a b ~f:(fun x -> x.hide_cursor);
+      persistent = merge_on a b ~f:(fun x -> x.persistent);
     }
 
-  type internal = { ppf : Format.formatter; hide_cursor : bool }
+  type internal = {
+    ppf : Format.formatter;
+    hide_cursor : bool;
+    persistent : bool;
+  }
 
   let to_internal : t -> internal =
-   fun { ppf; hide_cursor } ->
+   fun { ppf; hide_cursor; persistent } ->
     {
       ppf = Option.value ppf ~default:Format.err_formatter;
       hide_cursor = Option.value hide_cursor ~default:true;
+      persistent = Option.value persistent ~default:false;
     }
 end
 
@@ -210,10 +220,15 @@ end = struct
     if config.hide_cursor then
       Format.fprintf config.ppf "\n%s%!" Ansi.show_cursor
 
-  let finalise (E { config = { ppf; hide_cursor }; bar_count; _ } as display) =
+  let finalise
+      (E { config = { ppf; hide_cursor; persistent }; bar_count; _ } as display)
+      =
     Ansi.move_up ppf (bar_count - 1);
-    rerender_all display;
-    Format.fprintf ppf "@,@]%s%!" (if hide_cursor then Ansi.show_cursor else "")
+    if persistent then (
+      rerender_all display;
+      Format.fprintf ppf "@,@]")
+    else Format.pp_print_string ppf Ansi.erase_line;
+    Format.fprintf ppf "%s%!" (if hide_cursor then Ansi.show_cursor else "")
 end
 
 module Global : sig
@@ -311,9 +326,10 @@ let start : 'a 'b. ?config:Config.t -> ('a, 'b) t -> ('a, 'b) Hlist.t * display
     | { report; _ } :: bs ->
         let reporter =
           let f =
-            report ~position:(positioned_at ~row:(bar_count - seen - 1)) ppf
+            Staged.prj
+              (report ~position:(positioned_at ~row:(bar_count - seen - 1)))
           in
-          fun ppf -> ignore (f ppf : int)
+          fun x -> ignore (f ppf x : int)
         in
         reporter :: inner (succ seen) bs
   in
@@ -351,6 +367,8 @@ module Reporters = struct
     | [] -> []
     | x :: xs -> x :: of_hlist xs
 end
+
+let list _ = assert false
 
 let start ?config t =
   let hlist, reporters = start ?config t in

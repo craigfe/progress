@@ -13,8 +13,14 @@ module type S = sig
 
   (** {2 Pre-provided segments} *)
 
+  val spinner : ?color:Fmt.style -> ?stages:string list -> unit -> _ t
+  val bytes : int t
+  val bytes_int64 : int64 t
+
   val bar :
     mode:[ `ASCII | `UTF8 ] ->
+    ?color:Fmt.style ->
+    ?color_empty:Fmt.style ->
     ?width:[ `Fixed of int | `Expand ] ->
     ('a -> float) ->
     'a t
@@ -66,7 +72,7 @@ module type S = sig
   (** [box w] is a box that wraps a dynamically-sized segment and sets it to
       have size [w ()] on each tick. *)
 
-  val box_winsize : fallback:int -> 'a t -> 'a t
+  val box_winsize : ?max:int -> fallback:int -> 'a t -> 'a t
   (** A box that takes on the current size of the terminal (or [fallback] if
       stdout is not attached to a terminal.) *)
 
@@ -96,9 +102,13 @@ module type Segment = sig
 
   include S
 
-  type 'a compiled
+  module Compiled : sig
+    type 'a t
 
-  val compile : initial:'a -> 'a t -> 'a compiled
-  val update : 'a compiled -> Format.formatter -> int
-  val report : 'a compiled -> Format.formatter -> 'a -> int
+    val pp_dump : Format.formatter -> 'a t -> unit
+  end
+
+  val compile : initial:'a -> 'a t -> 'a Compiled.t
+  val update : 'a Compiled.t -> Format.formatter -> int
+  val report : 'a Compiled.t -> Format.formatter -> 'a -> int
 end

@@ -1,3 +1,4 @@
-(executable
- (name stack)
- (libraries progress progress.logs progress.unix unix logs logs.fmt))
+(executables
+ (names stack download installer long_spinner)
+ (libraries progress progress.logs progress.unix unix logs logs.fmt fmt mtime
+   mtime.clock.os))
