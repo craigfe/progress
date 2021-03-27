@@ -4,15 +4,37 @@ module Units = Units
 
 type 'a reporter = 'a -> unit
 
+module Hlist = struct
+  (* ['a] and ['b] correspond to parameters of [Bar.List.t]. *)
+  type (_, _) t =
+    | [] : ('a, 'a) t
+    | ( :: ) : 'a * ('b, 'c) t -> ('a -> 'b, 'c) t
+
+  let rec apply_all : type a b. a -> (a, b) t -> b =
+   fun f -> function [] -> f | x :: xs -> apply_all (f x) xs
+
+  let rec append : type a b c. (a, b) t -> (b, c) t -> (a, c) t =
+   fun xs ys -> match xs with [] -> ys | x :: xs -> x :: append xs ys
+end
+
+module Reporters = struct
+  type _ t = [] : unit t | ( :: ) : 'a * 'b t -> ('a -> 'b) t
+
+  let rec of_hlist : type a. (a, unit) Hlist.t -> a t = function
+    | [] -> []
+    | x :: xs -> x :: of_hlist xs
+end
+
 module Segment_list = struct
   type 'a elt = { segment : 'a Segment.t; init : 'a }
 
   type (_, _) t =
-    | [] : ('a, 'a) t
-    | ( :: ) : 'a elt * ('b, 'c) t -> ('a reporter -> 'b, 'c) t
+    | One : 'a elt -> ('a reporter -> 'b, 'b) t
+    | Many : 'a elt list -> ('a reporter list -> 'b, 'b) t
+    | Plus : ('a, 'b) t * ('b, 'c) t -> ('a, 'c) t
 
-  let rec append : type a b c. (a, b) t -> (b, c) t -> (a, c) t =
-   fun x y -> match x with [] -> y | x :: xs -> x :: append xs y
+  let append : type a b c. (a, b) t -> (b, c) t -> (a, c) t =
+   fun x y -> Plus (x, y)
 end
 
 type ('a, 'b) t = ('a, 'b) Segment_list.t
@@ -22,7 +44,9 @@ module Bar = struct
     update : Format.formatter -> int;
     report :
       position:((Format.formatter -> unit) -> Format.formatter -> unit) ->
-      (Format.formatter -> 'a -> int) Staged.t;
+      Format.formatter ->
+      'a ->
+      int;
   }
 
   let of_segment : type a. a Segment_list.elt -> a t =
@@ -30,23 +54,23 @@ module Bar = struct
     let s = Segment.compile ~initial:init segment in
     let report = Segment.report s in
     let update = Segment.update s in
-    let report ~position =
+    let report =
       let buffer = Buffer.create 0 in
       let ppf_buf = Format.formatter_of_buffer buffer in
       Fmt.set_style_renderer ppf_buf `Ansi_tty;
       (* Print via a buffer to avoid positioning to the correct row if there is
           nothing to print. *)
-      Staged.inj (fun ppf (a : a) ->
-          let width = report ppf_buf a in
-          Format.pp_print_flush ppf_buf ();
-          match Buffer.length buffer with
-          | 0 -> width
-          | _ ->
-              position
-                (fun ppf -> Format.pp_print_string ppf (Buffer.contents buffer))
-                ppf;
-              Buffer.clear buffer;
-              width)
+      fun ~position ppf (a : a) ->
+        let width = report ppf_buf a in
+        Format.pp_print_flush ppf_buf ();
+        match Buffer.length buffer with
+        | 0 -> width
+        | _ ->
+            position
+              (fun ppf -> Format.pp_print_string ppf (Buffer.contents buffer))
+              ppf;
+            Buffer.clear buffer;
+            width
     in
     { report; update }
 
@@ -54,24 +78,34 @@ module Bar = struct
     type 'a bar = 'a t
 
     type (_, _) t =
-      | [] : ('a, 'a) t
-      | ( :: ) : 'a bar * ('b, 'c) t -> ('a reporter -> 'b, 'c) t
+      | One : 'a bar -> ('a reporter -> 'b, 'b) t
+      | Many : 'a bar list -> ('a reporter list -> 'b, 'b) t
+      | Plus : ('a, 'b) t * ('b, 'c) t -> ('a, 'c) t
 
     let rec of_segments : type a b. (a, b) Segment_list.t -> (a, b) t = function
-      | [] -> []
-      | x :: xs -> of_segment x :: of_segments xs
+      | One elt -> One (of_segment elt)
+      | Many elts -> Many (List.map of_segment elts)
+      | Plus (xs, ys) -> Plus (of_segments xs, of_segments ys)
 
     let rec length : type a b. (a, b) t -> int = function
-      | _ :: xs -> 1 + length xs
-      | [] -> 0
+      | One _ -> 1
+      | Many xs -> List.length xs
+      | Plus (xs, ys) -> length xs + length ys
   end
 end
 
-let make : type a b. init:a -> a Segment.t -> ((a -> unit) -> b, b) t =
- fun ~init segment -> [ { segment; init } ]
+let make : type a b. init:a -> a Segment.t -> (a reporter -> b, b) t =
+ fun ~init segment -> One { segment; init }
+
+let make_list :
+    type a b. init:a -> a Segment.t list -> (a reporter list -> b, b) t =
+ fun ~init segments ->
+  Many (List.map (fun segment -> Segment_list.{ segment; init }) segments)
+
+type bar_style = [ `ASCII | `UTF8 | `Custom of string list ]
 
 module Internal = struct
-  let counter ?prebar ~total ?(mode = `ASCII) ?message
+  let counter ?prebar ~total ?(style = `ASCII) ?message
       ?(pp : (int64, int64 Segment.t) Units.pp_fixed option) ?width
       ?(sampling_interval = 1) () =
     let open Segment in
@@ -83,7 +117,7 @@ module Internal = struct
       (Option.fold ~none:[] message ~some:(fun s -> [ const s ])
       @ Option.fold ~none:[] pp ~some:(fun f -> [ f of_pp ])
       @ Option.fold ~none:[] prebar ~some:(fun s -> [ s ])
-      @ [ bar ~mode proportion ])
+      @ [ bar ~style proportion ])
     |> Option.fold width ~some:box_fixed ~none:(fun s ->
            box_winsize ~fallback:80 s)
     |> periodic sampling_interval
@@ -91,8 +125,8 @@ module Internal = struct
     |> make ~init:0L
 end
 
-let counter ~total ?mode ?message ?pp ?width ?sampling_interval () =
-  Internal.counter ?prebar:None ~total ?mode ?message ?pp ?width
+let counter ~total ?style ?message ?pp ?width ?sampling_interval () =
+  Internal.counter ?prebar:None ~total ?style ?message ?pp ?width
     ?sampling_interval ()
 
 module Ansi = struct
@@ -143,12 +177,20 @@ module Config = struct
   }
 
   let to_internal : t -> internal =
-   fun { ppf; hide_cursor; persistent } ->
-    {
-      ppf = Option.value ppf ~default:Format.err_formatter;
-      hide_cursor = Option.value hide_cursor ~default:true;
-      persistent = Option.value persistent ~default:false;
-    }
+    let default_formatter =
+      (* We avoid using [Format.err_formatter] directly since [Fmt] uses
+         physical equality to share configuration options. *)
+      let ppf = Format.formatter_of_out_channel stderr in
+      Fmt.set_style_renderer ppf `Ansi_tty;
+      Fmt.set_utf_8 ppf true;
+      ppf
+    in
+    fun { ppf; hide_cursor; persistent } ->
+      {
+        ppf = Option.value ppf ~default:default_formatter;
+        hide_cursor = Option.value hide_cursor ~default:true;
+        persistent = Option.value persistent ~default:true;
+      }
 end
 
 module Display : sig
@@ -180,20 +222,25 @@ end = struct
   let uid (E { uid; _ }) = uid
 
   let rerender_all (E { config = { ppf; _ }; bars; latest_widths; _ }) =
-    let rec inner : type a b. int -> (a, b) Bar.List.t -> unit =
-     fun i -> function
-      | [] -> ()
-      | [ { update; _ } ] ->
+    let rec inner :
+        type a b. on_right_spine:bool -> int -> (a, b) Bar.List.t -> int =
+     fun ~on_right_spine i -> function
+      | One { update; _ } | Many [ { update; _ } ] ->
           let width = update ppf in
           latest_widths.(i) <- width;
-          Format.fprintf ppf "\r%!"
-      | { update; _ } :: bs ->
-          let width = update ppf in
-          latest_widths.(i) <- width;
-          Format.pp_force_newline ppf ();
-          inner (succ i) bs
+          if on_right_spine then Format.fprintf ppf "\r%!"
+          else Format.pp_force_newline ppf ();
+          succ i
+      | Many (x :: (_ :: _ as xs)) ->
+          let seen = inner ~on_right_spine:false i (One x) in
+          inner ~on_right_spine seen (Many xs)
+      | Plus (xs, ys) ->
+          let i = inner ~on_right_spine:false i xs in
+          inner ~on_right_spine i ys
+      | Many [] -> assert false
+     (* TODO: non-empty list *)
     in
-    inner 0 bars
+    ignore (inner ~on_right_spine:true 0 bars : int)
 
   let ceil_div x y = (x + y - 1) / y
   let overflow_rows ~old_width ~new_width = ceil_div old_width new_width - 1
@@ -298,16 +345,6 @@ let positioned_at ~row t ppf =
      the user has typed into the terminal between renders. *)
   Format.fprintf ppf "\r%a%t%a\r%!" Ansi.move_up row t Ansi.move_down row
 
-module Hlist = struct
-  (* ['a] and ['b] correspond to parameters of [Bar.List.t]. *)
-  type (_, _) t =
-    | [] : ('a, 'a) t
-    | ( :: ) : 'a * ('b, 'c) t -> ('a -> 'b, 'c) t
-
-  let rec apply_all : type a b. a -> (a, b) t -> b =
-   fun f -> function [] -> f | x :: xs -> apply_all (f x) xs
-end
-
 let start : 'a 'b. ?config:Config.t -> ('a, 'b) t -> ('a, 'b) Hlist.t * display
     =
  fun ?(config = Config.create ()) bars ->
@@ -320,20 +357,29 @@ let start : 'a 'b. ?config:Config.t -> ('a, 'b) t -> ('a, 'b) Hlist.t * display
   Format.pp_open_box ppf 0;
   if config.hide_cursor then Format.pp_print_string ppf Ansi.hide_cursor;
   Display.rerender_all display;
-  let rec inner : type a b. int -> (a, b) Bar.List.t -> (a, b) Hlist.t =
+  let rec inner : type a b. int -> (a, b) Bar.List.t -> int * (a, b) Hlist.t =
    fun seen -> function
-    | [] -> []
-    | { report; _ } :: bs ->
-        let reporter =
-          let f =
-            Staged.prj
-              (report ~position:(positioned_at ~row:(bar_count - seen - 1)))
-          in
-          fun x -> ignore (f ppf x : int)
+    | One { report; _ } ->
+        let f = report ~position:(positioned_at ~row:(bar_count - seen - 1)) in
+        let reporter x = ignore (f ppf x : int) in
+        (seen + 1, [ reporter ])
+    | Many xs ->
+        let reporters =
+          ListLabels.mapi xs ~f:(fun i Bar.{ report; _ } ->
+              let f =
+                report
+                  ~position:(positioned_at ~row:(bar_count - (seen + i) - 1))
+              in
+              fun x -> ignore (f ppf x : int))
         in
-        reporter :: inner (succ seen) bs
+        (seen + List.length xs, [ reporters ])
+    | Plus (left, right) ->
+        let seen, left = inner seen left in
+        let seen, right = inner seen right in
+        (seen, Hlist.append left right)
   in
-  (inner 0 bars, Display.uid display)
+  let _, bars = inner 0 bars in
+  (bars, Display.uid display)
 
 let finalize uid' =
   match Global.active_display () with
@@ -357,18 +403,6 @@ let with_reporters ?config t f =
     ~finally:(fun () -> finalize display)
 
 let ( / ) top bottom = Segment_list.append top bottom
-
-(* Present a slightly simpler type of heterogeneous lists to the user for use
-   with [start], since they don't need to concatenate them. *)
-module Reporters = struct
-  type _ t = [] : unit t | ( :: ) : 'a * 'b t -> ('a -> 'b) t
-
-  let rec of_hlist : type a. (a, unit) Hlist.t -> a t = function
-    | [] -> []
-    | x :: xs -> x :: of_hlist xs
-end
-
-let list _ = assert false
 
 let start ?config t =
   let hlist, reporters = start ?config t in

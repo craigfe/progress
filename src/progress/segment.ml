@@ -36,16 +36,12 @@ let const s =
 let conditional pred s = Cond { if_ = pred; then_ = s }
 let contramap ~f x = Contramap (x, f)
 
-let utf8_chars =
-  (* Characters: space @ [0x258F .. 0x2589] *)
-  [| " "; "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉"; "█" |]
-
-let utf_num = Array.length utf8_chars - 1
-
 let styled_opt style elt =
   match style with None -> elt | Some s -> Fmt.styled s elt
 
-let bar_unicode ~color ~color_empty width proportion ppf =
+let bar_custom ~stages ~color ~color_empty width proportion ppf =
+  let stages = Array.of_list stages in
+  let final_stage = Array.length stages - 1 in
   let pp_filled_segment = styled_opt color Fmt.string in
   let pp_unfilled_segment =
     styled_opt Option.(color_empty || color) Fmt.string
@@ -58,17 +54,17 @@ let bar_unicode ~color ~color_empty width proportion ppf =
   let not_filled = bar_width - filled - 1 in
   Fmt.string ppf "│";
   for _ = 1 to filled do
-    pp_filled_segment ppf utf8_chars.(utf_num)
+    pp_filled_segment ppf stages.(final_stage)
   done;
   (if filled <> bar_width then
    let () =
-     let chunks = Float.to_int (squaresf *. Float.of_int utf_num) in
-     let index = chunks - (filled * utf_num) in
-     if index >= 0 && index < utf_num then
-       pp_filled_segment ppf utf8_chars.(index)
+     let chunks = Float.to_int (squaresf *. Float.of_int final_stage) in
+     let index = chunks - (filled * final_stage) in
+     if index >= 0 && index < final_stage then
+       pp_filled_segment ppf stages.(index)
    in
    for _ = 1 to not_filled do
-     pp_unfilled_segment ppf utf8_chars.(0)
+     pp_unfilled_segment ppf stages.(0)
    done);
   Fmt.string ppf "│";
   width
@@ -92,18 +88,27 @@ let bar_ascii ~color ~color_empty width proportion ppf =
   Fmt.char ppf ']';
   width
 
-let bar ~mode = match mode with `UTF8 -> bar_unicode | `ASCII -> bar_ascii
+let bar ~style =
+  match style with
+  | `ASCII -> bar_ascii
+  | `Custom stages -> bar_custom ~stages
+  | `UTF8 ->
+      let stages =
+        [ " "; "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉"; "█" ]
+      in
+      bar_custom ~stages
+
 let ( ++ ) a b = Group [| a; b |]
 
-let bar ~mode ?color ?color_empty ?(width = `Expand) f =
+let bar ?(style = `UTF8) ?color ?color_empty ?(width = `Expand) f =
   contramap ~f
     (match width with
     | `Fixed width ->
         if width < 3 then failwith "Not enough space for a progress bar";
         of_pp ~width (fun ppf x ->
-            ignore (bar ~mode ~color ~color_empty (fun _ -> width) x ppf : int))
+            ignore (bar ~style ~color ~color_empty (fun _ -> width) x ppf : int))
     | `Expand ->
-        let pp ~width ppf x = bar ~mode ~color ~color_empty width x ppf in
+        let pp ~width ppf x = bar ~style ~color ~color_empty width x ppf in
         Pp_unsized { pp })
 
 (** [ticker n] is a function [f] that returns [true] on every [n]th call. *)

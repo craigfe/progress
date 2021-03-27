@@ -92,7 +92,7 @@ let test_unicode_bar () =
   let () =
     let@ report =
       Progress.(
-        Segment.bar ~mode:`UTF8 ~width:(`Fixed 3) Fun.id
+        Segment.bar ~style:`UTF8 ~width:(`Fixed 3) Fun.id
         |> make ~init:0.
         |> with_reporters ~config)
     in
@@ -125,7 +125,7 @@ let test_unicode_bar () =
   clear_test_state ();
   let () =
     let@ report =
-      Progress.Segment.bar ~mode:`UTF8 ~width:(`Fixed 5) Fun.id
+      Progress.Segment.bar ~style:`UTF8 ~width:(`Fixed 5) Fun.id
       |> Progress.make ~init:0.
       |> Progress.with_reporters ~config
     in
@@ -144,7 +144,7 @@ let test_unicode_bar () =
 let test_progress_bar_lifecycle () =
   let open Progress.Units.Bytes in
   let@ report =
-    Progress.counter ~mode:`ASCII ~total:(gib 1) ~sampling_interval:1 ~width:53
+    Progress.counter ~style:`ASCII ~total:(gib 1) ~sampling_interval:1 ~width:53
       ~message:"<msg>" ~pp:Progress.Units.bytes ()
     |> Progress.with_reporters ~config
   in
@@ -177,7 +177,7 @@ let test_progress_bar_width () =
   let check_width ~width ~message ?pp ~count_width () =
     let@ _report =
       Progress.with_reporters ~config
-        (Progress.counter ~mode:`ASCII ~total:1L ~sampling_interval:1 ~width
+        (Progress.counter ~style:`ASCII ~total:1L ~sampling_interval:1 ~width
            ~message ?pp ())
     in
     String.length (read_bar ())
@@ -214,7 +214,7 @@ module Boxes = struct
     @@ fun () ->
     ignore
       Progress.(
-        start @@ make ~init:0. Segment.(bar ~width:`Expand ~mode:`UTF8 Fun.id))
+        start @@ make ~init:0. Segment.(bar ~width:`Expand ~style:`UTF8 Fun.id))
 
   let test_two_unsized_in_box () =
     Alcotest.check_raises "Two unsized elements in a box"
@@ -223,7 +223,7 @@ module Boxes = struct
           segments in a single box.")
     @@ fun () ->
     let open Progress in
-    let unsized = Segment.bar ~mode:`UTF8 Fun.id in
+    let unsized = Segment.bar ~style:`UTF8 Fun.id in
     ignore (start @@ make ~init:0. Segment.(box_fixed 10 (unsized ++ unsized)))
 end
 

@@ -4,7 +4,7 @@ let () =
       Progress.Segment.(
         box_winsize
         @@ accumulator ( + ) 0
-        @@ bar ~mode:`UTF8 (fun x -> float_of_int x /. 100.))
+        @@ bar ~style:`UTF8 (fun x -> float_of_int x /. 100.))
   in
   Progress.with_reporters bar (fun f ->
       for i = 1 to 100 do

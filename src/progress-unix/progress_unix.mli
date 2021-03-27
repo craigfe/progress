@@ -9,7 +9,7 @@ val stopwatch : unit -> 'a Progress.Segment.t
 
 val counter :
   total:int64 ->
-  ?mode:[ `ASCII | `UTF8 ] ->
+  ?style:Progress.bar_style ->
   ?message:string ->
   ?pp:(int64, int64 Progress.Segment.t) Progress.Units.pp_fixed ->
   ?width:int ->

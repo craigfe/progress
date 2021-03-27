@@ -30,9 +30,11 @@ type ('a, 'b) t
     These reporting functions are supplied when beginning the {{!rendering}
     rendering} process. *)
 
+type bar_style = [ `ASCII | `UTF8 | `Custom of string list ]
+
 val counter :
   total:int64 ->
-  ?mode:[ `ASCII | `UTF8 ] ->
+  ?style:bar_style ->
   ?message:string ->
   ?pp:(int64, int64 Segment.t) Units.pp_fixed ->
   ?width:int ->
@@ -46,7 +48,7 @@ val counter :
     where each reported value contributes cumulatively towards an eventual total
     of [total]. Optional parameters are as follows:
 
-    - [?mode] specifies whether to use a UTF-8 or an ASCII encoding for the
+    - [?style] specifies whether to use a UTF-8 or an ASCII encoding for the
       progress bar. The UTF-8 encoding shows a higher resolution of progress,
       but may not be supported in all terminals. The default is [`ASCII].
 
@@ -76,6 +78,8 @@ val make : init:'a -> 'a Segment.t -> ('a reporter -> 'b, 'b) t
 (** Define a new progress bar from a specification, with the given initial
     value. *)
 
+val make_list : init:'a -> 'a Segment.t list -> ('a reporter list -> 'b, 'b) t
+
 (** {2 Multiple progress bars} *)
 
 val ( / ) : ('a, 'b) t -> ('b, 'c) t -> ('a, 'c) t
@@ -87,9 +91,6 @@ val ( / ) : ('a, 'b) t -> ('b, 'c) t -> ('a, 'c) t
 module Reporters : sig
   type 'a t = [] : unit t | ( :: ) : 'a * 'b t -> ('a -> 'b) t
 end
-
-val list : ('a, unit) t list -> ('a Reporters.t list -> 'b, 'b) t
-(** TODO *)
 
 (** {1 Rendering} *)
 
@@ -178,7 +179,7 @@ module Internal : sig
   val counter :
     ?prebar:int64 Segment.t ->
     total:int64 ->
-    ?mode:[ `ASCII | `UTF8 ] ->
+    ?style:bar_style ->
     ?message:string ->
     ?pp:(int64, int64 Segment.t) Units.pp_fixed ->
     ?width:int ->

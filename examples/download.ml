@@ -13,7 +13,7 @@ let bar ~total =
        [
          spinner ~color:`Green ();
          const "[" ++ Progress_unix.stopwatch () ++ const "]";
-         bar ~color:`Cyan ~mode:`ASCII (fun x ->
+         bar ~color:`Cyan ~style:`ASCII (fun x ->
              float_of_int x /. float_of_int total);
          bytes ++ const " / " ++ const total_bytes;
        ]

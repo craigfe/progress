@@ -18,7 +18,7 @@ module type S = sig
   val bytes_int64 : int64 t
 
   val bar :
-    mode:[ `ASCII | `UTF8 ] ->
+    ?style:[ `ASCII | `UTF8 | `Custom of string list ] ->
     ?color:Fmt.style ->
     ?color_empty:Fmt.style ->
     ?width:[ `Fixed of int | `Expand ] ->

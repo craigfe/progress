@@ -1,5 +1,5 @@
 let bar message =
-  Progress_unix.counter ~mode:`UTF8 ~total:1_000_000L ~message
+  Progress_unix.counter ~style:`UTF8 ~total:1_000_000L ~message
     ~pp:Progress.Units.bytes ()
 
 let main () =

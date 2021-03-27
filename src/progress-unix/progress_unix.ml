@@ -9,8 +9,8 @@ let stopwatch () =
 
 let counter_prebar = stopwatch ()
 
-let counter ~total ?mode ?message ?pp ?width ?sampling_interval =
-  Internal.counter ~prebar:counter_prebar ~total ?mode ?message ?pp ?width
+let counter ~total ?style ?message ?pp ?width ?sampling_interval =
+  Internal.counter ~prebar:counter_prebar ~total ?style ?message ?pp ?width
     ?sampling_interval
 
 let stderr_if_tty =
