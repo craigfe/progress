@@ -153,7 +153,7 @@ type display
 (** Functions for explicitly starting and stopping the process of rendering a
     bar; useful when the code doing the progress reporting cannot be
     conveniently delimited inside {!with_display}. All {!display}s must be
-    properly {!finalise}d, and it is not possible to interleave rendering of
+    properly {!finalize}d, and it is not possible to interleave rendering of
     displays. *)
 
 val start : ?config:Config.t -> ('a, unit) t -> 'a Reporters.t * display
@@ -161,10 +161,10 @@ val start : ?config:Config.t -> ('a, unit) t -> 'a Reporters.t * display
 
     @raise Failure if there is already an active progress bar display. *)
 
-val finalise : display -> unit
+val finalize : display -> unit
 (** Terminate the given progress bar display.
 
-    @raise Failure if the display has already been finalised. *)
+    @raise Failure if the display has already been finalized. *)
 
 (** {1 Miscellaneous} *)
 

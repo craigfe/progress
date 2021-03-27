@@ -160,7 +160,7 @@ module Display : sig
   val handle_width_change : t -> int -> unit
   val interject_with : t -> (unit -> 'a) -> 'a
   val cleanup : t -> unit
-  val finalise : t -> unit
+  val finalize : t -> unit
 end = struct
   type t =
     | E : {
@@ -220,7 +220,7 @@ end = struct
     if config.hide_cursor then
       Format.fprintf config.ppf "\n%s%!" Ansi.show_cursor
 
-  let finalise
+  let finalize
       (E { config = { ppf; hide_cursor; persistent }; bar_count; _ } as display)
       =
     Ansi.move_up ppf (bar_count - 1);
@@ -335,13 +335,13 @@ let start : 'a 'b. ?config:Config.t -> ('a, 'b) t -> ('a, 'b) Hlist.t * display
   in
   (inner 0 bars, Display.uid display)
 
-let finalise uid' =
+let finalize uid' =
   match Global.active_display () with
-  | None -> failwith "Display already finalised"
+  | None -> failwith "Display already finalized"
   | Some display ->
       if not (Uid.equal (Display.uid display) uid') then
-        failwith "Display already finalised";
-      Display.finalise display;
+        failwith "Display already finalized";
+      Display.finalize display;
       Global.set_inactive ()
 
 let interject_with : 'a. (unit -> 'a) -> 'a =
@@ -354,7 +354,7 @@ let with_reporters ?config t f =
   let reporters, display = start ?config t in
   Fun.protect
     (fun () -> Hlist.apply_all f reporters)
-    ~finally:(fun () -> finalise display)
+    ~finally:(fun () -> finalize display)
 
 let ( / ) top bottom = Segment_list.append top bottom
 

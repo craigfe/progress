@@ -25,5 +25,5 @@ let with_reporters ?(config = Config.create ()) x =
 let start ?(config = Config.create ()) x =
   start ~config:Config.(config || default_config) x
 
-let finalise = finalise
+let finalize = finalize
 let ( / ) = ( / )

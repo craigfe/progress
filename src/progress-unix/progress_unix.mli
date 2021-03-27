@@ -41,7 +41,7 @@ val start :
   ('a, unit) Progress.t ->
   'a Progress.Reporters.t * Progress.display
 
-val finalise : Progress.display -> unit
+val finalize : Progress.display -> unit
 
 (** {2 Re-exports}
 
