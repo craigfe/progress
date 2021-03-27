@@ -1,4 +1,4 @@
 (executables
- (names stack download installer long_spinner)
+ (names stack download installer long_spinner interject)
  (libraries progress progress.logs progress.unix unix logs logs.fmt fmt mtime
    mtime.clock.os))
