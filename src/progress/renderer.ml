@@ -58,15 +58,6 @@ let make_list :
  fun ~init segments ->
   Many (List.map (fun segment -> Segment_list.{ segment; init }) segments)
 
-module Ansi = struct
-  let show_cursor = "\x1b[?25h"
-  let hide_cursor = "\x1b[?25l"
-  let erase_display_suffix = "\x1b[J"
-  let erase_line = "\x1b[K"
-  let move_up ppf = function 0 -> () | n -> Format.fprintf ppf "\x1b[%dA" n
-  let move_down ppf = function 0 -> () | n -> Format.fprintf ppf "\x1b[%dB" n
-end
-
 module Uid : sig
   type t
 

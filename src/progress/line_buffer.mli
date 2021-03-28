@@ -5,8 +5,14 @@ type t
 val create : size:int -> t
 (** Create a line buffer with the given initial size. *)
 
-val ppf : t -> Format.formatter
-(** Return a formatter that adds to the buffer. *)
+val with_ppf : t -> (Format.formatter -> 'a) -> 'a
+(** [with_ppf buf f] gives a view of [buf] as a formatter to [f] (and then
+    flushes the formatter to [buf]). *)
+
+val add_char : t -> char -> unit
+val add_string : t -> string -> unit
+val add_substring : t -> string -> off:int -> len:int -> unit
+val add_style_code : t -> Ansi.style -> unit
 
 val contents : t -> string
 (** Reset the write head to the start of the buffer and return a copy of the

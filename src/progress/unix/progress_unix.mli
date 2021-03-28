@@ -28,7 +28,7 @@ val debounced_accumulator :
 
 val counter :
      total:'elt
-  -> ?color:Fmt.style
+  -> ?color:Ansi.style
   -> ?style:bar_style
   -> ?message:string
   -> ?pp:'elt pp * int

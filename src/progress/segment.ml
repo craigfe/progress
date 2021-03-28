@@ -3,12 +3,11 @@ open! Import
 open Staged.Syntax
 
 type 'a pp = Format.formatter -> 'a -> unit
-type 'a sized_pp = Format.formatter -> 'a -> int
 
 type 'a t =
-  | Pp_unsized of { pp : width:(unit -> int) -> 'a sized_pp }
-  | Pp_fixed of { pp : Format.formatter -> 'a -> unit; width : int }
-  | Const of { pp : Format.formatter -> unit; width : int }
+  | Pp_unsized of { pp : width:(unit -> int) -> Line_buffer.t -> 'a -> int }
+  | Pp_fixed of { pp : Line_buffer.t -> 'a -> unit; width : int }
+  | Const of { pp : Line_buffer.t -> unit; width : int }
   | Staged of (unit -> 'a t)
   | Contramap : 'a t * ('b -> 'a) -> 'b t
   | Cond of { if_ : 'a -> bool; then_ : 'a t }
@@ -16,39 +15,38 @@ type 'a t =
   | Group of 'a t array
   | Pair : { left : 'a t; sep : unit t; right : 'b t } -> ('a * 'b) t
 
-let of_pp ~width pp = Pp_fixed { pp; width }
-let const_fmt ~width pp = Const { pp; width }
+let of_pp ~width pp =
+  let pp buf x = Line_buffer.with_ppf buf (fun ppf -> pp ppf x) in
+  Pp_fixed { pp; width }
+
+let const_fmt ~width pp =
+  let pp buf = Line_buffer.with_ppf buf (fun ppf -> pp ppf) in
+  Const { pp; width }
+
+let alpha ~width pp = Pp_fixed { pp; width }
+let alpha_unsized pp = Pp_unsized { pp }
+let theta ~width pp = Const { pp; width }
 let bytes = of_pp ~width:Units.Bytes.width Units.Bytes.of_int
 let bytes_int64 = of_pp ~width:Units.Bytes.width Units.Bytes.of_int64
 let percentage = of_pp ~width:Units.Percentage.width Units.Percentage.of_float
 
 let const s =
-  const_fmt ~width:(String.Utf8.length s) (fun ppf ->
-      Format.pp_print_string ppf s)
+  let len = String.length s and len_utf8 = String.Utf8.length s in
+  theta ~width:len_utf8 (fun buf -> Line_buffer.add_substring buf s ~off:0 ~len)
 
 let conditional pred s = Cond { if_ = pred; then_ = s }
 let contramap ~f x = Contramap (x, f)
 
-let styled_opt ~style pp_elt ppf elt =
+let with_style_opt ~style buf f =
   match style with
-  | None -> pp_elt ppf elt
-  | Some s -> Fmt.styled s pp_elt ppf elt
-
-let repeated_styled_opt ~repeat ~style pp_elt ppf elt =
-  match style with
-  | None ->
-      for _ = 1 to repeat do
-        pp_elt ppf elt
-      done
+  | None -> f ()
   | Some s ->
-      Fmt.styled s
-        (fun ppf () ->
-          for _ = 1 to repeat do
-            pp_elt ppf elt
-          done)
-        ppf ()
+      Line_buffer.add_style_code buf s;
+      let a = f () in
+      Line_buffer.add_style_code buf `None;
+      a
 
-let bar_custom ~stages ~color ~color_empty width proportion ppf =
+let bar_custom ~stages ~color ~color_empty width proportion buf =
   let color_empty = Option.(color_empty || color) in
   let stages = Array.of_list stages in
   let final_stage = Array.length stages - 1 in
@@ -58,22 +56,28 @@ let bar_custom ~stages ~color ~color_empty width proportion ppf =
   let squares = Float.to_int squaresf in
   let filled = min squares bar_width in
   let not_filled = bar_width - filled - 1 in
-  Fmt.string ppf "│";
-  repeated_styled_opt ~repeat:filled ~style:color Fmt.string ppf
-    stages.(final_stage);
-  (if filled <> bar_width then
-   let () =
-     let chunks = Float.to_int (squaresf *. Float.of_int final_stage) in
-     let index = chunks - (filled * final_stage) in
-     if index >= 0 && index < final_stage then
-       repeated_styled_opt ~repeat:1 ~style:color Fmt.string ppf stages.(index)
-   in
-   repeated_styled_opt ~repeat:not_filled ~style:color_empty Fmt.string ppf
-     stages.(0));
-  Fmt.string ppf "│";
+  Line_buffer.add_string buf "│";
+  with_style_opt ~style:color buf (fun () ->
+      for _ = 1 to filled do
+        Line_buffer.add_string buf stages.(final_stage)
+      done);
+  let () =
+    if filled <> bar_width then (
+      let chunks = Float.to_int (squaresf *. Float.of_int final_stage) in
+      let index = chunks - (filled * final_stage) in
+      if index >= 0 && index < final_stage then
+        with_style_opt ~style:color buf (fun () ->
+            Line_buffer.add_string buf stages.(index));
+
+      with_style_opt ~style:color_empty buf (fun () ->
+          for _ = 1 to not_filled do
+            Line_buffer.add_string buf stages.(0)
+          done))
+  in
+  Line_buffer.add_string buf "│";
   width
 
-let bar_ascii ~color ~color_empty width proportion ppf =
+let bar_ascii ~color ~color_empty width proportion buf =
   let color_empty = Option.(color_empty || color) in
   let width = width () in
   let bar_width = width - 2 in
@@ -81,10 +85,16 @@ let bar_ascii ~color ~color_empty width proportion ppf =
     min (Float.to_int (Float.of_int bar_width *. proportion)) bar_width
   in
   let not_filled = bar_width - filled in
-  Fmt.char ppf '[';
-  repeated_styled_opt ~style:color ~repeat:filled Fmt.char ppf '#';
-  repeated_styled_opt ~style:color_empty ~repeat:not_filled Fmt.char ppf '-';
-  Fmt.char ppf ']';
+  Line_buffer.add_char buf '[';
+  with_style_opt ~style:color buf (fun () ->
+      for _ = 1 to filled do
+        Line_buffer.add_char buf '#'
+      done);
+  with_style_opt ~style:color_empty buf (fun () ->
+      for _ = 1 to not_filled do
+        Line_buffer.add_char buf '-'
+      done);
+  Line_buffer.add_char buf ']';
   width
 
 let bar ~style =
@@ -104,8 +114,8 @@ let bar ?(style = `UTF8) ?color ?color_empty ?(width = `Expand) f =
     (match width with
     | `Fixed width ->
         if width < 3 then failwith "Not enough space for a progress bar";
-        of_pp ~width (fun ppf x ->
-            ignore (bar ~style ~color ~color_empty (fun _ -> width) x ppf : int))
+        alpha ~width (fun buf x ->
+            ignore (bar ~style ~color ~color_empty (fun _ -> width) x buf : int))
     | `Expand ->
         let pp ~width ppf x = bar ~style ~color ~color_empty width x ppf in
         Pp_unsized { pp })
@@ -127,15 +137,12 @@ let modulo_counter : int -> (unit -> int) Staged.t =
 let stateful f = Staged f
 
 let string =
-  let pp ~width ppf s =
-    let len = String.length s in
-    if len <= width () then (
-      Fmt.string ppf s;
-      len)
-    else assert false
-    (* TODO *)
-  in
-  Pp_unsized { pp }
+  alpha_unsized (fun ~width buf s ->
+      let len = String.length s in
+      if len <= width () then (
+        Line_buffer.add_string buf s;
+        len)
+      else assert false)
 
 let periodic interval t =
   match interval with
@@ -190,10 +197,11 @@ let spinner ?color ?stages () =
         (Array.of_list stages, width)
   in
   let stage_count = Array.length stages in
-  let pp = styled_opt ~style:color Fmt.string in
   stateful (fun () ->
       let tick = Staged.prj (modulo_counter stage_count) in
-      const_fmt ~width (fun ppf -> pp ppf stages.(tick ())))
+      theta ~width (fun buf ->
+          with_style_opt buf ~style:color (fun () ->
+              Line_buffer.add_string buf stages.(tick ()))))
 
 (** The [compile] step transforms a pure [t] term in to a potentially-impure
     [Compiled.t] term to be used for a single display lifecycle. It has three
@@ -205,8 +213,8 @@ let spinner ?color ?stages () =
     - inline nested groupings to make printing more efficient. *)
 module Compiled = struct
   type 'a t =
-    | Pp of { pp : 'a sized_pp; mutable latest : 'a }
-    | Const of { pp : Format.formatter -> int }
+    | Pp of { pp : Line_buffer.t -> 'a -> int; mutable latest : 'a }
+    | Const of { pp : Line_buffer.t -> int }
     | Contramap : 'a t * ('b -> 'a) -> 'b t
     | Cond of
         { if_ : 'a -> bool
@@ -347,11 +355,11 @@ let compile =
 let report compiled =
   let rec aux : type a. a Compiled.t -> (Line_buffer.t -> a -> int) Staged.t =
     function
-    | Const { pp } -> Staged.inj (fun buf (_ : a) -> pp (Line_buffer.ppf buf))
+    | Const { pp } -> Staged.inj (fun buf (_ : a) -> pp buf)
     | Pp pp ->
         Staged.inj (fun buf x ->
             pp.latest <- x;
-            pp.pp (Line_buffer.ppf buf) x)
+            pp.pp buf x)
     | Contramap (t, f) ->
         let$ inner = aux t in
         fun buf a -> inner buf (f a)
@@ -388,10 +396,10 @@ let report compiled =
   aux compiled
 
 let update =
-  let rec aux : type a. a Compiled.t -> (Format.formatter -> int) Staged.t =
+  let rec aux : type a. a Compiled.t -> (Line_buffer.t -> int) Staged.t =
     function
     | Const { pp } -> Staged.inj pp
-    | Pp pp -> Staged.inj (fun ppf -> pp.pp ppf pp.latest)
+    | Pp pp -> Staged.inj (fun buf -> pp.pp buf pp.latest)
     (* Updating happens unconditionally *)
     | Cond { then_; _ } -> aux then_
     | Contramap (inner, _) -> aux inner
@@ -407,6 +415,4 @@ let update =
           let z = right ppf in
           x + y + z
   in
-  fun compiled ->
-    let theta = Staged.prj (aux compiled) in
-    Staged.inj (fun buf -> theta (Line_buffer.ppf buf))
+  fun compiled -> aux compiled

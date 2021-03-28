@@ -28,24 +28,47 @@ let advance t len =
   if new_position > t.length then resize t len;
   t.position <- new_position
 
-let add_substring t s offset len =
-  if offset < 0 || len < 0 || offset > String.length s - len then
+let add_char b c =
+  let pos = b.position in
+  if pos >= b.length then resize b 1;
+  Bytes.unsafe_set b.buffer pos c;
+  b.position <- pos + 1
+
+let add_substring t s ~off ~len =
+  if off < 0 || len < 0 || off > String.length s - len then
     invalid_arg "Line_buffer.add_substring";
   let position = t.position in
   advance t len;
-  Bytes.unsafe_blit_string s offset t.buffer position len
+  Bytes.unsafe_blit_string s off t.buffer position len
+
+let add_string b s =
+  let len = String.length s in
+  let new_position = b.position + len in
+  if new_position > b.length then resize b len;
+  Bytes.unsafe_blit_string s 0 b.buffer b.position len;
+  b.position <- new_position
+
+let add_style_code buf style = add_string buf (Ansi.style_code style)
 
 let create ~size =
   let buffer = Bytes.create size in
   let rec ppf =
     lazy
-      (let ppf = Format.make_formatter (add_substring t) (fun () -> ()) in
+      (let ppf =
+         Format.make_formatter
+           (fun s off len -> add_substring t s ~off ~len)
+           (fun () -> ())
+       in
        Fmt.set_style_renderer ppf `Ansi_tty;
        ppf)
   and t = { buffer; position = 0; length = size; ppf } in
   t
 
-let ppf t = Lazy.force t.ppf
+let with_ppf t f =
+  let ppf = Lazy.force t.ppf in
+  let a = f ppf in
+  Format.pp_print_flush ppf ();
+  a
 
 let contents t =
   let res = Bytes.sub_string t.buffer 0 t.position in

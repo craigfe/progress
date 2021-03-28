@@ -38,13 +38,14 @@ module type Elt = sig
   val to_float : t -> float
 end
 
+module Ansi = Ansi
 module Duration = Duration
 
 type bar_style = [ `ASCII | `UTF8 | `Custom of string list ]
 
 val counter :
      total:'elt
-  -> ?color:Fmt.style
+  -> ?color:Ansi.style
   -> ?style:bar_style
   -> ?message:string
   -> ?pp:(Format.formatter -> 'elt -> unit) * int
@@ -196,7 +197,7 @@ module Internal : sig
   val counter :
        ?prebar:'elt Segment.t
     -> total:'elt
-    -> ?color:Fmt.style
+    -> ?color:Ansi.style
     -> ?style:bar_style
     -> ?message:string
     -> ?pp:(Format.formatter -> 'elt -> unit) * int

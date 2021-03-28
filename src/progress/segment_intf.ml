@@ -15,15 +15,15 @@ module type S = sig
 
   (** {2 Pre-provided segments} *)
 
-  val spinner : ?color:Fmt.style -> ?stages:string list -> unit -> _ t
+  val spinner : ?color:Ansi.style -> ?stages:string list -> unit -> _ t
   val bytes : int t
   val bytes_int64 : int64 t
   val percentage : float t
 
   val bar :
        ?style:[ `ASCII | `UTF8 | `Custom of string list ]
-    -> ?color:Fmt.style
-    -> ?color_empty:Fmt.style
+    -> ?color:Ansi.style
+    -> ?color_empty:Ansi.style
     -> ?width:[ `Fixed of int | `Expand ]
     -> ('a -> float)
     -> 'a t

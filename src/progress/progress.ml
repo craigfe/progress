@@ -1,8 +1,4 @@
 open! Import
-module Config = Config
-module Duration = Duration
-module Segment = Segment
-module Units = Units
 
 module type Elt = sig
   type t
@@ -57,3 +53,9 @@ let counter (type elt) ~total ?color ?style ?message ?pp ?width
   Internal.counter ?color ?prebar:None ~total ?style ?message ?pp ?width
     ?sampling_interval
     (module Elt)
+
+module Ansi = Ansi
+module Config = Config
+module Duration = Duration
+module Segment = Segment
+module Units = Units
