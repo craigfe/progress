@@ -18,6 +18,7 @@ module type S = sig
   val spinner : ?color:Fmt.style -> ?stages:string list -> unit -> _ t
   val bytes : int t
   val bytes_int64 : int64 t
+  val percentage : float t
 
   val bar :
     ?style:[ `ASCII | `UTF8 | `Custom of string list ] ->

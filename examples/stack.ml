@@ -1,15 +1,15 @@
-let bar message =
-  Progress_unix.counter ~style:`UTF8 ~total:1_000_000L ~message
-    ~pp:Progress.Units.bytes
+let bar color message =
+  Progress_unix.counter ~color ~style:`UTF8 ~total:1_000_000L ~message
+    ~pp:Progress.Units.Bytes.(of_int64, width)
     (module Int64)
 
 let main () =
   Progress_unix.(
     with_reporters
-      (bar "index.html     "
-      / bar "sitemap.xml    "
-      / bar "img/kittens.jpg"
-      / bar "img/puppies.jpg"))
+      (bar `Red "index.html     "
+      / bar `Yellow "sitemap.xml    "
+      / bar `Green "img/kittens.jpg"
+      / bar `Blue "img/puppies.jpg"))
   @@ fun a b c d ->
   let pick_random () =
     match Random.int 100 with

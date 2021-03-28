@@ -28,9 +28,9 @@ module Reporters = Renderer.Reporters
 type bar_style = [ `ASCII | `UTF8 | `Custom of string list ]
 
 module Internal = struct
-  let counter (type elt) ?prebar ~(total : elt) ?(style = `ASCII) ?message
-      ?(pp : (elt, elt Segment.t) Units.pp_fixed option) ?width
-      ?(sampling_interval = 1) (module Elt : Elt with type t = elt) =
+  let counter (type elt) ?prebar ~(total : elt) ?color ?(style = `ASCII)
+      ?message ?pp ?width ?(sampling_interval = 1)
+      (module Elt : Elt with type t = elt) =
     let open Segment in
     let proportion =
       let total = Elt.to_float total in
@@ -41,7 +41,7 @@ module Internal = struct
       @ Option.fold ~none:[] pp ~some:(fun (pp, width) -> [ of_pp ~width pp ])
       @ Option.fold ~none:[] prebar ~some:(fun s -> [ s ])
       @ [
-          bar ~style proportion
+          bar ?color ~style proportion
           ++ const " "
           ++ using proportion percentage;
         ])
@@ -52,8 +52,8 @@ module Internal = struct
     |> make ~init:Elt.zero
 end
 
-let counter (type elt) ~(total : elt) ?style ?message ?pp ?width
+let counter (type elt) ~total ?color ?style ?message ?pp ?width
     ?sampling_interval (module Elt : Elt with type t = elt) =
-  Internal.counter ?prebar:None ~total ?style ?message ?pp ?width
+  Internal.counter ?color ?prebar:None ~total ?style ?message ?pp ?width
     ?sampling_interval
     (module Elt)

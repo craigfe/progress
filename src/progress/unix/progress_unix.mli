@@ -11,6 +11,7 @@ type 'a pp := Format.formatter -> 'a -> unit
 
 val counter :
   total:'elt ->
+  ?color:Fmt.style ->
   ?style:Progress.bar_style ->
   ?message:string ->
   ?pp:'elt pp * int ->

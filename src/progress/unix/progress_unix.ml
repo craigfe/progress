@@ -6,11 +6,11 @@ let stopwatch () =
       let pp ppf = Units.Duration.mm_ss ppf (Mtime_clock.count start_time) in
       Segment.const_fmt ~width:5 pp)
 
-let counter (type elt) ~(total : elt) ?style ?message
-    ?(pp : (elt, elt Segment.t) Units.pp_fixed option) ?width ?sampling_interval
-    (module Elt : Progress.Elt with type t = elt) : (elt reporter -> 'a, 'a) t =
-  Internal.counter ~prebar:(stopwatch ()) ~total ?style ?message ?pp ?width
-    ?sampling_interval
+let counter (type elt) ~total ?color ?style ?message ?pp ?width
+    ?sampling_interval (module Elt : Progress.Elt with type t = elt) :
+    (elt reporter -> 'a, 'a) t =
+  Internal.counter ~prebar:(stopwatch ()) ~total ?color ?style ?message ?pp
+    ?width ?sampling_interval
     (module Elt)
 
 let stderr_if_tty =

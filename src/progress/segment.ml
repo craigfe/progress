@@ -20,14 +20,9 @@ and ('a, 'b) cond = { if_ : 'a -> bool; then_ : 'b }
 
 let of_pp ~width pp = Pp_fixed { pp; width }
 let const_fmt ~width pp = Const { pp; width }
-
-let bytes =
-  (* TODO: built-in noalloc pretty printer for bytes *)
-  let pp, width = Units.Bytes.pp_fixed in
-  let pp ppf x = pp ppf (Int64.of_int x) in
-  of_pp ~width pp
-
-let bytes_int64 = Units.bytes of_pp
+let bytes = of_pp ~width:Units.Bytes.width Units.Bytes.of_int
+let bytes_int64 = of_pp ~width:Units.Bytes.width Units.Bytes.of_int64
+let percentage = of_pp ~width:Units.Percentage.width Units.Percentage.of_float
 
 let const s =
   const_fmt ~width:(String.Utf8.length s) (fun ppf ->
