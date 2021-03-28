@@ -4,13 +4,17 @@
 
 (** {2 Time-sensitive segments} *)
 
-val elapsed : unit -> 'a Progress.Segment.t
+open Progress
+
+type 'a segment := 'a Segment.t
+
+val elapsed : unit -> 'a segment
 (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
 
 type 'a pp := Format.formatter -> 'a -> unit
 
-val rate : int64 pp * int -> int64 Progress.Segment.t
-val eta : int64 -> int64 Progress.Segment.t
+val rate : int64 pp * int -> int64 segment
+val eta : int64 -> int64 segment
 
 type 'a accumulated
 
@@ -18,24 +22,20 @@ val acc : 'a accumulated -> 'a
 val latest : 'a accumulated -> 'a
 
 val debounced_accumulator :
-     Progress.Duration.t
-  -> ('a -> 'a -> 'a)
-  -> 'a
-  -> 'a accumulated Progress.Segment.t
-  -> 'a Progress.Segment.t
+  Duration.t -> ('a -> 'a -> 'a) -> 'a -> 'a accumulated segment -> 'a segment
 (** [debounce span s] has the same output format as [s], but only passes
     reported values doen to [s] at most once in any given time [span]. *)
 
 val counter :
      total:'elt
   -> ?color:Fmt.style
-  -> ?style:Progress.bar_style
+  -> ?style:bar_style
   -> ?message:string
   -> ?pp:'elt pp * int
   -> ?width:int
   -> ?sampling_interval:int
-  -> (module Progress.Elt with type t = 'elt)
-  -> ('elt Progress.reporter -> 'a, 'a) Progress.t
+  -> (module Elt with type t = 'elt)
+  -> ('elt reporter -> 'a, 'a) t
 (** [counter ~total ()] is a progress bar of the form:
 
     {[
@@ -53,18 +53,12 @@ val stderr_if_tty : Format.formatter
 
 (** Renderers that use {!stderr_if_tty} as an output formatter. *)
 
-val with_reporters :
-  ?config:Progress.Config.t -> ('a, 'b) Progress.t -> 'a -> 'b
-
-val start :
-     ?config:Progress.Config.t
-  -> ('a, unit) Progress.t
-  -> 'a Progress.Reporters.t * Progress.display
-
-val finalize : Progress.display -> unit
+val with_reporters : ?config:Config.t -> ('a, 'b) t -> 'a -> 'b
+val start : ?config:Config.t -> ('a, unit) t -> 'a Reporters.t * display
+val finalize : display -> unit
 
 (** {2 Re-exports}
 
     Convenient aliases to functions defined in {!Progress}. *)
 
-val ( / ) : ('a, 'b) Progress.t -> ('b, 'c) Progress.t -> ('a, 'c) Progress.t
+val ( / ) : ('a, 'b) t -> ('b, 'c) t -> ('a, 'c) t
