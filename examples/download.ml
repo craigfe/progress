@@ -1,18 +1,17 @@
-module S = Progress.Segment
+module L = Progress.Line
 
 let () = Fmt.set_style_renderer Fmt.stderr `Ansi_tty
 
 let bar ~total =
   let total_bytes = Fmt.to_to_string Progress.Units.Bytes.of_int total in
   let rate =
-    S.using Int64.of_int
+    L.using Int64.of_int
       (Progress_unix.rate Progress.Units.Bytes.(of_int64, width))
   in
-  let eta = S.using Int64.of_int (Progress_unix.eta (Int64.of_int total)) in
-
-  let open S in
-  Progress_unix.debounced_accumulator (Progress.Duration.of_ms 100.) ( + ) 0
-  @@ box_winsize ~fallback:80
+  let eta = L.using Int64.of_int (Progress_unix.eta (Int64.of_int total)) in
+  let open L in
+  Progress_unix.debounced_accumulator (Progress.Duration.of_ms 0.0001) ( + ) 0
+  @@ Expert.box_winsize ~fallback:80
   @@ list ~sep:(const " ")
        [ spinner ~color:`Green ()
        ; const "[" ++ Progress_unix.elapsed () ++ const "]"
@@ -25,6 +24,7 @@ let bar ~total =
        ]
 
 let () =
+  Memtrace.trace_if_requested ();
   let total = 231231231 in
   let bar = Progress.make ~init:0 (bar ~total) in
   Progress.with_reporters bar @@ fun report ->

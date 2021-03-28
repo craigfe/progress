@@ -80,17 +80,17 @@ val counter :
 
     See {!Progress_unix.counter} for an equivalent that contains a timer. *)
 
-(** [Segment] contains a DSL for defining custom progress bars. *)
-module Segment : sig
-  include Segment.S
+(** [Line] contains a DSL for defining custom progress bars. *)
+module Line : sig
+  include Line.S
   (** @inline *)
 end
 
-val make : init:'a -> 'a Segment.t -> ('a reporter -> 'b, 'b) t
+val make : init:'a -> 'a Line.t -> ('a reporter -> 'b, 'b) t
 (** Define a new progress bar from a specification, with the given initial
     value. *)
 
-val make_list : init:'a -> 'a Segment.t list -> ('a reporter list -> 'b, 'b) t
+val make_list : init:'a -> 'a Line.t list -> ('a reporter list -> 'b, 'b) t
 
 (** {2 Multiple progress bars} *)
 
@@ -195,7 +195,7 @@ module Units = Units
     API. *)
 module Internal : sig
   val counter :
-       ?prebar:'elt Segment.t
+       ?prebar:'elt Line.Expert.t
     -> total:'elt
     -> ?color:Ansi.style
     -> ?style:bar_style

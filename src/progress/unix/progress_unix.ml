@@ -1,29 +1,32 @@
 open Progress
 
 let elapsed () =
-  Segment.stateful (fun () ->
+  let open Line in
+  Expert.stateful (fun () ->
       let start_time = Mtime_clock.counter () in
       let pp ppf = Units.Duration.mm_ss ppf (Mtime_clock.count start_time) in
-      Segment.const_fmt ~width:5 pp)
+      const_fmt ~width:5 pp)
 
 let rate (pp, width) =
-  Segment.stateful (fun () ->
+  let open Line in
+  Expert.stateful (fun () ->
       let buf = Ring_buffer.create ~size:16 in
       let width = width + 2 in
       let pp ppf x = Fmt.pf ppf "%a/s" pp x in
-      Segment.using
+      using
         (fun x ->
           Ring_buffer.record buf x;
           Int64.of_float (Ring_buffer.rate_per_second buf))
-        (Segment.of_pp ~width pp))
+        (of_pp ~width pp))
 
 let eta total =
-  Segment.stateful (fun () ->
+  let open Line in
+  Expert.stateful (fun () ->
       let buf = Ring_buffer.create ~size:16 in
       let pp ppf x = Fmt.pf ppf "ETA: %a" Units.Duration.mm_ss x in
       let width = 10 in
       let acc = ref 0L in
-      Segment.using
+      using
         (fun x ->
           Ring_buffer.record buf x;
           acc := Int64.add !acc x;
@@ -33,7 +36,7 @@ let eta total =
             let todo = Int64.(to_float (sub total !acc)) in
             Mtime.Span.of_uint64_ns
               (Int64.of_float (todo /. per_second *. 1_000_000_000.)))
-        (Segment.of_pp ~width pp))
+        (of_pp ~width pp))
 
 type 'a accumulated = { acc : 'a; latest : 'a }
 
@@ -41,8 +44,8 @@ let acc t = t.acc
 let latest t = t.latest
 
 let debounced_accumulator interval combine zero s =
-  let open Segment in
-  stateful (fun () ->
+  let open Line in
+  Expert.stateful (fun () ->
       let latest = ref (Mtime_clock.now ()) in
       let total = ref zero in
       let pending = ref zero in
@@ -55,7 +58,7 @@ let debounced_accumulator interval combine zero s =
             true
       in
       using (fun a -> pending := combine !pending a)
-      @@ conditional (fun _ -> should_update ())
+      @@ Expert.conditional (fun _ -> should_update ())
       @@ using (fun () ->
              let acc = combine !total !pending in
              let latest = !pending in

@@ -10,9 +10,9 @@ let bars =
   ; ("Blocky:     ", `Custom [ " "; "▖"; "▌"; "▛"; "█" ], `Magenta)
   ]
   |> List.map (fun (label, style, color) ->
-         let open Progress.Segment in
-         box_winsize ~max:50
-         @@ accumulator ( + ) 0
+         let open Progress.Line in
+         Expert.box_winsize ~max:50
+         @@ Expert.accumulator ( + ) 0
          @@ (const label ++ bar ~style ~color (fun x -> float_of_int x /. 1000.)))
   |> Progress.make_list ~init:0
 

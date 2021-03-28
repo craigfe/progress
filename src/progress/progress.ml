@@ -28,23 +28,24 @@ module Internal = struct
   let counter (type elt) ?prebar ~(total : elt) ?color ?(style = `ASCII)
       ?message ?pp ?width ?(sampling_interval = 1)
       (module Elt : Elt with type t = elt) =
-    let open Segment in
+    let open Line in
     let proportion =
       let total = Elt.to_float total in
       fun i -> Elt.to_float i /. total
     in
     list
       (Option.fold ~none:[] message ~some:(fun s -> [ const s ])
-      @ Option.fold ~none:[] pp ~some:(fun (pp, width) -> [ of_pp ~width pp ])
+      @ Option.fold ~none:[] pp ~some:(fun (pp, width) ->
+            [ Segment.of_pp ~width pp ])
       @ Option.fold ~none:[] prebar ~some:(fun s -> [ s ])
       @ [ bar ?color ~style proportion
           ++ const " "
           ++ using proportion percentage
         ])
-    |> Option.fold width ~some:box_fixed ~none:(fun s ->
-           box_winsize ~fallback:80 s)
-    |> periodic sampling_interval
-    |> accumulator Elt.add Elt.zero
+    |> Option.fold width ~some:Segment.box_fixed ~none:(fun s ->
+           Segment.box_winsize ~fallback:80 s)
+    |> Segment.periodic sampling_interval
+    |> Segment.accumulator Elt.add Elt.zero
     |> make ~init:Elt.zero
 end
 
@@ -57,5 +58,6 @@ let counter (type elt) ~total ?color ?style ?message ?pp ?width
 module Ansi = Ansi
 module Config = Config
 module Duration = Duration
+module Line = Line
 module Segment = Segment
 module Units = Units

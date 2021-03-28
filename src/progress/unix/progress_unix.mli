@@ -2,19 +2,19 @@
 
     It is packaged as the Dune library [progress.unix]. *)
 
-(** {2 Time-sensitive segments} *)
+(** {2 Time-sensitive line segments} *)
 
 open Progress
 
-type 'a segment := 'a Segment.t
+type 'a line := 'a Line.t
 
-val elapsed : unit -> 'a segment
+val elapsed : unit -> 'a line
 (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
 
 type 'a pp := Format.formatter -> 'a -> unit
 
-val rate : int64 pp * int -> int64 segment
-val eta : int64 -> int64 segment
+val rate : int64 pp * int -> int64 line
+val eta : int64 -> int64 line
 
 type 'a accumulated
 
@@ -22,7 +22,7 @@ val acc : 'a accumulated -> 'a
 val latest : 'a accumulated -> 'a
 
 val debounced_accumulator :
-  Duration.t -> ('a -> 'a -> 'a) -> 'a -> 'a accumulated segment -> 'a segment
+  Duration.t -> ('a -> 'a -> 'a) -> 'a -> 'a accumulated line -> 'a line
 (** [debounce span s] has the same output format as [s], but only passes
     reported values doen to [s] at most once in any given time [span]. *)
 
@@ -43,7 +43,7 @@ val counter :
     ]}
 
     This is an equivalent of {!Progress.counter} with an extra {!stopwatch}
-    segment. *)
+    line. *)
 
 (** {2 TTY-sensitive renderers} *)
 

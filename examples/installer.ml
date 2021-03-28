@@ -15,8 +15,8 @@ let with_bars f =
   let bar_names = [ "alcotest"; "ctypes"; "irmin"; "fmt"; "logs" ] in
   let bars =
     ListLabels.map bar_names ~f:(fun name ->
-        let open Progress.Segment in
-        box_winsize
+        let open Progress.Line in
+        Expert.box_winsize
           (spinner ~color:`Green () ++ const (" " ^ name ^ ": ") ++ string))
     |> Progress.make_list ~init:""
   in

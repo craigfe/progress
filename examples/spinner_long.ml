@@ -9,8 +9,7 @@ let stages =
 
 let bar =
   Progress.make ~init:()
-    Progress.Segment.(
-      spinner ~color:`Blue ~stages () ++ const "  Calculating...")
+    Progress.Line.(spinner ~color:`Blue ~stages () ++ const "  Calculating...")
 
 let () =
   Progress.with_reporters bar (fun report ->

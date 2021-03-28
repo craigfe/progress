@@ -1,5 +1,5 @@
 let bar color message =
-  Progress_unix.counter ~color ~style:`UTF8 ~total:1_000_000L ~message
+  Progress_unix.counter ~color ~style:`UTF8 ~total:1_000_000_000L ~message
     ~pp:Progress.Units.Bytes.(of_int64, width)
     (module Int64)
 
@@ -19,13 +19,13 @@ let main () =
     | _ -> d
   in
   let random_progress () = Random.int64 10_000L in
-  for i = 1 to 1_250 do
+  for i = 1 to 1_250_000 do
     if i mod 100 = 0 then Logs.info (fun f -> f "Iterations reached: %d" i);
-    (pick_random ()) (random_progress ());
-    Unix.sleepf 0.01
+    (pick_random ()) (random_progress ()) (* Unix.sleepf 0.01 *)
   done
 
 let () =
+  Memtrace.trace_if_requested ();
   let () =
     (* Run with [dune exec examples/stack.exe -- --verbose] to see log entries
        being interleaved with progress bar rendering. *)

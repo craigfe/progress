@@ -2,4 +2,4 @@
  (names stack download installer spinner_long spinner_bar interject
    bar_styles)
  (libraries progress progress.logs progress.unix unix logs logs.fmt fmt mtime
-   mtime.clock.os))
+   mtime.clock.os memtrace))

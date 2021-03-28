@@ -1,9 +1,9 @@
 let () =
   let bar =
     Progress.make ~init:0
-      Progress.Segment.(
-        box_winsize
-        @@ accumulator ( + ) 0
+      Progress.Line.(
+        Expert.box_winsize
+        @@ Expert.accumulator ( + ) 0
         @@ bar ~style:`UTF8 (fun x -> float_of_int x /. 100.))
   in
   Progress.with_reporters bar (fun f ->

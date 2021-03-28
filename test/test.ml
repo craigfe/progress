@@ -26,7 +26,7 @@ module Units = struct end
 let test_pair () =
   let bar =
     Progress.(
-      Segment.(
+      Line.(
         pair ~sep:(const ", ")
           (of_pp ~width:1 Format.pp_print_int)
           (of_pp ~width:1 Format.pp_print_string))
@@ -44,7 +44,7 @@ let test_unicode_bar () =
   let () =
     let@ report =
       Progress.(
-        Segment.bar ~style:`UTF8 ~width:(`Fixed 3) Fun.id
+        Line.bar ~style:`UTF8 ~width:(`Fixed 3) Fun.id
         |> make ~init:0.
         |> with_reporters ~config)
     in
@@ -77,7 +77,7 @@ let test_unicode_bar () =
   clear_test_state ();
   let () =
     let@ report =
-      Progress.Segment.bar ~style:`UTF8 ~width:(`Fixed 5) Fun.id
+      Progress.Line.bar ~style:`UTF8 ~width:(`Fixed 5) Fun.id
       |> Progress.make ~init:0.
       |> Progress.with_reporters ~config
     in
@@ -169,7 +169,7 @@ module Boxes = struct
     @@ fun () ->
     ignore
       Progress.(
-        start @@ make ~init:0. Segment.(bar ~width:`Expand ~style:`UTF8 Fun.id))
+        start @@ make ~init:0. Line.(bar ~width:`Expand ~style:`UTF8 Fun.id))
 
   let test_two_unsized_in_box () =
     Alcotest.check_raises "Two unsized elements in a box"
@@ -178,15 +178,16 @@ module Boxes = struct
           segments in a single box.")
     @@ fun () ->
     let open Progress in
-    let unsized = Segment.bar ~style:`UTF8 Fun.id in
-    ignore (start @@ make ~init:0. Segment.(box_fixed 10 (unsized ++ unsized)))
+    let unsized = Line.bar ~style:`UTF8 Fun.id in
+    ignore
+      (start @@ make ~init:0. Line.(Expert.box_fixed 10 (unsized ++ unsized)))
 end
 
 module Stateful = struct
   let test_periodic () =
     let@ report =
       Progress.(
-        Segment.(accumulator ( + ) 0 (periodic 3 (of_pp ~width:1 Fmt.int)))
+        Line.Expert.(accumulator ( + ) 0 (periodic 3 (of_pp ~width:1 Fmt.int)))
         |> make ~init:0
         |> with_reporters ~config)
     in
