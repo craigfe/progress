@@ -1,5 +1,8 @@
 version = 0.17.0
 profile = conventional
+
 parse-docstrings
-break-infix = fit-or-vertical
 module-item-spacing = compact
+dock-collection-brackets = false
+break-infix = fit-or-vertical
+break-separators = before

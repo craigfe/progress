@@ -146,8 +146,8 @@ let accumulator combine zero s =
   stateful (fun () ->
       let state = ref zero in
       Contramap
-        ( s,
-          fun a ->
+        ( s
+        , fun a ->
             state := combine !state a;
             !state ))
 
@@ -222,11 +222,11 @@ module Compiled = struct
         Fmt.pf ppf "(%a, %a, %a)" pp_dump left pp_dump sep pp_dump right
 end
 
-type 'a state = {
-  consumed : int;
-  expand : (unit -> int, [ `Msg of string ]) result;
-  initial : 'a;
-}
+type 'a state =
+  { consumed : int
+  ; expand : (unit -> int, [ `Msg of string ]) result
+  ; initial : 'a
+  }
 
 let array_fold_left_map f acc input_array =
   let len = Array.length input_array in
@@ -260,15 +260,15 @@ let compile =
     | Pp_unsized { pp } ->
         let width = Result.get_or_invalid_arg state.expand in
         let pp ppf x = pp ~width ppf x in
-        ( Pp { pp; latest = state.initial },
-          { state with expand = expansion_occurred } )
+        ( Pp { pp; latest = state.initial }
+        , { state with expand = expansion_occurred } )
     | Pp_fixed { pp; width } ->
         let pp ppf x =
           pp ppf x;
           width
         in
-        ( Pp { pp; latest = state.initial },
-          { state with consumed = state.consumed + width } )
+        ( Pp { pp; latest = state.initial }
+        , { state with consumed = state.consumed + width } )
     | Contramap (t, f) ->
         let initial_a = state.initial in
         let inner, state = inner { state with initial = f initial_a } t in
@@ -315,12 +315,11 @@ let compile =
   in
   fun ~initial x ->
     inner
-      {
-        consumed = 0;
-        expand =
+      { consumed = 0
+      ; expand =
           Result.errorf
-            "Encountered an expanding element that is not contained in a box";
-        initial;
+            "Encountered an expanding element that is not contained in a box"
+      ; initial
       }
       x
     |> fst

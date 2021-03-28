@@ -1,8 +1,8 @@
-type t = {
-  ppf : Format.formatter option;
-  hide_cursor : bool option;
-  persistent : bool option;
-}
+type t =
+  { ppf : Format.formatter option
+  ; hide_cursor : bool option
+  ; persistent : bool option
+  }
 
 let create ?ppf ?hide_cursor ?persistent () = { ppf; hide_cursor; persistent }
 
@@ -10,17 +10,13 @@ let create ?ppf ?hide_cursor ?persistent () = { ppf; hide_cursor; persistent }
 let merge_on ~f a b = match (f a, f b) with Some a, _ -> Some a | None, b -> b
 
 let ( || ) a b =
-  {
-    ppf = merge_on a b ~f:(fun x -> x.ppf);
-    hide_cursor = merge_on a b ~f:(fun x -> x.hide_cursor);
-    persistent = merge_on a b ~f:(fun x -> x.persistent);
+  { ppf = merge_on a b ~f:(fun x -> x.ppf)
+  ; hide_cursor = merge_on a b ~f:(fun x -> x.hide_cursor)
+  ; persistent = merge_on a b ~f:(fun x -> x.persistent)
   }
 
-type internal = {
-  ppf : Format.formatter;
-  hide_cursor : bool;
-  persistent : bool;
-}
+type internal =
+  { ppf : Format.formatter; hide_cursor : bool; persistent : bool }
 
 module Default = struct
   let ppf =
@@ -37,8 +33,7 @@ end
 
 let to_internal : t -> internal =
  fun { ppf; hide_cursor; persistent } ->
-  {
-    ppf = Option.value ppf ~default:Default.ppf;
-    hide_cursor = Option.value hide_cursor ~default:Default.hide_cursor;
-    persistent = Option.value persistent ~default:Default.persistent;
+  { ppf = Option.value ppf ~default:Default.ppf
+  ; hide_cursor = Option.value hide_cursor ~default:Default.hide_cursor
+  ; persistent = Option.value persistent ~default:Default.persistent
   }

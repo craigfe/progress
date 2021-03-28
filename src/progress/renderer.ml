@@ -103,13 +103,13 @@ module Display : sig
   val finalize : t -> unit
 end = struct
   type t =
-    | E : {
-        config : Config.internal;
-        bars : (_, _) Bar_list.t;
-        bar_count : int;
-        uid : Uid.t;
-        latest_widths : int array;
-      }
+    | E :
+        { config : Config.internal
+        ; bars : (_, _) Bar_list.t
+        ; bar_count : int
+        ; uid : Uid.t
+        ; latest_widths : int array
+        }
         -> t
 
   let create ~config bars =
@@ -205,12 +205,12 @@ module Global : sig
   val set_active_exn : Display.t -> unit
   val set_inactive : unit -> unit
 end = struct
-  type runtime = {
-    (* Race conditions over these fields are not handled, but protection against
-       concurrent usage is best-effort anyway. *)
-    mutable active_display : Display.t option;
-    displaced_handlers : (int, Sys.signal_behavior) Hashtbl.t;
-  }
+  type runtime =
+    { (* Race conditions over these fields are not handled, but protection against
+         concurrent usage is best-effort anyway. *)
+      mutable active_display : Display.t option
+    ; displaced_handlers : (int, Sys.signal_behavior) Hashtbl.t
+    }
 
   let runtime = { active_display = None; displaced_handlers = Hashtbl.create 0 }
   let is_active () = Option.is_some runtime.active_display

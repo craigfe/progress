@@ -2,11 +2,11 @@
     designed to cooperate with progress bar rendering. *)
 
 val reporter :
-  ?pp_header:(Logs.level * string option) Fmt.t ->
-  ?app:Format.formatter ->
-  ?dst:Format.formatter ->
-  unit ->
-  Logs.reporter
+     ?pp_header:(Logs.level * string option) Fmt.t
+  -> ?app:Format.formatter
+  -> ?dst:Format.formatter
+  -> unit
+  -> Logs.reporter
 (** [reporter] is like {!Logs_fmt.reporter} but produces a reporter that
     {{!Progress.interject_with} suspends} any ongoing progress bar rendering
     while displaying log entries, ensuring that log entries in the terminal are

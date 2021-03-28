@@ -48,8 +48,7 @@ let test_seconds () =
 
 let tests =
   Alcotest.
-    [
-      test_case "percentage" `Quick test_percentage;
-      test_case "bytes" `Quick test_bytes;
-      test_case "seconds" `Quick test_seconds;
+    [ test_case "percentage" `Quick test_percentage
+    ; test_case "bytes" `Quick test_bytes
+    ; test_case "seconds" `Quick test_seconds
     ]

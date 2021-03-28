@@ -8,12 +8,11 @@ let bar ~total =
   box_winsize ~max:80 ~fallback:80
   @@ accumulator ( + ) 0
   @@ list ~sep:(const " ")
-       [
-         spinner ~color:`Green ();
-         const "[" ++ Progress_unix.stopwatch () ++ const "]";
-         bar ~color:`Cyan ~style:`ASCII (fun x ->
-             float_of_int x /. float_of_int total);
-         bytes ++ const " / " ++ const total_bytes;
+       [ spinner ~color:`Green ()
+       ; const "[" ++ Progress_unix.stopwatch () ++ const "]"
+       ; bar ~color:`Cyan ~style:`ASCII (fun x ->
+             float_of_int x /. float_of_int total)
+       ; bytes ++ const " / " ++ const total_bytes
        ]
 
 let () =

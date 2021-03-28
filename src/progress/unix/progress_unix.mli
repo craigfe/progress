@@ -10,15 +10,15 @@ val stopwatch : unit -> 'a Progress.Segment.t
 type 'a pp := Format.formatter -> 'a -> unit
 
 val counter :
-  total:'elt ->
-  ?color:Fmt.style ->
-  ?style:Progress.bar_style ->
-  ?message:string ->
-  ?pp:'elt pp * int ->
-  ?width:int ->
-  ?sampling_interval:int ->
-  (module Progress.Elt with type t = 'elt) ->
-  ('elt Progress.reporter -> 'a, 'a) Progress.t
+     total:'elt
+  -> ?color:Fmt.style
+  -> ?style:Progress.bar_style
+  -> ?message:string
+  -> ?pp:'elt pp * int
+  -> ?width:int
+  -> ?sampling_interval:int
+  -> (module Progress.Elt with type t = 'elt)
+  -> ('elt Progress.reporter -> 'a, 'a) Progress.t
 (** [counter ~total ()] is a progress bar of the form:
 
     {[
@@ -40,9 +40,9 @@ val with_reporters :
   ?config:Progress.Config.t -> ('a, 'b) Progress.t -> 'a -> 'b
 
 val start :
-  ?config:Progress.Config.t ->
-  ('a, unit) Progress.t ->
-  'a Progress.Reporters.t * Progress.display
+     ?config:Progress.Config.t
+  -> ('a, unit) Progress.t
+  -> 'a Progress.Reporters.t * Progress.display
 
 val finalize : Progress.display -> unit
 

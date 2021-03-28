@@ -209,21 +209,18 @@ end
 let () =
   let open Alcotest in
   run __FILE__
-    [
-      ( "main",
-        [
-          test_case "Pair" `Quick test_pair;
-          test_case "Unicode bar" `Quick test_unicode_bar;
-          test_case "Progress bar lifecycle" `Quick test_progress_bar_lifecycle;
-          test_case "Progress bar width" `Quick test_progress_bar_width;
-        ] );
-      ( "boxes",
-        [
-          test_case "Unsized element not in box" `Quick
-            Boxes.test_unsized_not_in_box;
-          test_case "Two unsized elements in box" `Quick
-            Boxes.test_two_unsized_in_box;
-        ] );
-      ("stateful", [ test_case "periodic" `Quick Stateful.test_periodic ]);
-      ("units", Test_units.tests);
+    [ ( "main"
+      , [ test_case "Pair" `Quick test_pair
+        ; test_case "Unicode bar" `Quick test_unicode_bar
+        ; test_case "Progress bar lifecycle" `Quick test_progress_bar_lifecycle
+        ; test_case "Progress bar width" `Quick test_progress_bar_width
+        ] )
+    ; ( "boxes"
+      , [ test_case "Unsized element not in box" `Quick
+            Boxes.test_unsized_not_in_box
+        ; test_case "Two unsized elements in box" `Quick
+            Boxes.test_two_unsized_in_box
+        ] )
+    ; ("stateful", [ test_case "periodic" `Quick Stateful.test_periodic ])
+    ; ("units", Test_units.tests)
     ]

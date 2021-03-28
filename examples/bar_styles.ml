@@ -1,14 +1,13 @@
 let bars =
-  [
-    ("Rough bar:  ", `Custom [ " "; "█" ], `Red);
-    ( "Fine bar:   ",
-      `Custom [ " "; "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉"; "█" ],
-      `Yellow );
-    ( "Vertical:   ",
-      `Custom [ " "; "▁"; "▂"; "▃"; "▄"; "▅"; "▆"; "▇"; "█" ],
-      `Green );
-    ("Fade in:    ", `Custom [ " "; "░"; "▒"; "▓"; "█" ], `Blue);
-    ("Blocky:     ", `Custom [ " "; "▖"; "▌"; "▛"; "█" ], `Magenta);
+  [ ("Rough bar:  ", `Custom [ " "; "█" ], `Red)
+  ; ( "Fine bar:   "
+    , `Custom [ " "; "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉"; "█" ]
+    , `Yellow )
+  ; ( "Vertical:   "
+    , `Custom [ " "; "▁"; "▂"; "▃"; "▄"; "▅"; "▆"; "▇"; "█" ]
+    , `Green )
+  ; ("Fade in:    ", `Custom [ " "; "░"; "▒"; "▓"; "█" ], `Blue)
+  ; ("Blocky:     ", `Custom [ " "; "▖"; "▌"; "▛"; "█" ], `Magenta)
   ]
   |> List.map (fun (label, style, color) ->
          let open Progress.Segment in

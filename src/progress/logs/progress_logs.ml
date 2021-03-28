@@ -4,9 +4,8 @@ let instrument_reporter : Logs.reporter -> Logs.reporter =
     Progress.interject_with (fun () -> msgf construction)
   in
   fun r ->
-    {
-      report =
-        (fun src level ~over k f -> r.report src level ~over k (wrap_msgf f));
+    { report =
+        (fun src level ~over k f -> r.report src level ~over k (wrap_msgf f))
     }
 
 let reporter ?pp_header ?app ?dst () =

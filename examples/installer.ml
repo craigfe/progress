@@ -28,15 +28,14 @@ let pick_random l =
 
 let random_action =
   pick_random
-    [
-      "cmake .";
-      "make";
-      "make clean";
-      "gcc foo.c -o foo";
-      "gcc bar.c -o bar";
-      "./helper.sh rebuild-cache";
-      "make all-clean";
-      "make test";
+    [ "cmake ."
+    ; "make"
+    ; "make clean"
+    ; "gcc foo.c -o foo"
+    ; "gcc bar.c -o bar"
+    ; "./helper.sh rebuild-cache"
+    ; "make all-clean"
+    ; "make test"
     ]
 
 let () =

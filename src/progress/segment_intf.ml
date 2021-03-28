@@ -21,12 +21,12 @@ module type S = sig
   val percentage : float t
 
   val bar :
-    ?style:[ `ASCII | `UTF8 | `Custom of string list ] ->
-    ?color:Fmt.style ->
-    ?color_empty:Fmt.style ->
-    ?width:[ `Fixed of int | `Expand ] ->
-    ('a -> float) ->
-    'a t
+       ?style:[ `ASCII | `UTF8 | `Custom of string list ]
+    -> ?color:Fmt.style
+    -> ?color_empty:Fmt.style
+    -> ?width:[ `Fixed of int | `Expand ]
+    -> ('a -> float)
+    -> 'a t
   (** [bar ~width f] is a progress bar of the form:
 
       {[ [#######################################................] ]}

@@ -41,15 +41,15 @@ end
 type bar_style = [ `ASCII | `UTF8 | `Custom of string list ]
 
 val counter :
-  total:'elt ->
-  ?color:Fmt.style ->
-  ?style:bar_style ->
-  ?message:string ->
-  ?pp:(Format.formatter -> 'elt -> unit) * int ->
-  ?width:int ->
-  ?sampling_interval:int ->
-  (module Elt with type t = 'elt) ->
-  ('elt reporter -> 'a, 'a) t
+     total:'elt
+  -> ?color:Fmt.style
+  -> ?style:bar_style
+  -> ?message:string
+  -> ?pp:(Format.formatter -> 'elt -> unit) * int
+  -> ?width:int
+  -> ?sampling_interval:int
+  -> (module Elt with type t = 'elt)
+  -> ('elt reporter -> 'a, 'a) t
 (** [counter ~total (module Int)] is a progress bar of the form:
 
     {[ <message?>  <count?>  [########..............................]  XX% ]}
@@ -192,14 +192,14 @@ module Units = Units
     API. *)
 module Internal : sig
   val counter :
-    ?prebar:'elt Segment.t ->
-    total:'elt ->
-    ?color:Fmt.style ->
-    ?style:bar_style ->
-    ?message:string ->
-    ?pp:(Format.formatter -> 'elt -> unit) * int ->
-    ?width:int ->
-    ?sampling_interval:int ->
-    (module Elt with type t = 'elt) ->
-    ('elt reporter -> 'a, 'a) t
+       ?prebar:'elt Segment.t
+    -> total:'elt
+    -> ?color:Fmt.style
+    -> ?style:bar_style
+    -> ?message:string
+    -> ?pp:(Format.formatter -> 'elt -> unit) * int
+    -> ?width:int
+    -> ?sampling_interval:int
+    -> (module Elt with type t = 'elt)
+    -> ('elt reporter -> 'a, 'a) t
 end
