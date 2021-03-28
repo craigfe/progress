@@ -127,6 +127,17 @@ let modulo_counter : int -> (unit -> int) Staged.t =
 
 let stateful f = Staged f
 
+let string =
+  let pp ~width ppf s =
+    let len = String.length s in
+    if len <= width () then (
+      Fmt.string ppf s;
+      len)
+    else assert false
+    (* TODO *)
+  in
+  Pp_unsized { pp }
+
 let periodic interval t =
   match interval with
   | n when n <= 0 -> Format.kasprintf invalid_arg "Non-positive interval: %d" n
@@ -346,7 +357,7 @@ let report compiled =
           let z = right ppf v_right in
           x + y + z
   in
-  Staged.prj (aux compiled)
+  aux compiled
 
 let update compiled =
   let rec aux : type a. a Compiled.t -> (Format.formatter -> int) Staged.t =
@@ -368,4 +379,4 @@ let update compiled =
           let z = right ppf in
           x + y + z
   in
-  Staged.prj (aux compiled)
+  aux compiled

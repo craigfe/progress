@@ -1,3 +1,5 @@
+open! Import
+
 module type Counter = sig
   type t
 
@@ -37,6 +39,8 @@ module type S = sig
   val const : string -> _ t
   (** [const s] is the segment that always displays [s]. [s] must not contain
       any newline characters. *)
+
+  val string : string t
 
   val const_fmt : width:int -> (Format.formatter -> unit) -> _ t
   (** {!const_fmt} is a variant of {!const} that takes a fixed-width
@@ -112,6 +116,6 @@ module type Segment = sig
   end
 
   val compile : initial:'a -> 'a t -> 'a Compiled.t
-  val update : 'a Compiled.t -> Format.formatter -> int
-  val report : 'a Compiled.t -> Format.formatter -> 'a -> int
+  val update : 'a Compiled.t -> (Format.formatter -> int) Staged.t
+  val report : 'a Compiled.t -> (Format.formatter -> 'a -> int) Staged.t
 end

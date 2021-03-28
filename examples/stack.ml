@@ -1,6 +1,7 @@
 let bar message =
   Progress_unix.counter ~style:`UTF8 ~total:1_000_000L ~message
-    ~pp:Progress.Units.bytes ()
+    ~pp:Progress.Units.bytes
+    (module Int64)
 
 let main () =
   Progress_unix.(

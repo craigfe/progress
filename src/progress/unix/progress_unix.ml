@@ -7,14 +7,15 @@ let stopwatch () =
           let pp ppf = pp_time ppf (Mtime_clock.count start_time) in
           Segment.const_fmt ~width pp))
 
-let counter_prebar = stopwatch ()
-
-let counter ~total ?style ?message ?pp ?width ?sampling_interval =
-  Internal.counter ~prebar:counter_prebar ~total ?style ?message ?pp ?width
+let counter (type elt) ~(total : elt) ?style ?message
+    ?(pp : (elt, elt Segment.t) Units.pp_fixed option) ?width ?sampling_interval
+    (module Elt : Progress.Elt with type t = elt) : (elt reporter -> 'a, 'a) t =
+  Internal.counter ~prebar:(stopwatch ()) ~total ?style ?message ?pp ?width
     ?sampling_interval
+    (module Elt)
 
 let stderr_if_tty =
-  if Unix.(isatty stderr) then Format.err_formatter
+  if Unix.(isatty stderr) then Progress.Config.Default.ppf
   else Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
 
 let default_config = Config.create ~ppf:stderr_if_tty ()

@@ -8,14 +8,14 @@ val stopwatch : unit -> 'a Progress.Segment.t
 (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
 
 val counter :
-  total:int64 ->
+  total:'elt ->
   ?style:Progress.bar_style ->
   ?message:string ->
-  ?pp:(int64, int64 Progress.Segment.t) Progress.Units.pp_fixed ->
+  ?pp:('elt, 'elt Progress.Segment.t) Progress.Units.pp_fixed ->
   ?width:int ->
   ?sampling_interval:int ->
-  unit ->
-  (int64 Progress.reporter -> 'a, 'a) Progress.t
+  (module Progress.Elt with type t = 'elt) ->
+  ('elt Progress.reporter -> 'a, 'a) Progress.t
 (** [counter ~total ()] is a progress bar of the form:
 
     {[

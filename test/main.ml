@@ -145,7 +145,8 @@ let test_progress_bar_lifecycle () =
   let open Progress.Units.Bytes in
   let@ report =
     Progress.counter ~style:`ASCII ~total:(gib 1) ~sampling_interval:1 ~width:53
-      ~message:"<msg>" ~pp:Progress.Units.bytes ()
+      ~message:"<msg>" ~pp:Progress.Units.bytes
+      (module Int64)
     |> Progress.with_reporters ~config
   in
   check_bar "<msg>     0.0 B    [---------------------------]   0%";
@@ -178,7 +179,8 @@ let test_progress_bar_width () =
     let@ _report =
       Progress.with_reporters ~config
         (Progress.counter ~style:`ASCII ~total:1L ~sampling_interval:1 ~width
-           ~message ?pp ())
+           ~message ?pp
+           (module Int64))
     in
     String.length (read_bar ())
     |> Alcotest.(check int)

@@ -32,15 +32,23 @@ type ('a, 'b) t
 
 type bar_style = [ `ASCII | `UTF8 | `Custom of string list ]
 
+module type Elt = sig
+  type t
+
+  val zero : t
+  val add : t -> t -> t
+  val to_float : t -> float
+end
+
 val counter :
-  total:int64 ->
+  total:'elt ->
   ?style:bar_style ->
   ?message:string ->
-  ?pp:(int64, int64 Segment.t) Units.pp_fixed ->
+  ?pp:('elt, 'elt Segment.t) Units.pp_fixed ->
   ?width:int ->
   ?sampling_interval:int ->
-  unit ->
-  (int64 reporter -> 'a, 'a) t
+  (module Elt with type t = 'elt) ->
+  ('elt reporter -> 'a, 'a) t
 (** [counter ~total ()] is a progress bar of the form:
 
     {[ <message?>  <count?>  [########..............................]  XX% ]}
@@ -107,6 +115,12 @@ module Config : sig
       codes) during progress bar rendering. Defaults to [true]. *)
 
   val ( || ) : t -> t -> t
+
+  module Default : sig
+    val ppf : Format.formatter
+    val hide_cursor : bool
+    val persistent : bool
+  end
 end
 
 val with_reporters : ?config:Config.t -> ('a, 'b) t -> 'a -> 'b
@@ -177,13 +191,13 @@ module Units = Units
     API. *)
 module Internal : sig
   val counter :
-    ?prebar:int64 Segment.t ->
-    total:int64 ->
+    ?prebar:'elt Segment.t ->
+    total:'elt ->
     ?style:bar_style ->
     ?message:string ->
-    ?pp:(int64, int64 Segment.t) Units.pp_fixed ->
+    ?pp:('elt, 'elt Segment.t) Units.pp_fixed ->
     ?width:int ->
     ?sampling_interval:int ->
-    unit ->
-    (int64 reporter -> 'a, 'a) t
+    (module Elt with type t = 'elt) ->
+    ('elt reporter -> 'a, 'a) t
 end
