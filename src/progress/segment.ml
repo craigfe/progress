@@ -29,16 +29,29 @@ let const s =
 let conditional pred s = Cond { if_ = pred; then_ = s }
 let contramap ~f x = Contramap (x, f)
 
-let styled_opt style elt =
-  match style with None -> elt | Some s -> Fmt.styled s elt
+let styled_opt ~style pp_elt ppf elt =
+  match style with
+  | None -> pp_elt ppf elt
+  | Some s -> Fmt.styled s pp_elt ppf elt
+
+let repeated_styled_opt ~repeat ~style pp_elt ppf elt =
+  match style with
+  | None ->
+      for _ = 1 to repeat do
+        pp_elt ppf elt
+      done
+  | Some s ->
+      Fmt.styled s
+        (fun ppf () ->
+          for _ = 1 to repeat do
+            pp_elt ppf elt
+          done)
+        ppf ()
 
 let bar_custom ~stages ~color ~color_empty width proportion ppf =
+  let color_empty = Option.(color_empty || color) in
   let stages = Array.of_list stages in
   let final_stage = Array.length stages - 1 in
-  let pp_filled_segment = styled_opt color Fmt.string in
-  let pp_unfilled_segment =
-    styled_opt Option.(color_empty || color) Fmt.string
-  in
   let width = width () in
   let bar_width = width - 2 in
   let squaresf = Float.of_int bar_width *. proportion in
@@ -46,38 +59,31 @@ let bar_custom ~stages ~color ~color_empty width proportion ppf =
   let filled = min squares bar_width in
   let not_filled = bar_width - filled - 1 in
   Fmt.string ppf "│";
-  for _ = 1 to filled do
-    pp_filled_segment ppf stages.(final_stage)
-  done;
+  repeated_styled_opt ~repeat:filled ~style:color Fmt.string ppf
+    stages.(final_stage);
   (if filled <> bar_width then
    let () =
      let chunks = Float.to_int (squaresf *. Float.of_int final_stage) in
      let index = chunks - (filled * final_stage) in
      if index >= 0 && index < final_stage then
-       pp_filled_segment ppf stages.(index)
+       repeated_styled_opt ~repeat:1 ~style:color Fmt.string ppf stages.(index)
    in
-   for _ = 1 to not_filled do
-     pp_unfilled_segment ppf stages.(0)
-   done);
+   repeated_styled_opt ~repeat:not_filled ~style:color_empty Fmt.string ppf
+     stages.(0));
   Fmt.string ppf "│";
   width
 
 let bar_ascii ~color ~color_empty width proportion ppf =
+  let color_empty = Option.(color_empty || color) in
   let width = width () in
   let bar_width = width - 2 in
-  let pp_filled_segment = styled_opt color Fmt.char in
-  let pp_unfilled_segment = styled_opt Option.(color_empty || color) Fmt.char in
   let filled =
     min (Float.to_int (Float.of_int bar_width *. proportion)) bar_width
   in
   let not_filled = bar_width - filled in
   Fmt.char ppf '[';
-  for _ = 1 to filled do
-    pp_filled_segment ppf '#'
-  done;
-  for _ = 1 to not_filled do
-    pp_unfilled_segment ppf '-'
-  done;
+  repeated_styled_opt ~style:color ~repeat:filled Fmt.char ppf '#';
+  repeated_styled_opt ~style:color_empty ~repeat:not_filled Fmt.char ppf '-';
   Fmt.char ppf ']';
   width
 
@@ -184,7 +190,7 @@ let spinner ?color ?stages () =
         (Array.of_list stages, width)
   in
   let stage_count = Array.length stages in
-  let pp = styled_opt color Fmt.string in
+  let pp = styled_opt ~style:color Fmt.string in
   stateful (fun () ->
       let tick = Staged.prj (modulo_counter stage_count) in
       const_fmt ~width (fun ppf -> pp ppf stages.(tick ())))
