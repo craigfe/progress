@@ -38,6 +38,8 @@ module type Elt = sig
   val to_float : t -> float
 end
 
+module Duration = Duration
+
 type bar_style = [ `ASCII | `UTF8 | `Custom of string list ]
 
 val counter :

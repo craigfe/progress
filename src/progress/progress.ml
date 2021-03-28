@@ -1,5 +1,6 @@
 open! Import
 module Config = Config
+module Duration = Duration
 module Segment = Segment
 module Units = Units
 

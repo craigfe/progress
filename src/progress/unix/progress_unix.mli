@@ -4,10 +4,27 @@
 
 (** {2 Time-sensitive segments} *)
 
-val stopwatch : unit -> 'a Progress.Segment.t
+val elapsed : unit -> 'a Progress.Segment.t
 (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
 
 type 'a pp := Format.formatter -> 'a -> unit
+
+val rate : int64 pp * int -> int64 Progress.Segment.t
+val eta : int64 -> int64 Progress.Segment.t
+
+type 'a accumulated
+
+val acc : 'a accumulated -> 'a
+val latest : 'a accumulated -> 'a
+
+val debounced_accumulator :
+     Progress.Duration.t
+  -> ('a -> 'a -> 'a)
+  -> 'a
+  -> 'a accumulated Progress.Segment.t
+  -> 'a Progress.Segment.t
+(** [debounce span s] has the same output format as [s], but only passes
+    reported values doen to [s] at most once in any given time [span]. *)
 
 val counter :
      total:'elt

@@ -11,12 +11,10 @@ type 'a t =
   | Const of { pp : Format.formatter -> unit; width : int }
   | Staged of (unit -> 'a t)
   | Contramap : 'a t * ('b -> 'a) -> 'b t
-  | Cond of ('a, 'a t) cond
+  | Cond of { if_ : 'a -> bool; then_ : 'a t }
   | Box of { contents : 'a t; width : unit -> int }
   | Group of 'a t array
   | Pair : { left : 'a t; sep : unit t; right : 'b t } -> ('a * 'b) t
-
-and ('a, 'b) cond = { if_ : 'a -> bool; then_ : 'b }
 
 let of_pp ~width pp = Pp_fixed { pp; width }
 let const_fmt ~width pp = Const { pp; width }
@@ -142,15 +140,6 @@ let periodic interval t =
           let should_update = ticker interval in
           conditional (fun _ -> should_update ()) t)
 
-let accumulator combine zero s =
-  stateful (fun () ->
-      let state = ref zero in
-      Contramap
-        ( s
-        , fun a ->
-            state := combine !state a;
-            !state ))
-
 let box_dynamic width contents = Box { contents; width }
 let box_fixed width = box_dynamic (fun () -> width)
 
@@ -168,6 +157,15 @@ let list ?(sep = const "  ") =
   List.intersperse ~sep >> Array.of_list >> fun xs -> Group xs
 
 let using f t = Contramap (t, f)
+
+let accumulator combine zero s =
+  stateful (fun () ->
+      let state = ref zero in
+      using
+        (fun a ->
+          state := combine !state a;
+          !state)
+        s)
 
 let spinner ?color ?stages () =
   let stages, width =
@@ -204,7 +202,12 @@ module Compiled = struct
     | Pp of { pp : 'a sized_pp; mutable latest : 'a }
     | Const of { pp : Format.formatter -> int }
     | Contramap : 'a t * ('b -> 'a) -> 'b t
-    | Cond of ('a, 'a t) cond
+    | Cond of
+        { if_ : 'a -> bool
+        ; then_ : 'a t
+        ; width : int
+        ; mutable latest_span : Line_buffer.Span.t
+        }
     | Group of 'a t array
     | Pair : { left : 'a t; sep : unit t; right : 'b t } -> ('a * 'b) t
 
@@ -212,7 +215,9 @@ module Compiled = struct
    fun ppf -> function
     | Pp _ -> Fmt.string ppf "Pp _"
     | Const _ -> Fmt.string ppf "Const _"
-    | Cond { then_; _ } -> Fmt.pf ppf "Cond ( %a )" pp_dump then_
+    | Cond { then_; latest_span; width; _ } ->
+        Fmt.pf ppf "Cond { if_ = <opaque>; then_ = %a; width = %d; span = %a }"
+          pp_dump then_ width Line_buffer.Span.pp latest_span
     | Contramap (x, _) -> Fmt.pf ppf "Contramap ( %a )" pp_dump x
     | Group xs ->
         Fmt.string ppf "[ ";
@@ -274,8 +279,17 @@ let compile =
         let inner, state = inner { state with initial = f initial_a } t in
         (Contramap (inner, f), { state with initial = initial_a })
     | Cond { if_; then_ } ->
-        let then_, state = inner state then_ in
-        (Cond { if_; then_ }, state)
+        let state' =
+          { consumed = 0
+          ; expand =
+              Result.errorf "Conditional element have a fixed-length child"
+          ; initial = state.initial
+          }
+        in
+        let then_, state' = inner state' then_ in
+        let width = state'.consumed in
+        let state = { state with consumed = state.consumed + width } in
+        (Cond { if_; then_; width; latest_span = Line_buffer.Span.empty }, state)
     | Staged s -> inner state (s ())
     | Box { contents; width } ->
         let f = ref (fun () -> assert false) in
@@ -325,41 +339,55 @@ let compile =
     |> fst
 
 let report compiled =
-  let rec aux : type a. a Compiled.t -> (Format.formatter -> a -> int) Staged.t
-      = function
-    | Const { pp } -> Staged.inj (fun ppf (_ : a) -> pp ppf)
+  let rec aux : type a. a Compiled.t -> (Line_buffer.t -> a -> int) Staged.t =
+    function
+    | Const { pp } -> Staged.inj (fun buf (_ : a) -> pp (Line_buffer.ppf buf))
     | Pp pp ->
-        Staged.inj (fun ppf x ->
+        Staged.inj (fun buf x ->
             pp.latest <- x;
-            pp.pp ppf x)
+            pp.pp (Line_buffer.ppf buf) x)
     | Contramap (t, f) ->
         let$ inner = aux t in
-        fun ppf a -> inner ppf (f a)
-    | Cond { if_; then_ } ->
-        let$ then_ = aux then_ in
-        (* TODO: revise handling of conditional segments *)
-        fun ppf x -> if if_ x then then_ ppf x else 0
+        fun buf a -> inner buf (f a)
+    | Cond t ->
+        let$ then_ = aux t.then_ in
+        fun buf x ->
+          if t.if_ x then (
+            let start = Line_buffer.current_position buf in
+            let _actual_width = then_ buf x in
+            let finish = Line_buffer.current_position buf in
+            t.latest_span <- Line_buffer.Span.between_marks start finish;
+            (* TODO: assert that width is well-behaved *)
+            (* if actual_width <> t.width then
+             *   Fmt.failwith
+             *     "Conditional segment not respecting stated width: expected %d, \
+             *      found %d"
+             *     t.width actual_width; *)
+            t.width)
+          else (
+            Line_buffer.skip buf t.latest_span;
+            t.width)
     | Group g ->
         let reporters = Array.map (aux >> Staged.prj) g in
-        Staged.inj (fun ppf v ->
-            Array.fold_left (fun a f -> a + f ppf v) 0 reporters)
+        Staged.inj (fun buf v ->
+            Array.fold_left (fun a f -> a + f buf v) 0 reporters)
     | Pair { left; sep; right } ->
         let$ left = aux left and$ sep = aux sep and$ right = aux right in
-        fun ppf (v_left, v_right) ->
-          let x = left ppf v_left in
-          let y = sep ppf () in
-          let z = right ppf v_right in
+        fun buf (v_left, v_right) ->
+          let x = left buf v_left in
+          let y = sep buf () in
+          let z = right buf v_right in
           x + y + z
   in
   aux compiled
 
-let update compiled =
+let update =
   let rec aux : type a. a Compiled.t -> (Format.formatter -> int) Staged.t =
     function
     | Const { pp } -> Staged.inj pp
     | Pp pp -> Staged.inj (fun ppf -> pp.pp ppf pp.latest)
     (* Updating happens unconditionally *)
-    | Cond { if_ = _; then_ } -> aux then_
+    | Cond { then_; _ } -> aux then_
     | Contramap (inner, _) -> aux inner
     | Group g ->
         let updaters = Array.map (aux >> Staged.prj) g in
@@ -373,4 +401,6 @@ let update compiled =
           let z = right ppf in
           x + y + z
   in
-  aux compiled
+  fun compiled ->
+    let theta = Staged.prj (aux compiled) in
+    Staged.inj (fun buf -> theta (Line_buffer.ppf buf))

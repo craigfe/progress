@@ -52,6 +52,10 @@ module type S = sig
       pretty-printer to render the value. The pretty-printer must never emit
       newline characters. *)
 
+  val conditional : ('a -> bool) -> 'a t -> 'a t
+  (** [conditional pred s] has the same output format as [s], but is only passes
+      reported values down to [s] when they satisfy [pred]. *)
+
   (** {2:stateful Stateful segments} *)
 
   val periodic : int -> 'a t -> 'a t
@@ -117,6 +121,6 @@ module type Segment = sig
   end
 
   val compile : initial:'a -> 'a t -> 'a Compiled.t
-  val update : 'a Compiled.t -> (Format.formatter -> int) Staged.t
-  val report : 'a Compiled.t -> (Format.formatter -> 'a -> int) Staged.t
+  val update : 'a Compiled.t -> (Line_buffer.t -> int) Staged.t
+  val report : 'a Compiled.t -> (Line_buffer.t -> 'a -> int) Staged.t
 end

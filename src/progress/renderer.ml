@@ -11,35 +11,24 @@ module Bar : sig
   val update : _ t -> unit -> int
   val report : 'a t -> 'a -> int
 end = struct
-  type 'a t = { buffer : Buffer.t; update : unit -> int; report : 'a -> int }
+  type 'a t =
+    { line_buffer : Line_buffer.t; update : unit -> int; report : 'a -> int }
 
   let create : type a. a Segment_list.elt -> a t =
    fun { segment; init } ->
     let s = Segment.compile ~initial:init segment in
-    let buffer = Buffer.create 80 in
-    let ppf_buf = Format.formatter_of_buffer buffer in
-    Fmt.set_style_renderer ppf_buf `Ansi_tty;
+    let line_buffer = Line_buffer.create ~size:80 in
     let report =
       let report = Staged.prj (Segment.report s) in
-      fun (a : a) ->
-        let width = report ppf_buf a in
-        Format.pp_print_flush ppf_buf ();
-        width
+      fun (a : a) -> report line_buffer a
     in
     let update =
       let update = Staged.prj (Segment.update s) in
-      fun () ->
-        let width = update ppf_buf in
-        Format.pp_print_flush ppf_buf ();
-        width
+      fun () -> update line_buffer
     in
-    { buffer; report; update }
+    { line_buffer; report; update }
 
-  let contents t =
-    let res = Buffer.contents t.buffer in
-    Buffer.clear t.buffer;
-    res
-
+  let contents t = Line_buffer.contents t.line_buffer
   let update t = t.update
   let report t = t.report
 end
