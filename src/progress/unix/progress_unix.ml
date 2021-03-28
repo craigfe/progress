@@ -3,9 +3,8 @@ open Progress
 let stopwatch () =
   Segment.stateful (fun () ->
       let start_time = Mtime_clock.counter () in
-      Units.seconds (fun ~width pp_time ->
-          let pp ppf = pp_time ppf (Mtime_clock.count start_time) in
-          Segment.const_fmt ~width pp))
+      let pp ppf = Units.Duration.mm_ss ppf (Mtime_clock.count start_time) in
+      Segment.const_fmt ~width:5 pp)
 
 let counter (type elt) ~(total : elt) ?style ?message
     ?(pp : (elt, elt Segment.t) Units.pp_fixed option) ?width ?sampling_interval

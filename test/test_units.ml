@@ -7,7 +7,7 @@ let expect_pp_fixed pp_fixed s f =
   Alcotest.(check int) "Expected length" (snd pp_fixed) (String.length result)
 
 let test_percentage () =
-  let expect = expect_pp_fixed Progress.Units.Percentage.pp_fixed in
+  let expect = expect_pp_fixed Progress.Units.Percentage.(of_float, width) in
   expect "  0%" (-0.1);
   expect "  0%" (almost 0.01);
   expect "  1%" 0.01;
@@ -22,7 +22,7 @@ let test_percentage () =
   ()
 
 let test_bytes () =
-  let expect = expect_pp_fixed Progress.Units.Bytes.pp_fixed in
+  let expect = expect_pp_fixed Progress.Units.Bytes.(of_int64, width) in
   let open Progress.Units.Bytes in
   expect "   0.0 B  " 0L;
   expect " 999.0 B  " 999L;
@@ -36,10 +36,7 @@ let test_bytes () =
   ()
 
 let test_seconds () =
-  let pp ppf span =
-    Progress.Units.seconds (fun ~width:_ pp_time -> pp_time ppf span)
-  in
-  let expect = expect_pp_fixed (pp, 5) in
+  let expect = expect_pp_fixed (Progress.Units.Duration.mm_ss, 5) in
   expect "00:00" (Mtime.Span.of_uint64_ns 0L);
   expect "00:29" (Mtime.Span.of_uint64_ns 29_600_000_000L);
   expect "00:30" (Mtime.Span.of_uint64_ns 30_000_000_000L);

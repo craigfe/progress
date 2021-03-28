@@ -3,9 +3,7 @@ module S = Progress.Segment
 let () = Fmt.set_style_renderer Fmt.stderr `Ansi_tty
 
 let bar ~total =
-  let total_bytes =
-    Fmt.to_to_string Progress.Units.Bytes.pp (Int64.of_int total)
-  in
+  let total_bytes = Fmt.to_to_string Progress.Units.Bytes.of_int total in
   let open S in
   box_winsize ~max:80 ~fallback:80
   @@ accumulator ( + ) 0

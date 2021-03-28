@@ -38,12 +38,12 @@ module Internal = struct
     in
     list
       (Option.fold ~none:[] message ~some:(fun s -> [ const s ])
-      @ Option.fold ~none:[] pp ~some:(fun f -> [ f of_pp ])
+      @ Option.fold ~none:[] pp ~some:(fun (pp, width) -> [ of_pp ~width pp ])
       @ Option.fold ~none:[] prebar ~some:(fun s -> [ s ])
       @ [
           bar ~style proportion
           ++ const " "
-          ++ using proportion (Units.percentage of_pp);
+          ++ using proportion percentage;
         ])
     |> Option.fold width ~some:box_fixed ~none:(fun s ->
            box_winsize ~fallback:80 s)

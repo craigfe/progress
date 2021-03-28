@@ -1,21 +1,13 @@
 open! Import
 
-let trimmed pp_fixed ppf =
-  Format.asprintf "%a" (fst pp_fixed)
-  >> String.trim
-  >> Format.pp_print_string ppf
-
 module Percentage = struct
   let clamp (lower, upper) = Float.min upper >> Float.max lower
 
-  let pp_fixed =
-    let pp ppf proportion =
-      let percentage = clamp (0., 100.) (Float.trunc (proportion *. 100.)) in
-      Format.fprintf ppf "%3.0f%%" percentage
-    in
-    (pp, 4)
+  let of_float ppf proportion =
+    let percentage = clamp (0., 100.) (Float.trunc (proportion *. 100.)) in
+    Format.fprintf ppf "%3.0f%%" percentage
 
-  let pp = trimmed pp_fixed
+  let width = 4
 end
 
 module Bytes = struct
@@ -28,13 +20,13 @@ module Bytes = struct
   let pib = conv 5
 
   (** Pretty-printer for byte counts *)
-  let pp_fixed =
+  let pp_fixed to_float =
     (* Round down to the nearest 0.1 *)
     let tr f = Float.trunc (f *. 10.) /. 10. in
     let num = format_of_string "%6.1f " in
     let fpr = Format.fprintf in
-    let pp ppf =
-      Int64.to_float >> function
+    fun ppf ->
+      to_float >> function
       | n when n < 1024. -> fpr ppf (num ^^ "B  ") (tr n)
       | n when n < 1024. ** 2. -> fpr ppf (num ^^ "KiB") (tr (n /. 1024.))
       | n when n < 1024. ** 3. ->
@@ -46,23 +38,17 @@ module Bytes = struct
       | n when n < 1024. ** 6. ->
           fpr ppf (num ^^ "PiB") (tr (n /. (1024. ** 5.)))
       | n -> fpr ppf (num ^^ "EiB") (tr (n /. (1024. ** 6.)))
-    in
-    (pp, 10)
 
-  let pp = trimmed pp_fixed
+  let width = 10
+  let of_int = pp_fixed Int.to_float
+  let of_int64 = pp_fixed Int64.to_float
+  let of_float = pp_fixed Fun.id
 end
 
-type ('a, 'b) pp_fixed =
-  (width:int -> (Format.formatter -> 'a -> unit) -> 'b) -> 'b
-
-let percentage f = f ~width:(snd Percentage.pp_fixed) (fst Percentage.pp_fixed)
-let bytes f = f ~width:(snd Bytes.pp_fixed) (fst Bytes.pp_fixed)
-
-let seconds f =
-  let pp ppf span =
+module Duration = struct
+  let mm_ss ppf span =
     let seconds = Mtime.Span.to_s span in
     Format.fprintf ppf "%02.0f:%02.0f"
       (Float.div seconds 60. |> Float.floor)
       (Float.rem seconds 60. |> Float.floor)
-  in
-  f ~width:5 pp
+end

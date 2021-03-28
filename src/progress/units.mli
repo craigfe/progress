@@ -1,24 +1,12 @@
 type 'a pp := Format.formatter -> 'a -> unit
 
-type ('a, 'b) pp_fixed = (width:int -> 'a pp -> 'b) -> 'b
-(** A fixed-width pretty printer. Intended to be used to create progress bar
-    segments, e.g. {!bytes} {!Segment.of_pp} is a segment that pretty-prints
-    values as byte counts. *)
+module Duration : sig
+  val mm_ss : Mtime.Span.t pp
+  (** Renders a time span in fixed-width [MM:SS] form. *)
+end
 
-val bytes : (int64, _) pp_fixed
-(** Prints a 64-bit integer as a byte count. e.g.
+(** {2 Assorted pretty-printing utilities} *)
 
-    {[
-      0L                  ↦  "   0.0 B  "
-      999L                ↦  " 999.0 B  "
-      1024L               ↦  "   1.0 KiB"
-      1024L * 1023L       ↦  "1023.0 KiB"
-      1024L * 1024L - 1L  ↦  "1023.9 KiB"
-    ]}*)
-
-[@@@ocamlformat "parse-docstrings = false"]
-
-val percentage : (float, _) pp_fixed
 (** Prints a proportion as a percentage. e.g.
 
     {[
@@ -29,45 +17,40 @@ val percentage : (float, _) pp_fixed
     ]}
 
     {b Note:} values will be clamped into the range [\[0., 1.\]]. *)
-
-[@@@ocamlformat "parse-docstrings = true"]
-
-val seconds : (Mtime.Span.t, _) pp_fixed
-(** Renders a time span in fixed-width [MM:SS] form. *)
-
-(** {2 Assorted pretty-printing utilities} *)
-
 module Percentage : sig
-  type t := float
-
-  val pp : t pp
-
-  val pp_fixed : t pp * int
-  (** {!pp_fixed} is {!pp} with left-padding added to achieve fixed size. *)
+  val of_float : float pp
+  val width : int
 end
 
+(** Prints a numeric value as as a byte count. e.g.
+
+    {[
+      0                ↦  "   0.0 B  "
+      999              ↦  " 999.0 B  "
+      1024             ↦  "   1.0 KiB"
+      1024 * 1023      ↦  "1023.0 KiB"
+      1024 * 1024 - 1  ↦  "1023.9 KiB"
+    ]}*)
 module Bytes : sig
-  type t := int64
-
-  val pp : t pp
-
-  val pp_fixed : t pp * int
-  (** {!pp_fixed} is {!pp} with padding added to achieve fixed size. *)
+  val of_int : int pp
+  val of_float : float pp
+  val of_int64 : int64 pp
+  val width : int
 
   (** Quick builders for base-2 byte counts *)
 
-  val kib : int -> t
+  val kib : int -> int64
   (** [kib n] is [n] kibibytes. *)
 
-  val mib : int -> t
+  val mib : int -> int64
   (** [mib n] is [n] mebibytes. *)
 
-  val gib : int -> t
+  val gib : int -> int64
   (** [gib n] is [n] gibibytes. *)
 
-  val tib : int -> t
+  val tib : int -> int64
   (** [tib n] is [n] tebibytes. *)
 
-  val pib : int -> t
+  val pib : int -> int64
   (** [pib n] is [n] pebibytes. *)
 end

@@ -97,7 +97,7 @@ let test_progress_bar_lifecycle () =
   let open Progress.Units.Bytes in
   let@ report =
     Progress.counter ~style:`ASCII ~total:(gib 1) ~sampling_interval:1 ~width:53
-      ~message:"<msg>" ~pp:Progress.Units.bytes
+      ~message:"<msg>" ~pp:(of_int64, width)
       (module Int64)
     |> Progress.with_reporters ~config
   in
@@ -142,11 +142,12 @@ let test_progress_bar_width () =
             width count_width message)
          width
   in
-  check_width ~width:80 ~message:"<msg>" ~pp:Progress.Units.bytes ~count_width:5
-    ();
+  check_width ~width:80 ~message:"<msg>"
+    ~pp:Progress.Units.Bytes.(of_int64, width)
+    ~count_width:5 ();
   clear_test_state ();
   check_width ~width:40 ~message:""
-    ~pp:(fun f -> f ~width:2 Fmt.(const string "XX"))
+    ~pp:(Fmt.(const string "XX"), 2)
     ~count_width:2 ();
   clear_test_state ();
   check_width ~width:40 ~message:"Very long message" ~count_width:0 ();

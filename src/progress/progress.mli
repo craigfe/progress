@@ -44,12 +44,12 @@ val counter :
   total:'elt ->
   ?style:bar_style ->
   ?message:string ->
-  ?pp:('elt, 'elt Segment.t) Units.pp_fixed ->
+  ?pp:(Format.formatter -> 'elt -> unit) * int ->
   ?width:int ->
   ?sampling_interval:int ->
   (module Elt with type t = 'elt) ->
   ('elt reporter -> 'a, 'a) t
-(** [counter ~total ()] is a progress bar of the form:
+(** [counter ~total (module Int)] is a progress bar of the form:
 
     {[ <message?>  <count?>  [########..............................]  XX% ]}
 
@@ -195,7 +195,7 @@ module Internal : sig
     total:'elt ->
     ?style:bar_style ->
     ?message:string ->
-    ?pp:('elt, 'elt Segment.t) Units.pp_fixed ->
+    ?pp:(Format.formatter -> 'elt -> unit) * int ->
     ?width:int ->
     ?sampling_interval:int ->
     (module Elt with type t = 'elt) ->

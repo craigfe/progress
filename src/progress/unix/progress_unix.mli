@@ -7,11 +7,13 @@
 val stopwatch : unit -> 'a Progress.Segment.t
 (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
 
+type 'a pp := Format.formatter -> 'a -> unit
+
 val counter :
   total:'elt ->
   ?style:Progress.bar_style ->
   ?message:string ->
-  ?pp:('elt, 'elt Progress.Segment.t) Progress.Units.pp_fixed ->
+  ?pp:'elt pp * int ->
   ?width:int ->
   ?sampling_interval:int ->
   (module Progress.Elt with type t = 'elt) ->
