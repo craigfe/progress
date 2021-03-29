@@ -11,7 +11,7 @@ let bar =
   Progress.make ~init:()
     Line.(const "[" ++ spin ++ spin ++ spin ++ spin ++ spin ++ const "]")
 
-let () =
+let run () =
   Progress.with_reporters bar (fun report ->
       for _ = 1 to 40 do
         report ();

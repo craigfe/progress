@@ -38,7 +38,7 @@ let random_action =
     ; "make test"
     ]
 
-let () =
+let run () =
   Fmt.set_style_renderer Fmt.stdout `Ansi_tty;
   let line_prefix = line_prefix ~stages:4 in
   let deps = 1234 in

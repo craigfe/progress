@@ -21,7 +21,7 @@ let pick_random_function l =
   let len = List.length l in
   fun x -> List.nth l (Random.int len) x
 
-let () =
+let run () =
   Progress.with_reporters bars (fun reporters ->
       let random_reporter = pick_random_function reporters in
       for _ = 0 to 6000 do

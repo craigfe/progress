@@ -1,11 +1,11 @@
-let () =
-  let bar =
-    Progress.make ~init:0
-      Progress.Line.(
-        Expert.box_winsize
-        @@ Expert.accumulator ( + ) 0
-        @@ bar ~style:`UTF8 (fun x -> float_of_int x /. 100.))
-  in
+let bar =
+  Progress.make ~init:0
+    Progress.Line.(
+      Expert.box_winsize
+      @@ Expert.accumulator ( + ) 0
+      @@ bar ~style:`UTF8 (fun x -> float_of_int x /. 100.))
+
+let run () =
   Progress.with_reporters bar (fun f ->
       for i = 1 to 100 do
         f 1;

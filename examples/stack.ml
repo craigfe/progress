@@ -24,7 +24,7 @@ let main () =
     (pick_random ()) (random_progress ()) (* Unix.sleepf 0.01 *)
   done
 
-let () =
+let run () =
   Memtrace.trace_if_requested ();
   let () =
     (* Run with [dune exec examples/stack.exe -- --verbose] to see log entries

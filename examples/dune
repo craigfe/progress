@@ -1,5 +1,10 @@
-(executables
- (names stack download installer spinner_long spinner_bar interject
-   bar_styles)
+(library
+ (name examples)
+ (modules (:standard \ main))
  (libraries progress progress.logs progress.unix unix logs logs.fmt fmt mtime
-   mtime.clock.os memtrace))
+            mtime.clock.os memtrace))
+
+(executable
+ (name main)
+ (modules main)
+ (libraries examples fmt))

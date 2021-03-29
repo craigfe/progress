@@ -1,7 +1,5 @@
 module L = Progress.Line
 
-let () = Fmt.set_style_renderer Fmt.stderr `Ansi_tty
-
 let bar ~total =
   let total_bytes = Fmt.to_to_string Progress.Units.Bytes.of_int total in
   let rate =
@@ -23,8 +21,7 @@ let bar ~total =
          @@ (const "(" ++ rate ++ const ", " ++ eta ++ const ")")
        ]
 
-let () =
-  Memtrace.trace_if_requested ();
+let run () =
   let total = 231231231 in
   let bar = Progress.make ~init:0 (bar ~total) in
   Progress.with_reporters bar @@ fun report ->
