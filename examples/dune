@@ -1,8 +1,9 @@
 (library
  (name examples)
- (modules (:standard \ main))
+ (modules
+  (:standard \ main))
  (libraries progress progress.logs progress.unix unix logs logs.fmt fmt mtime
-            mtime.clock.os memtrace))
+   mtime.clock.os memtrace))
 
 (executable
  (name main)
