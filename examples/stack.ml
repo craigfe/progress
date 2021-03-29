@@ -19,26 +19,23 @@ let main () =
     | _ -> d
   in
   let random_progress () = Random.int64 10_000L in
-  for i = 1 to 1_250_000 do
+  for i = 1 to 1_300_000 do
     if i mod 100 = 0 then Logs.info (fun f -> f "Iterations reached: %d" i);
-    (pick_random ()) (random_progress ()) (* Unix.sleepf 0.01 *)
+    (pick_random ()) (random_progress ())
   done
 
 let run () =
   Memtrace.trace_if_requested ();
   let () =
-    (* Run with [dune exec examples/stack.exe -- --verbose] to see log entries
-       being interleaved with progress bar rendering. *)
-    match Sys.argv with
-    | [| _ |] -> ()
-    | [| _; "--verbose" |] ->
+    (* Run with [VERBOSE=true] to see log entries being interleaved with
+       progress bar rendering. *)
+    match Sys.getenv_opt "VERBOSE" with
+    | None | Some "false" -> ()
+    | Some _ ->
         (* Configure a [Logs] reporter that behaves properly with concurrent
            progress bar rendering. *)
         Logs.set_reporter
           (Progress_logs.instrument_reporter (Logs_fmt.reporter ()));
         Logs.set_level (Some Info)
-    | _ ->
-        Format.eprintf "usage: %s [--verbose]@." Sys.argv.(0);
-        exit 1
   in
   main ()
