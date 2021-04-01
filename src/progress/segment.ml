@@ -2,6 +2,20 @@ include Segment_intf
 open! Import
 open Staged.Syntax
 
+(** The core DSL that is used to define individual lines of a progress bar
+    display. An ['a t] is an immutable specification of a progress bar line that
+    consumes values of type ['a], and an ['a Compiled.t] is an efficient mutable
+    instantiation of that specification used for a single rendering lifecycle.
+
+    {2 Width tracking}
+
+    We track the rendered "widths" of various components for two reasons: to
+    handle expansive elements / boxes, and to enable the rednerer to respond
+    correctly to terminal size changes. This is done algebraically for
+    performance: the alternative of measuring the rendered width is inefficient
+    because it would need to account for UTF-8 encoding and zero-width ANSI
+    colour codes. *)
+
 type 'a pp = Format.formatter -> 'a -> unit
 
 type 'a t =

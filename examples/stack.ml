@@ -18,10 +18,11 @@ let main () =
     | n when n < 74 -> c
     | _ -> d
   in
-  let random_progress () = Random.int64 10_000L in
-  for i = 1 to 1_300_000 do
+  let random_progress () = Random.int64 1_000_000L in
+  for i = 1 to 13_000 do
     if i mod 100 = 0 then Logs.info (fun f -> f "Iterations reached: %d" i);
-    (pick_random ()) (random_progress ())
+    (pick_random ()) (random_progress ());
+    Unix.sleepf 0.001
   done
 
 let run () =

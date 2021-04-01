@@ -53,9 +53,18 @@ let run () =
       done);
   Fmt.pr "%t 📃  Building fresh packages ... @." line_prefix;
   with_bars (fun reporters ->
+      (* Give everyone something to do *)
+      List.iter (fun f -> f (random_action ())) reporters;
+
+      (* Finish a task every so often *)
       let random_reporter = pick_random reporters in
-      for _ = 1 to 1000 do
+      for _ = 1 to 20 do
         random_reporter () (random_action ());
-        Unix.sleepf 0.1
+
+        (* Advance the spinners while we wait *)
+        for _ = 1 to 10 do
+          Progress.tick ();
+          Unix.sleepf 0.05
+        done
       done);
   Fmt.pr "✨ Done in %a@." Mtime.Span.pp (Mtime_clock.count started)

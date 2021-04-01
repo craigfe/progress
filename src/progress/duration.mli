@@ -1,4 +1,5 @@
 type t = Mtime.Span.t
+(** The type of time durations. *)
 
 (** {2 Round values} *)
 
