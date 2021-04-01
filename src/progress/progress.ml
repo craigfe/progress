@@ -15,6 +15,7 @@ type ('a, 'b) t = ('a, 'b) Renderer.t
 let make = Renderer.make
 let make_list = Renderer.make_list
 let start = Renderer.start
+let tick = Renderer.tick
 let finalize = Renderer.finalize
 let interject_with = Renderer.interject_with
 let with_reporters = Renderer.with_reporters

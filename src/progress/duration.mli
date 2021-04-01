@@ -1,6 +1,6 @@
 type t = Mtime.Span.t
 
-(** {2 Round values} **)
+(** {2 Round values} *)
 
 val nanosecond : t
 val microsecond : t

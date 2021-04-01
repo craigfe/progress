@@ -49,4 +49,5 @@ module type Renderer = sig
   val finalize : display -> unit
   val with_reporters : ?config:Config.t -> ('a, 'b) t -> 'a -> 'b
   val interject_with : (unit -> 'a) -> 'a
+  val tick : unit -> unit
 end

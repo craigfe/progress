@@ -187,6 +187,19 @@ module Time_sensitive (Clock : Mclock) = struct
                 (Int64.of_float (todo /. per_second *. 1_000_000_000.)))
           (of_pp ~width pp))
 
+  let debounce interval s =
+    Expert.stateful (fun () ->
+        let latest = ref (Clock.now ()) in
+        let should_update () =
+          let now = Clock.now () in
+          match Mtime.Span.compare (Mtime.span !latest now) interval >= 0 with
+          | false -> false
+          | true ->
+              latest := now;
+              true
+        in
+        Expert.conditional (fun _ -> should_update ()) s)
+
   type 'a accumulated = { acc : 'a; latest : 'a }
 
   let acc t = t.acc

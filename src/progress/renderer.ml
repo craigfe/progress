@@ -1,3 +1,6 @@
+(** The core of the progress bar rendering logic. Consumes the {!Line} DSL and
+    emits rendering functions that put {!Ansi} escape codes in the right places. *)
+
 include Renderer_intf
 open! Import
 
@@ -8,11 +11,14 @@ module Bar : sig
 
   val create : 'a Segment_list.elt -> 'a t
   val contents : _ t -> string
-  val update : _ t -> unit -> int
+  val update : unconditional:bool -> _ t -> unit -> int
   val report : 'a t -> 'a -> int
 end = struct
   type 'a t =
-    { line_buffer : Line_buffer.t; update : unit -> int; report : 'a -> int }
+    { line_buffer : Line_buffer.t
+    ; update : unconditional:bool -> int
+    ; report : 'a -> int
+    }
 
   let create : type a. a Segment_list.elt -> a t =
    fun { segment; init } ->
@@ -24,12 +30,12 @@ end = struct
     in
     let update =
       let update = Staged.prj (Segment.update s) in
-      fun () -> update line_buffer
+      fun ~unconditional -> update line_buffer ~unconditional
     in
     { line_buffer; report; update }
 
   let contents t = Line_buffer.contents t.line_buffer
-  let update t = t.update
+  let update ~unconditional t () = t.update ~unconditional
   let report t = t.report
 end
 
@@ -77,6 +83,7 @@ module Display : sig
   val uid : t -> Uid.t
   val rerender_bar : t -> idx:int -> width:int -> string -> unit
   val rerender_all : t -> unit
+  val initial_render : t -> unit
   val handle_width_change : t -> int -> unit
   val interject_with : t -> (unit -> 'a) -> 'a
   val cleanup : t -> unit
@@ -106,18 +113,19 @@ end = struct
     Format.pp_print_string ppf data;
     if new_width < old_width then Format.pp_print_string ppf Ansi.erase_line
 
-  let rerender_all (E { config = { ppf; _ }; bars; bar_count; _ } as t) =
+  let rerender_all_from_top ~unconditional
+      (E { config = { ppf; _ }; bars; bar_count; _ } as t) =
     let rec inner :
         type a b. on_right_spine:bool -> idx:int -> (a, b) Bar_list.t -> int =
      fun ~on_right_spine ~idx -> function
       | One bar ->
-          let width = Bar.update bar () in
+          let width = Bar.update ~unconditional bar () in
           rerender_line t ~width ~idx (Bar.contents bar);
           if on_right_spine then Format.fprintf ppf "\r%!"
           else Format.pp_force_newline ppf ();
           succ idx
       | Many [ bar ] ->
-          let width = Bar.update bar () in
+          let width = Bar.update ~unconditional bar () in
           rerender_line t ~width ~idx (Bar.contents bar);
           if on_right_spine then Format.fprintf ppf "\r%!"
           else Format.pp_force_newline ppf ();
@@ -133,6 +141,8 @@ end = struct
     in
     let seen = inner ~on_right_spine:true ~idx:0 bars in
     assert (seen = bar_count)
+
+  let initial_render = rerender_all_from_top ~unconditional:true
 
   let rerender_bar (E { config = { ppf; _ }; bar_count; _ } as t) ~idx ~width
       data =
@@ -159,11 +169,16 @@ end = struct
     in
     Ansi.move_up ppf (overflows + bar_count - 1 - bottom_overflow);
     if overflows > 0 then Format.pp_print_string ppf Ansi.erase_display_suffix;
-    rerender_all display
+    rerender_all_from_top ~unconditional:true display
+
+  let rerender_all (E { config = { ppf; _ }; bar_count; _ } as t) =
+    Ansi.move_up ppf (bar_count - 1);
+    rerender_all_from_top ~unconditional:false t
 
   let interject_with (E { config = { ppf; _ }; bar_count; _ } as t) f =
     Format.fprintf ppf "%a%s%!" Ansi.move_up (bar_count - 1) Ansi.erase_line;
-    Fun.protect f ~finally:(fun () -> rerender_all t)
+    Fun.protect f ~finally:(fun () ->
+        rerender_all_from_top ~unconditional:true t)
 
   let cleanup (E { config; _ }) =
     if config.hide_cursor then
@@ -174,7 +189,7 @@ end = struct
       =
     Ansi.move_up ppf (bar_count - 1);
     if persistent then (
-      rerender_all display;
+      rerender_all_from_top ~unconditional:true display;
       Format.fprintf ppf "@,@]")
     else Format.pp_print_string ppf Ansi.erase_line;
     Format.fprintf ppf "%s%!" (if hide_cursor then Ansi.show_cursor else "")
@@ -252,7 +267,7 @@ let start : 'a 'b. ?config:Config.t -> ('a, 'b) t -> ('a, 'b) Hlist.t * display
   Global.set_active_exn display;
   Format.pp_open_box ppf 0;
   if config.hide_cursor then Format.pp_print_string ppf Ansi.hide_cursor;
-  Display.rerender_all display;
+  Display.initial_render display;
   let rec inner : type a b. int -> (a, b) Bar_list.t -> int * (a, b) Hlist.t =
    fun seen -> function
     | One bar ->
@@ -304,3 +319,8 @@ let interject_with : 'a. (unit -> 'a) -> 'a =
   match Global.active_display () with
   | None -> f ()
   | Some d -> Display.interject_with d f
+
+let tick () =
+  match Global.active_display () with
+  | None -> ()
+  | Some d -> Display.rerender_all d

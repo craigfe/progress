@@ -84,7 +84,7 @@ module Span = struct
 
   let pp ppf t = Fmt.pf ppf "{ pos = %d; len = %d }" t.pos t.len
   let empty = { pos = 0; len = 0 }
-  let between_marks a b = { pos = a; len = b - a + 1 }
+  let between_marks a b = { pos = a; len = b - a }
 end
 
 let skip t (span : Span.t) =

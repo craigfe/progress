@@ -85,6 +85,7 @@ module Compiled = struct
         { if_ : 'a -> bool
         ; then_ : 'a t
         ; width : int
+        ; mutable latest : 'a
         ; mutable latest_span : Line_buffer.Span.t
         }
     | Group of 'a t array
@@ -170,7 +171,14 @@ let compile =
         let then_, state' = inner state' then_ in
         let width = state'.consumed in
         let state = { state with consumed = state.consumed + width } in
-        (Cond { if_; then_; width; latest_span = Line_buffer.Span.empty }, state)
+        ( Cond
+            { if_
+            ; then_
+            ; width
+            ; latest = state.initial
+            ; latest_span = Line_buffer.Span.empty
+            }
+        , state )
     | Staged s -> inner state (s ())
     | Box { contents; width } ->
         let f = ref (fun () -> assert false) in
@@ -234,17 +242,17 @@ let report compiled =
     | Cond t ->
         let$ then_ = aux t.then_ in
         fun buf x ->
+          t.latest <- x;
           if t.if_ x then (
             let start = Line_buffer.current_position buf in
-            let _actual_width = then_ buf x in
+            let reported_width = then_ buf x in
             let finish = Line_buffer.current_position buf in
             t.latest_span <- Line_buffer.Span.between_marks start finish;
-            (* TODO: assert that width is well-behaved *)
-            (* if actual_width <> t.width then
-             *   Fmt.failwith
-             *     "Conditional segment not respecting stated width: expected %d, \
-             *      found %d"
-             *     t.width actual_width; *)
+            if reported_width <> t.width then
+              Fmt.failwith
+                "Conditional segment not respecting stated width: expected %d, \
+                 reported %d"
+                t.width reported_width;
             t.width)
           else (
             Line_buffer.skip buf t.latest_span;
@@ -264,24 +272,41 @@ let report compiled =
   aux compiled
 
 let update =
-  let rec aux : type a. a Compiled.t -> (Line_buffer.t -> int) Staged.t =
-    function
-    | Noop -> Staged.inj (fun _ -> 0)
-    | Const { pp } -> Staged.inj pp
-    | Pp pp -> Staged.inj (fun buf -> pp.pp buf pp.latest)
-    (* Updating happens unconditionally *)
-    | Cond { then_; _ } -> aux then_
+  let rec aux : type a. a Compiled.t -> (bool -> Line_buffer.t -> int) Staged.t
+      = function
+    | Noop -> Staged.inj (fun _ _ -> 0)
+    | Const { pp } -> Staged.inj (fun _ -> pp)
+    | Pp pp -> Staged.inj (fun _ buf -> pp.pp buf pp.latest)
+    | Cond t ->
+        let$ then_ = aux t.then_ in
+        fun unconditional buf ->
+          if unconditional || t.if_ t.latest then (
+            let start = Line_buffer.current_position buf in
+            let actual_width = then_ unconditional buf in
+            let finish = Line_buffer.current_position buf in
+            t.latest_span <- Line_buffer.Span.between_marks start finish;
+            if actual_width <> t.width then
+              Fmt.failwith
+                "Conditional segment not respecting stated width: expected %d, \
+                 found %d"
+                t.width actual_width;
+            t.width)
+          else (
+            Line_buffer.skip buf t.latest_span;
+            t.width)
     | Contramap (inner, _) -> aux inner
     | Group g ->
         let updaters = Array.map (aux >> Staged.prj) g in
-        Staged.inj (fun ppf ->
-            Array.fold_left (fun a f -> a + f ppf) 0 updaters)
+        Staged.inj (fun uncond ppf ->
+            Array.fold_left (fun a f -> a + f uncond ppf) 0 updaters)
     | Pair { left; sep; right } ->
         let$ left = aux left and$ sep = aux sep and$ right = aux right in
-        fun ppf ->
-          let x = left ppf in
-          let y = sep ppf in
-          let z = right ppf in
+        fun uncond ppf ->
+          let x = left uncond ppf in
+          let y = sep uncond ppf in
+          let z = right uncond ppf in
           x + y + z
   in
-  fun compiled -> aux compiled
+  fun compiled ->
+    let$ f = aux compiled in
+    fun ~unconditional buf : int -> f unconditional buf

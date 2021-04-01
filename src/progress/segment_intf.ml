@@ -84,6 +84,9 @@ module type Segment = sig
   end
 
   val compile : initial:'a -> 'a t -> 'a Compiled.t
-  val update : 'a Compiled.t -> (Line_buffer.t -> int) Staged.t
+
+  val update :
+    'a Compiled.t -> (unconditional:bool -> Line_buffer.t -> int) Staged.t
+
   val report : 'a Compiled.t -> (Line_buffer.t -> 'a -> int) Staged.t
 end

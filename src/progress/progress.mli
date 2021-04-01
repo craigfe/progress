@@ -168,6 +168,8 @@ val interject_with : (unit -> 'a) -> 'a
     appropriate position to resume rendering. In practice, this means that any
     printing to the terminal should be terminated with a newline character. *)
 
+val tick : unit -> unit
+
 type display
 (** Functions for explicitly starting and stopping the process of rendering a
     bar; useful when the code doing the progress reporting cannot be

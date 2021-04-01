@@ -16,6 +16,7 @@ module type Time_sensitive = sig
 
   val acc : 'a accumulated -> 'a
   val latest : 'a accumulated -> 'a
+  val debounce : Duration.t -> 'a t -> 'a t
 
   val debounced_accumulator :
     Duration.t -> ('a -> 'a -> 'a) -> 'a -> 'a accumulated t -> 'a t
