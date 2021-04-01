@@ -1,16 +1,16 @@
 type t =
-  { data : int64 array
+  { get_time : unit -> Mtime.t
+  ; data : int64 array
   ; timestamps : Mtime.t array
   ; max_length : int
   ; mutable most_recently_added : int
   ; mutable length : int
   }
 
-let get_time () = Mtime_clock.now ()
-
-let create ~size:max_length =
+let create ~clock:get_time ~size:max_length =
   let start_time = get_time () in
-  { data = Array.make max_length 0L
+  { get_time
+  ; data = Array.make max_length 0L
   ; timestamps = Array.make max_length start_time
   ; max_length
   ; most_recently_added = -1
@@ -21,7 +21,7 @@ let is_empty t = t.most_recently_added = -1
 
 let push t ~key ~data =
   t.data.(key) <- data;
-  t.timestamps.(key) <- get_time ()
+  t.timestamps.(key) <- t.get_time ()
 
 let record t data =
   if t.length = t.max_length then (

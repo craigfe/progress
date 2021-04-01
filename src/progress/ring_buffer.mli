@@ -1,7 +1,7 @@
 type t
 (** The type of ring buffers. *)
 
-val create : size:int -> t
+val create : clock:(unit -> Mtime.t) -> size:int -> t
 
 val record : t -> int64 -> unit
 (** Add a value to the ring buffer. *)

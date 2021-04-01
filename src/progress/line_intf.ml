@@ -1,3 +1,34 @@
+(** Signature of a monotonic clock. See [mtime.clock.os] for a Unix
+    implementation. *)
+module type Mclock = sig
+  val elapsed : unit -> Mtime.span
+  val now : unit -> Mtime.t
+
+  type counter
+
+  val counter : unit -> counter
+  val count : counter -> Mtime.span
+end
+
+module type Time_sensitive = sig
+  type 'a t
+  type 'a accumulated
+
+  val acc : 'a accumulated -> 'a
+  val latest : 'a accumulated -> 'a
+
+  val debounced_accumulator :
+    Duration.t -> ('a -> 'a -> 'a) -> 'a -> 'a accumulated t -> 'a t
+  (** [debounce span s] has the same output format as [s], but only passes
+      reported values doen to [s] at most once in any given time [span]. *)
+
+  val elapsed : unit -> 'a t
+  (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
+
+  val rate : (Format.formatter -> int64 -> unit) * int -> int64 t
+  val eta : int64 -> int64 t
+end
+
 module type S = sig
   type 'a t
   (** The type of segments of progress bars that display reported values of type
@@ -5,10 +36,10 @@ module type S = sig
 
   (** {2 Pre-provided segments} *)
 
-  val spinner : ?color:Ansi.style -> ?stages:string list -> unit -> _ t
   val bytes : int t
   val bytes_int64 : int64 t
   val percentage : float t
+  val string : string t
 
   val const : string -> _ t
   (** [const s] is the segment that always displays [s]. [s] must not contain
@@ -23,7 +54,7 @@ module type S = sig
       pretty-printer to render the value. The pretty-printer must never emit
       newline characters. *)
 
-  val string : string t
+  val spinner : ?color:Ansi.style -> ?stages:string list -> unit -> _ t
 
   val bar :
        ?style:[ `ASCII | `UTF8 | `Custom of string list ]
@@ -58,6 +89,13 @@ module type S = sig
   val using : ('a -> 'b) -> 'b t -> 'a t
   (** [using f s] is a segment that first applies [f] to the reported value and
       then behaves as segment [s]. *)
+
+  module type Time_sensitive = sig
+    include Time_sensitive with type 'a t := 'a t
+    (** @inline *)
+  end
+
+  module Time_sensitive (_ : Mclock) : Time_sensitive
 
   module Expert : sig
     include Segment.S with type 'a t = 'a t
