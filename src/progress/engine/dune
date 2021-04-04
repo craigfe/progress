@@ -1,0 +1,4 @@
+(library
+ (name progress_engine)
+ (public_name progress.engine)
+ (libraries mtime fmt uutf))

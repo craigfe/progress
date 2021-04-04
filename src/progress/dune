@@ -4,4 +4,10 @@
  (foreign_stubs
   (language c)
   (names progress_stubs))
- (libraries mtime fmt uutf terminal_size unix))
+ (libraries
+  (re_export progress.engine)
+  mtime.clock.os
+  fmt
+  uutf
+  terminal_size
+  unix))

@@ -3,11 +3,13 @@
     progress bars, then begin {{!rendering} rendering} them to get access to
     their respective reporting functions.
 
-    - See {!Progress_unix} for access to Unix-specific utilities.
     - See {!Progress_logs} for related extensions to the
-      {{:https://erratique.ch/software/logs} Logs} library. *)
+      {{:https://erratique.ch/software/logs} Logs} library.
+    - See {!Progress_engine} for non-Unix-dependent utilities. *)
 
 (** {1 Description} *)
+
+open Progress_engine
 
 type 'a reporter = 'a -> unit
 (** A {i reporter} for values of type ['a]. In this library, each progress bar
@@ -38,8 +40,15 @@ module type Elt = sig
   val to_float : t -> float
 end
 
-module Ansi = Ansi
-module Duration = Duration
+module Ansi : sig
+  include module type of Ansi
+  (** @inline *)
+end
+
+module Duration : sig
+  include module type of Duration
+  (** @inline *)
+end
 
 type bar_style = [ `ASCII | `UTF8 | `Custom of string list ]
 
@@ -76,14 +85,20 @@ val counter :
       finalisation, which always occurs). This is useful when progress is being
       reported from a hot-loop, where the cost of re-displaying the progress bar
       is non-negligible. The default value is [1], meaning that all updates are
-      displayed immediately.
-
-    See {!Progress_unix.counter} for an equivalent that contains a timer. *)
+      displayed immediately. *)
 
 (** [Line] contains a DSL for defining custom progress bars. *)
 module Line : sig
   include Line.S
   (** @inline *)
+
+  include Line.Time_sensitive with type 'a t := 'a t
+
+  module Expert : sig
+    include Segment.S with type 'a t := 'a t
+
+    val box_winsize : ?max:int -> ?fallback:int -> 'a t -> 'a t
+  end
 end
 
 val make : init:'a -> 'a Line.t -> ('a reporter -> 'b, 'b) t
@@ -189,22 +204,8 @@ val finalize : display -> unit
 
 (** {1 Miscellaneous} *)
 
-module Units = Units
 (** Helpers for printing values of various units. *)
-
-(** Internals of the library exported to be used in sibling packages and in
-    testing. Not intended for public consumption, and does not provide a stable
-    API. *)
-module Internal : sig
-  val counter :
-       ?prebar:'elt Line.Expert.t
-    -> total:'elt
-    -> ?color:Ansi.style
-    -> ?style:bar_style
-    -> ?message:string
-    -> ?pp:(Format.formatter -> 'elt -> unit) * int
-    -> ?width:int
-    -> ?sampling_interval:int
-    -> (module Elt with type t = 'elt)
-    -> ('elt reporter -> 'a, 'a) t
+module Units : sig
+  include module type of Units
+  (** @inline *)
 end

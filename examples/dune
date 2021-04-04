@@ -2,7 +2,7 @@
  (name examples)
  (modules
   (:standard \ main))
- (libraries progress progress.logs progress.unix unix logs logs.fmt fmt mtime
+ (libraries progress progress.logs unix logs logs.fmt fmt mtime
    mtime.clock.os memtrace))
 
 (executable

@@ -64,13 +64,16 @@ let periodic interval t =
 let box_dynamic width contents = Box { contents; width }
 let box_fixed width = box_dynamic (fun () -> width)
 
-let box_winsize ?max ?(fallback = 80) s =
-  let get_width () =
-    match max with
-    | None -> Option.value ~default:fallback (Width.columns ())
-    | Some m -> min m (Option.value ~default:fallback (Width.columns ()))
-  in
-  box_dynamic get_width s
+module Platform_dependent (Platform : Platform.S) = struct
+  let box_winsize ?max ?(fallback = 80) s =
+    let get_width () =
+      match max with
+      | None -> Option.value ~default:fallback (Platform.Width.columns ())
+      | Some m ->
+          min m (Option.value ~default:fallback (Platform.Width.columns ()))
+    in
+    box_dynamic get_width s
+end
 
 let pair ?(sep = noop ()) a b = Pair { left = a; sep; right = b }
 

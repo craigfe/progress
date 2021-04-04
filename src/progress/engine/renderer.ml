@@ -1,3 +1,8 @@
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+   Distributed under the MIT license. See terms at the end of this file.
+  ————————————————————————————————————————————————————————————————————————————*)
+
 (** The core of the progress bar rendering logic. Consumes the {!Line} DSL and
     emits rendering functions that put {!Ansi} escape codes in the right places. *)
 
@@ -195,132 +200,152 @@ end = struct
     Format.fprintf ppf "%s%!" (if hide_cursor then Ansi.show_cursor else "")
 end
 
-module Global : sig
-  val active_display : unit -> Display.t option
-  val set_active_exn : Display.t -> unit
-  val set_inactive : unit -> unit
-end = struct
-  type runtime =
-    { (* Race conditions over these fields are not handled, but protection against
-         concurrent usage is best-effort anyway. *)
-      mutable active_display : Display.t option
-    ; displaced_handlers : (int, Sys.signal_behavior) Hashtbl.t
-    }
+module Make (Platform : Platform.S) = struct
+  module Global : sig
+    val active_display : unit -> Display.t option
+    val set_active_exn : Display.t -> unit
+    val set_inactive : unit -> unit
+  end = struct
+    type runtime =
+      { (* Race conditions over these fields are not handled, but protection against
+           concurrent usage is best-effort anyway. *)
+        mutable active_display : Display.t option
+      ; displaced_handlers : (int, Sys.signal_behavior) Hashtbl.t
+      }
 
-  let runtime = { active_display = None; displaced_handlers = Hashtbl.create 0 }
-  let is_active () = Option.is_some runtime.active_display
-  let active_display () = runtime.active_display
-  let cleanup () = Option.iter Display.cleanup runtime.active_display
+    let runtime =
+      { active_display = None; displaced_handlers = Hashtbl.create 0 }
 
-  let handle_width_change w =
-    match (w, runtime.active_display) with
-    | None, _ | _, None -> ()
-    | Some w, Some display -> Display.handle_width_change display w
+    let is_active () = Option.is_some runtime.active_display
+    let active_display () = runtime.active_display
+    let cleanup () = Option.iter Display.cleanup runtime.active_display
 
-  let handle_signal code =
-    cleanup ();
-    match Hashtbl.find_opt runtime.displaced_handlers code with
-    | Some (Signal_handle f) -> f code
-    | Some Signal_default -> exit 100
-    | Some Signal_ignore | None -> ()
+    let handle_width_change w =
+      match (w, runtime.active_display) with
+      | None, _ | _, None -> ()
+      | Some w, Some display -> Display.handle_width_change display w
 
-  let init_handlers =
-    lazy
-      (at_exit cleanup;
-       Width.set_changed_callback handle_width_change)
+    let handle_signal code =
+      cleanup ();
+      match Hashtbl.find_opt runtime.displaced_handlers code with
+      | Some (Signal_handle f) -> f code
+      | Some Signal_default -> exit 100
+      | Some Signal_ignore | None -> ()
 
-  let set_active_exn display =
-    if is_active () then
-      failwith "Can't run more than one progress bar renderer simultaneously";
+    let init_handlers =
+      lazy
+        (at_exit cleanup;
+         Platform.Width.set_changed_callback handle_width_change)
 
-    Lazy.force init_handlers;
+    let set_active_exn display =
+      if is_active () then
+        failwith "Can't run more than one progress bar renderer simultaneously";
 
-    ListLabels.iter
-      Sys.[ sigint; sigquit; sigterm; sigsegv ]
-      ~f:(fun code ->
-        let prev_handler = Sys.signal code (Signal_handle handle_signal) in
-        (* Until the previous signal is added to the hashtable, there's a short
-           period of time in which the {i previous} signal handler might be
-           ignored. Not much we can do about that, unfortunately. *)
-        Hashtbl.add runtime.displaced_handlers code prev_handler);
-    runtime.active_display <- Some display
+      Lazy.force init_handlers;
 
-  let set_inactive () =
-    Hashtbl.iter Sys.set_signal runtime.displaced_handlers;
-    Hashtbl.clear runtime.displaced_handlers;
-    runtime.active_display <- None
+      ListLabels.iter
+        Sys.[ sigint; sigquit; sigterm; sigsegv ]
+        ~f:(fun code ->
+          let prev_handler = Sys.signal code (Signal_handle handle_signal) in
+          (* Until the previous signal is added to the hashtable, there's a short
+             period of time in which the {i previous} signal handler might be
+             ignored. Not much we can do about that, unfortunately. *)
+          Hashtbl.add runtime.displaced_handlers code prev_handler);
+      runtime.active_display <- Some display
+
+    let set_inactive () =
+      Hashtbl.iter Sys.set_signal runtime.displaced_handlers;
+      Hashtbl.clear runtime.displaced_handlers;
+      runtime.active_display <- None
+  end
+
+  (* From the user's perspective, this is a handle to the currently-active
+     display. We don't need one of those, since internally we always have a
+     reference via [Global], but we keep track of identifiers anyway to ensure
+     hygiene. *)
+  type display = Uid.t
+
+  let start :
+        'a 'b. ?config:Config.t -> ('a, 'b) t -> ('a, 'b) Hlist.t * display =
+   fun ?(config = Config.create ()) bars ->
+    let config = Config.to_internal config in
+    let bars = Bar_list.of_segments bars in
+    let ppf = config.ppf in
+    let display = Display.create ~config bars in
+    Global.set_active_exn display;
+    Format.pp_open_box ppf 0;
+    if config.hide_cursor then Format.pp_print_string ppf Ansi.hide_cursor;
+    Display.initial_render display;
+    let rec inner : type a b. int -> (a, b) Bar_list.t -> int * (a, b) Hlist.t =
+     fun seen -> function
+      | One bar ->
+          let reporter x =
+            let width = Bar.report bar x in
+            Display.rerender_bar display ~idx:seen ~width (Bar.contents bar)
+          in
+          (seen + 1, [ reporter ])
+      | Many xs ->
+          let reporters =
+            ListLabels.mapi xs ~f:(fun i bar ->
+                let reporter x =
+                  let width = Bar.report bar x in
+                  Display.rerender_bar display ~idx:(seen + i) ~width
+                    (Bar.contents bar)
+                in
+                reporter)
+          in
+          (seen + List.length xs, [ reporters ])
+      | Plus (left, right) ->
+          let seen, left = inner seen left in
+          let seen, right = inner seen right in
+          (seen, Hlist.append left right)
+    in
+    let _, bars = inner 0 bars in
+    (bars, Display.uid display)
+
+  let finalize uid' =
+    match Global.active_display () with
+    | None -> failwith "Display already finalized"
+    | Some display ->
+        if not (Uid.equal (Display.uid display) uid') then
+          failwith "Display already finalized";
+        Display.finalize display;
+        Global.set_inactive ()
+
+  let with_reporters ?config t f =
+    let reporters, display = start ?config t in
+    Fun.protect
+      (fun () -> Hlist.apply_all f reporters)
+      ~finally:(fun () -> finalize display)
+
+  let start ?config t =
+    let hlist, disp = start ?config t in
+    (Reporters.of_hlist hlist, disp)
+
+  let interject_with : 'a. (unit -> 'a) -> 'a =
+   fun f ->
+    match Global.active_display () with
+    | None -> f ()
+    | Some d -> Display.interject_with d f
+
+  let tick () =
+    match Global.active_display () with
+    | None -> ()
+    | Some d -> Display.rerender_all d
 end
 
-(* From the user's perspective, this is a handle to the currently-active
-   display. We don't need one of those, since internally we always have a
-   reference via [Global], but we keep track of identifiers anyway to ensure
-   hygiene. *)
-type display = Uid.t
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
 
-let start : 'a 'b. ?config:Config.t -> ('a, 'b) t -> ('a, 'b) Hlist.t * display
-    =
- fun ?(config = Config.create ()) bars ->
-  let config = Config.to_internal config in
-  let bars = Bar_list.of_segments bars in
-  let ppf = config.ppf in
-  let display = Display.create ~config bars in
-  Global.set_active_exn display;
-  Format.pp_open_box ppf 0;
-  if config.hide_cursor then Format.pp_print_string ppf Ansi.hide_cursor;
-  Display.initial_render display;
-  let rec inner : type a b. int -> (a, b) Bar_list.t -> int * (a, b) Hlist.t =
-   fun seen -> function
-    | One bar ->
-        let reporter x =
-          let width = Bar.report bar x in
-          Display.rerender_bar display ~idx:seen ~width (Bar.contents bar)
-        in
-        (seen + 1, [ reporter ])
-    | Many xs ->
-        let reporters =
-          ListLabels.mapi xs ~f:(fun i bar ->
-              let reporter x =
-                let width = Bar.report bar x in
-                Display.rerender_bar display ~idx:(seen + i) ~width
-                  (Bar.contents bar)
-              in
-              reporter)
-        in
-        (seen + List.length xs, [ reporters ])
-    | Plus (left, right) ->
-        let seen, left = inner seen left in
-        let seen, right = inner seen right in
-        (seen, Hlist.append left right)
-  in
-  let _, bars = inner 0 bars in
-  (bars, Display.uid display)
+   Permission to use, copy, modify, and/or distribute this software for any
+   purpose with or without fee is hereby granted, provided that the above
+   copyright notice and this permission notice appear in all copies.
 
-let finalize uid' =
-  match Global.active_display () with
-  | None -> failwith "Display already finalized"
-  | Some display ->
-      if not (Uid.equal (Display.uid display) uid') then
-        failwith "Display already finalized";
-      Display.finalize display;
-      Global.set_inactive ()
-
-let with_reporters ?config t f =
-  let reporters, display = start ?config t in
-  Fun.protect
-    (fun () -> Hlist.apply_all f reporters)
-    ~finally:(fun () -> finalize display)
-
-let start ?config t =
-  let hlist, disp = start ?config t in
-  (Reporters.of_hlist hlist, disp)
-
-let interject_with : 'a. (unit -> 'a) -> 'a =
- fun f ->
-  match Global.active_display () with
-  | None -> f ()
-  | Some d -> Display.interject_with d f
-
-let tick () =
-  match Global.active_display () with
-  | None -> ()
-  | Some d -> Display.rerender_all d
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+   THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE SOFTWARE.
+  ————————————————————————————————————————————————————————————————————————————*)

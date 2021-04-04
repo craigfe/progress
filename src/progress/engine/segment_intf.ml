@@ -61,15 +61,17 @@ module type S = sig
   (** [box w] is a box that wraps a dynamically-sized segment and sets it to
       have size [w ()] on each tick. *)
 
-  val box_winsize : ?max:int -> ?fallback:int -> 'a t -> 'a t
-  (** A box that takes on the current size of the terminal (or [fallback] if
-      stdout is not attached to a terminal).
-
-      @param fallback defaults to [80].
-      @param max defaults to no limit. *)
-
   val box_fixed : int -> 'a t -> 'a t
   (** [box-fixed n s] fixes the size of the dynamic segment [s] to be [n]. *)
+
+  module Platform_dependent (_ : Platform.S) : sig
+    val box_winsize : ?max:int -> ?fallback:int -> 'a t -> 'a t
+    (** A box that takes on the current size of the terminal (or [fallback] if
+        stdout is not attached to a terminal).
+
+        @param fallback defaults to [80].
+        @param max defaults to no limit. *)
+  end
 end
 
 module type Segment = sig

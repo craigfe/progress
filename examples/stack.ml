@@ -1,10 +1,10 @@
 let bar color message =
-  Progress_unix.counter ~color ~style:`UTF8 ~total:1_000_000_000L ~message
+  Progress.counter ~color ~style:`UTF8 ~total:1_000_000_000L ~message
     ~pp:Progress.Units.Bytes.(of_int64, width)
     (module Int64)
 
 let main () =
-  Progress_unix.(
+  Progress.(
     with_reporters
       (bar `Red "index.html     "
       / bar `Yellow "sitemap.xml    "

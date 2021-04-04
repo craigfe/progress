@@ -91,12 +91,7 @@ module type S = sig
   (** [using f s] is a segment that first applies [f] to the reported value and
       then behaves as segment [s]. *)
 
-  module type Time_sensitive = sig
-    include Time_sensitive with type 'a t := 'a t
-    (** @inline *)
-  end
-
-  module Time_sensitive (_ : Mclock) : Time_sensitive
+  module Time_sensitive (_ : Mclock) : Time_sensitive with type 'a t := 'a t
 
   module Expert : sig
     include Segment.S with type 'a t = 'a t
@@ -106,6 +101,23 @@ end
 
 module type Line = sig
   module type S = S
+  module type Time_sensitive = Time_sensitive
 
   include S with type 'a t = 'a Segment.t
 end
+
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+
+   Permission to use, copy, modify, and/or distribute this software for any
+   purpose with or without fee is hereby granted, provided that the above
+   copyright notice and this permission notice appear in all copies.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+   THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE SOFTWARE.
+  ————————————————————————————————————————————————————————————————————————————*)

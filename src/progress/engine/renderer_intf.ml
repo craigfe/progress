@@ -1,3 +1,8 @@
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+   Distributed under the MIT license. See terms at the end of this file.
+  ————————————————————————————————————————————————————————————————————————————*)
+
 open! Import
 
 type 'a reporter = 'a -> unit
@@ -40,14 +45,18 @@ module type Renderer = sig
   module Reporters = Reporters
   module Segment_list = Segment_list
 
-  type display
   type ('a, 'b) t = ('a, 'b) Segment_list.t
 
   val make : init:'a -> 'a Segment.t -> ('a reporter -> 'b, 'b) t
   val make_list : init:'a -> 'a Segment.t list -> ('a reporter list -> 'b, 'b) t
-  val start : ?config:Config.t -> ('a, unit) t -> 'a Reporters.t * display
-  val finalize : display -> unit
-  val with_reporters : ?config:Config.t -> ('a, 'b) t -> 'a -> 'b
-  val interject_with : (unit -> 'a) -> 'a
-  val tick : unit -> unit
+
+  module Make (_ : Platform.S) : sig
+    type display
+
+    val start : ?config:Config.t -> ('a, unit) t -> 'a Reporters.t * display
+    val finalize : display -> unit
+    val with_reporters : ?config:Config.t -> ('a, 'b) t -> 'a -> 'b
+    val interject_with : (unit -> 'a) -> 'a
+    val tick : unit -> unit
+  end
 end
