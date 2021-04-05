@@ -47,15 +47,16 @@ let renderer_config : Line.render_config =
   { interval = Some Duration.millisecond; max_width = Some 120 }
 
 let make x =
-  let seg, init = Line.compile x ~config:renderer_config in
-  make ~init seg
+  let seg = Line.compile x ~config:renderer_config in
+  make seg
 
 let make_list xs =
   let xs = List.map (Line.compile ~config:renderer_config) xs in
-  make_list ~init:(snd (List.hd xs)) (List.map fst xs)
+  make_list xs
 
 let counter (type elt) ~(total : elt) ?color ?(style = `ASCII) ?message ?pp
-    ?width:_ ?sampling_interval:(_ = 1) (module Integer : Integer.S with type t = elt) =
+    ?width:_ ?sampling_interval:(_ = 1)
+    (module Integer : Integer.S with type t = elt) =
   let open Line in
   make
   @@ list

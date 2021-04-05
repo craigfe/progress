@@ -80,7 +80,7 @@ module Timer = struct
 end
 
 type 'a t =
-  | Basic of { segment : 'a Expert.t; zero : 'a }
+  | Basic of 'a Expert.t
   | List of 'a t list
   | Contramap : ('b t * ('a -> 'b)) -> 'a t
   | Pair : 'a t * unit t * 'b t -> ('a * 'b) t
@@ -95,37 +95,33 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
     include Expert
   end
 
-  let compile : type a. a t -> config:render_config -> a Expert.t * a =
+  let compile : type a. a t -> config:render_config -> a Expert.t =
    fun t ~config ->
-    let rec inner : type a. a t -> ((unit -> bool) -> a Expert.t) * a = function
+    let rec inner : type a. a t -> (unit -> bool) -> a Expert.t = function
       | Pair (a, sep, b) ->
-          let a, a_zero = inner a in
-          let sep, () = inner sep in
-          let b, b_zero = inner b in
-          ( (fun should_update ->
-              Expert.pair ~sep:(sep should_update) (a should_update)
-                (b should_update))
-          , (a_zero, b_zero) )
+          let a = inner a in
+          let sep = inner sep in
+          let b = inner b in
+          fun should_update ->
+            Expert.pair ~sep:(sep should_update) (a should_update)
+              (b should_update)
       | Contramap (x, f) ->
-          let x, _ = inner x in
-          ((fun y -> Expert.contramap ~f (x y)), Obj.magic None)
+          let x = inner x in
+          fun y -> Expert.contramap ~f (x y)
       | List xs ->
           let xs = List.map inner xs in
-          ( (fun should_update ->
-              Expert.array
-                (List.map (fun (f, _) -> f should_update) xs |> Array.of_list))
-          , snd (List.hd xs (* TODO: give a proper error message *)) )
-      | Basic { segment; zero } ->
-          ( (fun should_update ->
-              Expert.conditional (fun _ -> should_update ()) @@ segment)
-          , zero )
+          fun should_update ->
+            Expert.array
+              (List.map (fun f -> f should_update) xs |> Array.of_list)
+      | Basic segment ->
+          fun should_update ->
+            Expert.conditional (fun _ -> should_update ()) @@ segment
       | Acc { segment; elt = (module Integer) } ->
-          ( (fun should_update ->
-              Acc.wrap ~elt:(module Integer) ~clock:Clock.now ~should_update
-              @@ segment)
-          , Integer.zero )
+          fun should_update ->
+            Acc.wrap ~elt:(module Integer) ~clock:Clock.now ~should_update
+            @@ segment
     in
-    let inner, zero = inner t in
+    let inner = inner t in
     let segment =
       Expert.stateful (fun () ->
           let should_update =
@@ -141,7 +137,7 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
           @@ Expert.box_winsize ?max:config.max_width
           @@ inner (fun () -> !x))
     in
-    (segment, zero)
+    segment
 
   (* Basic utilities for combining segments *)
 
@@ -151,27 +147,29 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
       Expert.theta ~width:len_utf8 (fun buf ->
           Line_buffer.add_substring buf s ~off:0 ~len)
     in
-    Basic { segment; zero = Obj.magic None }
+    Basic segment
 
   let const_fmt ~width pp =
     let segment =
       Expert.theta ~width (fun buf ->
           Line_buffer.with_ppf buf (fun ppf -> pp ppf))
     in
-    Basic { segment; zero = Obj.magic None }
+    Basic segment
 
-  let expert_of_pp ~width pp =
-    Expert.alpha ~width (fun buf x ->
+  let expert_of_pp ~width ~initial pp =
+    Expert.alpha ~width ~initial (fun buf x ->
         Line_buffer.with_ppf buf (fun ppf -> pp ppf x))
 
-  let of_pp ~elt ~width pp =
-    let segment = Expert.contramap ~f:Acc.total @@ expert_of_pp ~width pp in
+  let of_pp (type elt) ~elt ~width pp =
+    let (module Integer : Integer.S with type t = elt) = elt in
+    let pp buf = Line_buffer.with_ppf buf pp in
+    let initial ppf = pp ppf Integer.zero in
+    let segment =
+      Expert.contramap ~f:Acc.total @@ Expert.alpha ~width ~initial pp
+    in
     Acc { segment; elt }
 
-  let pair ?(sep = Basic { segment = Expert.noop (); zero = Obj.magic None }) a
-      b =
-    Pair (a, sep, b)
-
+  let pair ?(sep = Basic (Expert.noop ())) a b = Pair (a, sep, b)
   let list ?(sep = const "  ") x = List (List.intersperse ~sep x)
   let ( ++ ) a b = List [ a; b ]
   let using f x = Contramap (x, f)
@@ -212,14 +210,11 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
     in
     let stage_count = Array.length stages in
     Basic
-      { segment =
-          Segment.stateful (fun () ->
-              let tick = Staged.prj (modulo_counter stage_count) in
-              Segment.theta ~width (fun buf ->
-                  with_style_opt buf ~style:color (fun () ->
-                      Line_buffer.add_string buf stages.(tick ()))))
-      ; zero = Obj.magic None
-      }
+      (Segment.stateful (fun () ->
+           let tick = Staged.prj (modulo_counter stage_count) in
+           Segment.theta ~width (fun buf ->
+               with_style_opt buf ~style:color (fun () ->
+                   Line_buffer.add_string buf stages.(tick ())))))
 
   let bytes =
     of_pp ~elt:(module Integer.Int) ~width:Units.Bytes.width Units.Bytes.of_int
@@ -239,14 +234,16 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
 
   let string =
     let segment =
-      Segment.alpha_unsized (fun ~width buf s ->
+      Segment.alpha_unsized
+        ~initial:(fun ~width:_ _ -> 0)
+        (fun ~width buf s ->
           let len = String.length s in
           if len <= width () then (
             Line_buffer.add_string buf s;
             len)
           else assert false)
     in
-    Basic { segment; zero = "" }
+    Basic segment
 
   let max (type elt) total (module Integer : Integer.S with type t = elt) =
     const (Integer.to_string total)
@@ -256,7 +253,10 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
     let width = String.length total in
     let segment =
       Expert.contramap ~f:Acc.total
-      @@ Expert.alpha ~width (fun lb x ->
+      @@ Expert.alpha
+           ~initial:(fun _ -> ())
+           ~width
+           (fun lb x ->
              let x = Integer.to_string x in
              for _ = String.length x to width - 1 do
                Line_buffer.add_char lb ' '
@@ -339,12 +339,16 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
             (match width with
             | `Fixed width ->
                 if width < 3 then failwith "Not enough space for a progress bar";
-                Segment.alpha ~width (fun buf x ->
+                Segment.alpha ~width
+                  ~initial:(fun _ -> ())
+                  (fun buf x ->
                     ignore
                       (bar ~style ~color ~color_empty (fun _ -> width) x buf
                         : int))
             | `Expand ->
-                Segment.alpha_unsized (fun ~width ppf x ->
+                Segment.alpha_unsized
+                  ~initial:(fun ~width:_ _ -> 0)
+                  (fun ~width ppf x ->
                     bar ~style ~color ~color_empty width x ppf))
       ; elt = (module Integer)
       }
@@ -371,7 +375,7 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
           let pp buf = print_time buf (Clock.count start_time) in
           Expert.theta ~width:5 pp)
     in
-    Basic { segment; zero = Obj.magic None }
+    Basic segment
 
   let rate ~width pp (type elt) (module Integer : Integer.S with type t = elt) :
       elt t =
@@ -379,7 +383,9 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
       let pp ppf x = Fmt.pf ppf "%a/s" pp x in
       Expert.contramap
         ~f:(Acc.ring_buffer >> Ring_buffer.rate_per_second >> Integer.to_float)
-        (expert_of_pp ~width pp)
+        (expert_of_pp ~width
+           ~initial:(fun buf -> Line_buffer.add_string buf "  /s")
+           pp)
     in
     Acc { segment; elt = (module Integer) }
 
@@ -397,24 +403,11 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
             Mtime.Span.of_uint64_ns
               (Int64.of_float
                  (todo /. Integer.to_float per_second *. 1_000_000_000.)))
-        (expert_of_pp ~width pp)
+        (expert_of_pp ~width
+           ~initial:(fun buf -> Line_buffer.add_string buf "ETA:  ")
+           pp)
     in
     Acc { elt = (module Integer); segment }
-end
-
-module Time_sensitive (Clock : Mclock) = struct
-  (* let debounce interval s =
-   *   Expert.stateful (fun () ->
-   *       let latest = ref (Clock.now ()) in
-   *       let should_update () =
-   *         let now = Clock.now () in
-   *         match Mtime.Span.compare (Mtime.span !latest now) interval >= 0 with
-   *         | false -> false
-   *         | true ->
-   *             latest := now;
-   *             true
-   *       in
-   *       Expert.conditional (fun _ -> should_update ()) s) *)
 end
 
 (*————————————————————————————————————————————————————————————————————————————

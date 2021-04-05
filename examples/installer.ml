@@ -52,7 +52,6 @@ let run () =
       done);
   Fmt.pr "%t 📃  Building fresh packages ... @." line_prefix;
   with_bars (fun reporters ->
-      Printf.eprintf "I have a reporter\n%!";
       (* Give everyone something to do *)
       List.iter (fun f -> f (random_action ())) reporters;
 

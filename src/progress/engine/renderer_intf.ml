@@ -29,7 +29,7 @@ module Reporters = struct
 end
 
 module Segment_list = struct
-  type 'a elt = { segment : 'a Segment.t; init : 'a }
+  type 'a elt = { segment : 'a Segment.t }
 
   type (_, _) t =
     | One : 'a elt -> ('a reporter -> 'b, 'b) t
@@ -47,8 +47,8 @@ module type Renderer = sig
 
   type ('a, 'b) t = ('a, 'b) Segment_list.t
 
-  val make : init:'a -> 'a Segment.t -> ('a reporter -> 'b, 'b) t
-  val make_list : init:'a -> 'a Segment.t list -> ('a reporter list -> 'b, 'b) t
+  val make : 'a Segment.t -> ('a reporter -> 'b, 'b) t
+  val make_list : 'a Segment.t list -> ('a reporter list -> 'b, 'b) t
 
   module Make (_ : Platform.S) : sig
     type display

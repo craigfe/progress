@@ -35,7 +35,9 @@ module type S = sig
   val elapsed : unit -> 'a t
   (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
 
-  val rate : width:int -> float Fmt.t -> (module Integer.S with type t = 'a) -> 'a t
+  val rate :
+    width:int -> float Fmt.t -> (module Integer.S with type t = 'a) -> 'a t
+
   val eta : total:'a -> (module Integer.S with type t = 'a) -> 'a t
 
   val const : string -> _ t
@@ -112,7 +114,7 @@ module type Line = sig
   module Make (_ : Mclock) (_ : Platform.S) : sig
     include S with type 'a t := 'a t
 
-    val compile : 'a t -> config:render_config -> 'a Expert.t * 'a
+    val compile : 'a t -> config:render_config -> 'a Expert.t
   end
 end
 

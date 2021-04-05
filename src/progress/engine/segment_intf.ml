@@ -18,16 +18,22 @@ module type S = sig
 
   val noop : unit -> _ t
   val theta : width:int -> theta -> _ t
-  val alpha : width:int -> 'a alpha -> 'a t
+  val alpha : width:int -> initial:theta -> 'a alpha -> 'a t
 
   val alpha_unsized :
-    (width:(unit -> int) -> Line_buffer.t -> 'a -> int) -> 'a t
+       initial:(width:(unit -> int) -> Line_buffer.t -> int)
+    -> (width:(unit -> int) -> Line_buffer.t -> 'a -> int)
+    -> 'a t
 
   val array : 'a t array -> 'a t
   val pair : ?sep:unit t -> 'a t -> 'b t -> ('a * 'b) t
   val contramap : f:('a -> 'b) -> 'b t -> 'a t
 
-  val of_pp : width:int -> (Format.formatter -> 'a -> unit) -> 'a t
+  val of_pp :
+       width:int
+    -> initial:(Format.formatter -> unit)
+    -> (Format.formatter -> 'a -> unit)
+    -> 'a t
   (** [of_pp ~width pp] is a segment that uses the supplied fixed-width
       pretty-printer to render the value. The pretty-printer must never emit
       newline characters. *)
@@ -85,7 +91,7 @@ module type Segment = sig
     val pp_dump : Format.formatter -> 'a t -> unit
   end
 
-  val compile : initial:'a -> 'a t -> 'a Compiled.t
+  val compile : 'a t -> 'a Compiled.t
 
   val update :
     'a Compiled.t -> (unconditional:bool -> Line_buffer.t -> int) Staged.t
