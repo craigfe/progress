@@ -27,16 +27,16 @@ module type S = sig
 
   val bytes : int t
   val bytes_int64 : int64 t
-  val percentage_of : 'a -> (module Elt.S with type t = 'a) -> 'a t
+  val percentage_of : 'a -> (module Integer.S with type t = 'a) -> 'a t
   val string : string t
-  val max : 'a -> (module Elt.S with type t = 'a) -> 'a t
-  val count : 'a -> (module Elt.S with type t = 'a) -> 'a t
+  val max : 'a -> (module Integer.S with type t = 'a) -> 'a t
+  val count : 'a -> (module Integer.S with type t = 'a) -> 'a t
 
   val elapsed : unit -> 'a t
   (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
 
-  val rate : width:int -> float Fmt.t -> (module Elt.S with type t = 'a) -> 'a t
-  val eta : total:'a -> (module Elt.S with type t = 'a) -> 'a t
+  val rate : width:int -> float Fmt.t -> (module Integer.S with type t = 'a) -> 'a t
+  val eta : total:'a -> (module Integer.S with type t = 'a) -> 'a t
 
   val const : string -> _ t
   (** [const s] is the segment that always displays [s]. [s] must not contain
@@ -47,7 +47,7 @@ module type S = sig
       pretty-printer rather than a string. *)
 
   val of_pp :
-       elt:(module Elt.S with type t = 'a)
+       elt:(module Integer.S with type t = 'a)
     -> width:int
     -> (Format.formatter -> 'a -> unit)
     -> 'a t
@@ -63,7 +63,7 @@ module type S = sig
     -> ?color_empty:Ansi.style
     -> ?width:[ `Fixed of int | `Expand ]
     -> total:'elt
-    -> (module Elt.S with type t = 'elt)
+    -> (module Integer.S with type t = 'elt)
     -> 'elt t
   (** [bar ~width f] is a progress bar of the form:
 

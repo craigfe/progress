@@ -4,7 +4,7 @@ type 'a t
 val create :
      clock:(unit -> Mtime.t)
   -> size:int
-  -> elt:(module Elt.S with type t = 'a)
+  -> elt:(module Integer.S with type t = 'a)
   -> 'a t
 
 val record : 'a t -> 'a -> unit

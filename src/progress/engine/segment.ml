@@ -409,4 +409,9 @@ let update top =
           x + y + z
   in
   let$ f = aux top in
-  fun ~unconditional buf : int -> f unconditional buf
+  fun ~unconditional buf : int ->
+    Sys.catch_break false;
+    Printf.eprintf "update\n%!";
+    let a = f unconditional buf in
+    Printf.eprintf "done\n%!";
+    a

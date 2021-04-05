@@ -52,7 +52,7 @@ val counter :
   -> ?pp:(Format.formatter -> 'elt -> unit) * int
   -> ?width:int
   -> ?sampling_interval:int
-  -> (module Elt.S with type t = 'elt)
+  -> (module Integer.S with type t = 'elt)
   -> ('elt reporter -> 'a, 'a) t
 (** [counter ~total (module Int)] is a progress bar of the form:
 

@@ -55,17 +55,17 @@ let make_list xs =
   make_list ~init:(snd (List.hd xs)) (List.map fst xs)
 
 let counter (type elt) ~(total : elt) ?color ?(style = `ASCII) ?message ?pp
-    ?width:_ ?sampling_interval:(_ = 1) (module Elt : Elt.S with type t = elt) =
+    ?width:_ ?sampling_interval:(_ = 1) (module Integer : Integer.S with type t = elt) =
   let open Line in
   make
   @@ list
        (Option.fold ~none:[] message ~some:(fun s -> [ const s ])
        @ Option.fold ~none:[] pp ~some:(fun (pp, width) ->
-             [ Line.of_pp ~elt:(module Elt) ~width pp ])
+             [ Line.of_pp ~elt:(module Integer) ~width pp ])
        @ [ Line.elapsed ()
-         ; (bar ?color ~style ~total (module Elt) : elt Line.t)
+         ; (bar ?color ~style ~total (module Integer) : elt Line.t)
            ++ const " "
-           ++ percentage_of total (module Elt)
+           ++ percentage_of total (module Integer)
          ])
 
 module Config = struct

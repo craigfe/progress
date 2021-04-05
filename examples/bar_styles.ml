@@ -6,14 +6,12 @@ let bars =
   ; ( "Vertical:   "
     , `Custom [ " "; "▁"; "▂"; "▃"; "▄"; "▅"; "▆"; "▇"; "█" ]
     , `Green )
-  ; ("Blocky:     ", `Custom [ " "; "▖"; "▌"; "▛"; "█" ], `Magenta)
-  ; ("Fade in:    ", `Custom [ " "; "░"; "▒"; "▓"; "█" ], `Blue)
+  ; ("Blocky:     ", `Custom [ " "; "▖"; "▌"; "▛"; "█" ], `Blue)
+  ; ("Fade in:    ", `Custom [ " "; "░"; "▒"; "▓"; "█" ], `Magenta)
   ]
   |> List.map (fun (label, style, color) ->
          let open Progress.Line in
-         const label
-         ++ bar ~style ~color ~total:1000 (module Int)
-         ++ percentage_of 100 (module Int))
+         const label ++ bar ~style ~color ~total:1000 (module Int))
   |> Progress.make_list
 
 let pick_random_function l =

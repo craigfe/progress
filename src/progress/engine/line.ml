@@ -27,32 +27,33 @@ module Acc = struct
 
   let wrap :
       type a.
-         elt:(module Elt.S with type t = a)
+         elt:(module Integer.S with type t = a)
       -> clock:(unit -> Mtime.t)
       -> should_update:(unit -> bool)
       -> a t Expert.t
       -> a Expert.t =
-   fun ~elt:(module Elt) ~clock ~should_update inner ->
+   fun ~elt:(module Integer) ~clock ~should_update inner ->
     Expert.stateful (fun () ->
         let ring_buffer =
-          Ring_buffer.create ~clock ~size:16 ~elt:(module Elt)
+          Ring_buffer.create ~clock ~size:16 ~elt:(module Integer)
         in
         let render_start = clock () in
         let state =
-          { latest = Elt.zero
-          ; total = Elt.zero
-          ; pending = Elt.zero
+          { latest = Integer.zero
+          ; total = Integer.zero
+          ; pending = Integer.zero
           ; render_start
           ; ring_buffer
           }
         in
 
-        Expert.contramap ~f:(fun a -> state.pending <- Elt.add a state.pending)
+        Expert.contramap ~f:(fun a ->
+            state.pending <- Integer.add a state.pending)
         @@ Expert.conditional (fun _ -> should_update ())
         @@ Expert.contramap ~f:(fun () ->
-               state.total <- Elt.add state.pending state.total;
+               state.total <- Integer.add state.pending state.total;
                state.latest <- state.pending;
-               state.pending <- Elt.zero;
+               state.pending <- Integer.zero;
                state)
         @@ inner)
 
@@ -84,7 +85,7 @@ type 'a t =
   | Contramap : ('b t * ('a -> 'b)) -> 'a t
   | Pair : 'a t * unit t * 'b t -> ('a * 'b) t
   | Acc of
-      { segment : 'a Acc.t Expert.t; elt : (module Elt.S with type t = 'a) }
+      { segment : 'a Acc.t Expert.t; elt : (module Integer.S with type t = 'a) }
 
 type render_config = { interval : Mtime.span option; max_width : int option }
 
@@ -118,11 +119,11 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
           ( (fun should_update ->
               Expert.conditional (fun _ -> should_update ()) @@ segment)
           , zero )
-      | Acc { segment; elt = (module Elt) } ->
+      | Acc { segment; elt = (module Integer) } ->
           ( (fun should_update ->
-              Acc.wrap ~elt:(module Elt) ~clock:Clock.now ~should_update
+              Acc.wrap ~elt:(module Integer) ~clock:Clock.now ~should_update
               @@ segment)
-          , Elt.zero )
+          , Integer.zero )
     in
     let inner, zero = inner t in
     let segment =
@@ -221,16 +222,20 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
       }
 
   let bytes =
-    of_pp ~elt:(module Elt.Int) ~width:Units.Bytes.width Units.Bytes.of_int
+    of_pp ~elt:(module Integer.Int) ~width:Units.Bytes.width Units.Bytes.of_int
 
   let bytes_int64 =
-    of_pp ~elt:(module Elt.Int64) ~width:Units.Bytes.width Units.Bytes.of_int64
+    of_pp
+      ~elt:(module Integer.Int64)
+      ~width:Units.Bytes.width Units.Bytes.of_int64
 
-  let percentage_of (type elt) total (module Elt : Elt.S with type t = elt) =
+  let percentage_of (type elt) total
+      (module Integer : Integer.S with type t = elt) =
     let pp ppf x =
-      Units.Percentage.of_float ppf (Elt.to_float x /. Elt.to_float total)
+      Units.Percentage.of_float ppf
+        (Integer.to_float x /. Integer.to_float total)
     in
-    of_pp ~elt:(module Elt) ~width:Units.Percentage.width pp
+    of_pp ~elt:(module Integer) ~width:Units.Percentage.width pp
 
   let string =
     let segment =
@@ -243,22 +248,22 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
     in
     Basic { segment; zero = "" }
 
-  let max (type elt) total (module Elt : Elt.S with type t = elt) =
-    const (Elt.to_string total)
+  let max (type elt) total (module Integer : Integer.S with type t = elt) =
+    const (Integer.to_string total)
 
-  let count (type elt) total (module Elt : Elt.S with type t = elt) =
-    let total = Elt.to_string total in
+  let count (type elt) total (module Integer : Integer.S with type t = elt) =
+    let total = Integer.to_string total in
     let width = String.length total in
     let segment =
       Expert.contramap ~f:Acc.total
       @@ Expert.alpha ~width (fun lb x ->
-             let x = Elt.to_string x in
+             let x = Integer.to_string x in
              for _ = String.length x to width - 1 do
                Line_buffer.add_char lb ' '
              done;
              Line_buffer.add_string lb x)
     in
-    Acc { segment; elt = (module Elt) }
+    Acc { segment; elt = (module Integer) }
 
   (* Progress bars *)
 
@@ -324,8 +329,8 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
         bar_custom ~stages
 
   let bar ?(style = `UTF8) ?color ?color_empty ?(width = `Expand) (type elt)
-      ~total (module Elt : Elt.S with type t = elt) : elt t =
-    let proportion x = Elt.to_float x /. Elt.to_float total in
+      ~total (module Integer : Integer.S with type t = elt) : elt t =
+    let proportion x = Integer.to_float x /. Integer.to_float total in
 
     Acc
       { segment =
@@ -341,7 +346,7 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
             | `Expand ->
                 Segment.alpha_unsized (fun ~width ppf x ->
                     bar ~style ~color ~color_empty width x ppf))
-      ; elt = (module Elt)
+      ; elt = (module Integer)
       }
 
   (* TODO: common start time by using something like Acc *)
@@ -368,16 +373,17 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
     in
     Basic { segment; zero = Obj.magic None }
 
-  let rate ~width pp (type elt) (module Elt : Elt.S with type t = elt) : elt t =
+  let rate ~width pp (type elt) (module Integer : Integer.S with type t = elt) :
+      elt t =
     let segment =
       let pp ppf x = Fmt.pf ppf "%a/s" pp x in
       Expert.contramap
-        ~f:(Acc.ring_buffer >> Ring_buffer.rate_per_second >> Elt.to_float)
+        ~f:(Acc.ring_buffer >> Ring_buffer.rate_per_second >> Integer.to_float)
         (expert_of_pp ~width pp)
     in
-    Acc { segment; elt = (module Elt) }
+    Acc { segment; elt = (module Integer) }
 
-  let eta (type elt) ~total (module Elt : Elt.S with type t = elt) =
+  let eta (type elt) ~total (module Integer : Integer.S with type t = elt) =
     let segment =
       let pp ppf x = Fmt.pf ppf "ETA: %a" Units.Duration.mm_ss x in
       let width = 10 in
@@ -385,15 +391,15 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
         ~f:(fun acc ->
           let per_second = Acc.ring_buffer acc |> Ring_buffer.rate_per_second in
           let acc = Acc.total acc in
-          if per_second = Elt.zero then Mtime.Span.max_span
+          if per_second = Integer.zero then Mtime.Span.max_span
           else
-            let todo = Elt.(to_float (sub total acc)) in
+            let todo = Integer.(to_float (sub total acc)) in
             Mtime.Span.of_uint64_ns
               (Int64.of_float
-                 (todo /. Elt.to_float per_second *. 1_000_000_000.)))
+                 (todo /. Integer.to_float per_second *. 1_000_000_000.)))
         (expert_of_pp ~width pp)
     in
-    Acc { elt = (module Elt); segment }
+    Acc { elt = (module Integer); segment }
 end
 
 module Time_sensitive (Clock : Mclock) = struct

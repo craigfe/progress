@@ -1,5 +1,9 @@
 let ( >> ) f g x = g (f x)
 
+let trace fmt x =
+  Fmt.epr fmt x;
+  x
+
 module String = struct
   include String
 

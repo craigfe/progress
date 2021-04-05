@@ -5,7 +5,7 @@ type 'a t =
   ; mutable most_recently_added : int
   ; mutable length : int
   ; get_time : unit -> Mtime.t
-  ; elt : (module Elt.S with type t = 'a)
+  ; elt : (module Integer.S with type t = 'a)
   }
 
 let create (type a) ~clock:get_time ~size:max_length ~elt : a t =
@@ -49,13 +49,13 @@ let fold =
 
 let rate_per_second : type a. a t -> a =
  fun t ->
-  let (module Elt) = t.elt in
-  if is_empty t then Elt.zero
+  let (module Integer) = t.elt in
+  if is_empty t then Integer.zero
   else
     let interval =
       let start_time = t.timestamps.(oldest_index t) in
       let end_time = t.timestamps.(t.most_recently_added) in
       Mtime.Span.to_s (Mtime.span start_time end_time)
     in
-    let sum = fold t ~f:Elt.add ~init:Elt.zero in
-    Elt.of_float (Elt.to_float sum /. interval)
+    let sum = fold t ~f:Integer.add ~init:Integer.zero in
+    Integer.of_float (Integer.to_float sum /. interval)
