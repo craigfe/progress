@@ -32,14 +32,6 @@ type ('a, 'b) t
     These reporting functions are supplied when beginning the {{!rendering}
     rendering} process. *)
 
-module type Elt = sig
-  type t
-
-  val zero : t
-  val add : t -> t -> t
-  val to_float : t -> float
-end
-
 module Ansi : sig
   include module type of Ansi
   (** @inline *)
@@ -60,7 +52,7 @@ val counter :
   -> ?pp:(Format.formatter -> 'elt -> unit) * int
   -> ?width:int
   -> ?sampling_interval:int
-  -> (module Elt with type t = 'elt)
+  -> (module Elt.S with type t = 'elt)
   -> ('elt reporter -> 'a, 'a) t
 (** [counter ~total (module Int)] is a progress bar of the form:
 
@@ -92,20 +84,18 @@ module Line : sig
   include Line.S
   (** @inline *)
 
-  include Line.Time_sensitive with type 'a t := 'a t
-
   module Expert : sig
-    include Segment.S with type 'a t := 'a t
+    include Segment.S with type 'a t = 'a Expert.t
 
     val box_winsize : ?max:int -> ?fallback:int -> 'a t -> 'a t
   end
 end
 
-val make : init:'a -> 'a Line.t -> ('a reporter -> 'b, 'b) t
+val make : 'a Line.t -> ('a reporter -> 'b, 'b) t
 (** Define a new progress bar from a specification, with the given initial
     value. *)
 
-val make_list : init:'a -> 'a Line.t list -> ('a reporter list -> 'b, 'b) t
+val make_list : 'a Line.t list -> ('a reporter list -> 'b, 'b) t
 
 (** {2 Multiple progress bars} *)
 

@@ -3,6 +3,8 @@ type 'a pp := Format.formatter -> 'a -> unit
 module Duration : sig
   val mm_ss : Mtime.Span.t pp
   (** Renders a time span in fixed-width [MM:SS] form. *)
+
+  val mm_ss_print : Mtime.Span.t Print.t
 end
 
 (** {2 Assorted pretty-printing utilities} *)

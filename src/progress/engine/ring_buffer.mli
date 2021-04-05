@@ -1,10 +1,14 @@
-type t
+type 'a t
 (** The type of ring buffers. *)
 
-val create : clock:(unit -> Mtime.t) -> size:int -> t
+val create :
+     clock:(unit -> Mtime.t)
+  -> size:int
+  -> elt:(module Elt.S with type t = 'a)
+  -> 'a t
 
-val record : t -> int64 -> unit
+val record : 'a t -> 'a -> unit
 (** Add a value to the ring buffer. *)
 
-val rate_per_second : t -> float
+val rate_per_second : 'a t -> 'a
 (** Estimate the rate of change of recorded values per second. *)

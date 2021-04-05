@@ -11,23 +11,11 @@ module type Mclock = sig
 end
 
 module type Time_sensitive = sig
-  type 'a t
-  type 'a accumulated
+  (* val debounced_accumulator :
+   *   Duration.t -> ('a -> 'a -> 'a) -> 'a -> 'a accumulated t -> 'a t
+   * (\** [debounce span s] has the same output format as [s], but only passes
+   *     reported values doen to [s] at most once in any given time [span]. *\) *)
 
-  val acc : 'a accumulated -> 'a
-  val latest : 'a accumulated -> 'a
-  val debounce : Duration.t -> 'a t -> 'a t
-
-  val debounced_accumulator :
-    Duration.t -> ('a -> 'a -> 'a) -> 'a -> 'a accumulated t -> 'a t
-  (** [debounce span s] has the same output format as [s], but only passes
-      reported values doen to [s] at most once in any given time [span]. *)
-
-  val elapsed : unit -> 'a t
-  (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
-
-  val rate : (Format.formatter -> int64 -> unit) * int -> int64 t
-  val eta : int64 -> int64 t
 end
 
 module type S = sig
@@ -39,8 +27,16 @@ module type S = sig
 
   val bytes : int t
   val bytes_int64 : int64 t
-  val percentage : float t
+  val percentage_of : 'a -> (module Elt.S with type t = 'a) -> 'a t
   val string : string t
+  val max : 'a -> (module Elt.S with type t = 'a) -> 'a t
+  val count : 'a -> (module Elt.S with type t = 'a) -> 'a t
+
+  val elapsed : unit -> 'a t
+  (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
+
+  val rate : width:int -> float Fmt.t -> (module Elt.S with type t = 'a) -> 'a t
+  val eta : total:'a -> (module Elt.S with type t = 'a) -> 'a t
 
   val const : string -> _ t
   (** [const s] is the segment that always displays [s]. [s] must not contain
@@ -50,7 +46,11 @@ module type S = sig
   (** {!const_fmt} is a variant of {!const} that takes a fixed-width
       pretty-printer rather than a string. *)
 
-  val of_pp : width:int -> (Format.formatter -> 'a -> unit) -> 'a t
+  val of_pp :
+       elt:(module Elt.S with type t = 'a)
+    -> width:int
+    -> (Format.formatter -> 'a -> unit)
+    -> 'a t
   (** [of_pp ~width pp] is a segment that uses the supplied fixed-width
       pretty-printer to render the value. The pretty-printer must never emit
       newline characters. *)
@@ -62,8 +62,9 @@ module type S = sig
     -> ?color:Ansi.style
     -> ?color_empty:Ansi.style
     -> ?width:[ `Fixed of int | `Expand ]
-    -> ('a -> float)
-    -> 'a t
+    -> total:'elt
+    -> (module Elt.S with type t = 'elt)
+    -> 'elt t
   (** [bar ~width f] is a progress bar of the form:
 
       {[ [#######################################................] ]}
@@ -91,19 +92,28 @@ module type S = sig
   (** [using f s] is a segment that first applies [f] to the reported value and
       then behaves as segment [s]. *)
 
-  module Time_sensitive (_ : Mclock) : Time_sensitive with type 'a t := 'a t
-
   module Expert : sig
-    include Segment.S with type 'a t = 'a t
+    include Segment.S with type 'a t = 'a Segment.t
     (** @inline *)
   end
 end
 
+module Types = struct
+  type render_config = { interval : Mtime.span option; max_width : int option }
+end
+
 module type Line = sig
   module type S = S
-  module type Time_sensitive = Time_sensitive
 
-  include S with type 'a t = 'a Segment.t
+  include module type of Types
+
+  type 'a t
+
+  module Make (_ : Mclock) (_ : Platform.S) : sig
+    include S with type 'a t := 'a t
+
+    val compile : 'a t -> config:render_config -> 'a Expert.t * 'a
+  end
 end
 
 (*————————————————————————————————————————————————————————————————————————————

@@ -16,9 +16,8 @@ let with_bars f =
   let bars =
     ListLabels.map bar_names ~f:(fun name ->
         let open Progress.Line in
-        Expert.box_winsize
-          (spinner ~color:`Green () ++ const (" " ^ name ^ ": ") ++ string))
-    |> Progress.make_list ~init:""
+        spinner ~color:`Green () ++ const (" " ^ name ^ ": ") ++ string)
+    |> Progress.make_list
   in
   Progress.(with_reporters ~config @@ bars) f
 

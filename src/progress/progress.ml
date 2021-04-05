@@ -1,14 +1,6 @@
 open! Import
 open Progress_engine
 
-module type Elt = sig
-  type t
-
-  val zero : t
-  val add : t -> t -> t
-  val to_float : t -> float
-end
-
 type 'a reporter = 'a -> unit
 
 module Platform = struct
@@ -26,8 +18,8 @@ module Segment = struct
 end
 
 module Line = struct
-  include Line.Time_sensitive (Mtime_clock)
   include Line
+  include Line.Make (Mtime_clock) (Platform)
 
   module Expert = struct
     include Expert.Platform_dependent (Platform)
@@ -51,25 +43,30 @@ module Reporters = Renderer.Reporters
 
 type bar_style = [ `ASCII | `UTF8 | `Custom of string list ]
 
+let renderer_config : Line.render_config =
+  { interval = Some Duration.millisecond; max_width = Some 120 }
+
+let make x =
+  let seg, init = Line.compile x ~config:renderer_config in
+  make ~init seg
+
+let make_list xs =
+  let xs = List.map (Line.compile ~config:renderer_config) xs in
+  make_list ~init:(snd (List.hd xs)) (List.map fst xs)
+
 let counter (type elt) ~(total : elt) ?color ?(style = `ASCII) ?message ?pp
-    ?width ?(sampling_interval = 1) (module Elt : Elt with type t = elt) =
+    ?width:_ ?sampling_interval:(_ = 1) (module Elt : Elt.S with type t = elt) =
   let open Line in
-  let proportion =
-    let total = Elt.to_float total in
-    fun i -> Elt.to_float i /. total
-  in
-  list
-    (Option.fold ~none:[] message ~some:(fun s -> [ const s ])
-    @ Option.fold ~none:[] pp ~some:(fun (pp, width) ->
-          [ Segment.of_pp ~width pp ])
-    @ [ Line.elapsed () ]
-    @ [ bar ?color ~style proportion ++ const " " ++ using proportion percentage
-      ])
-  |> Option.fold width ~some:Segment.box_fixed ~none:(fun s ->
-         Segment.box_winsize ~fallback:80 s)
-  |> Segment.periodic sampling_interval
-  |> Segment.accumulator Elt.add Elt.zero
-  |> make ~init:Elt.zero
+  make
+  @@ list
+       (Option.fold ~none:[] message ~some:(fun s -> [ const s ])
+       @ Option.fold ~none:[] pp ~some:(fun (pp, width) ->
+             [ Line.of_pp ~elt:(module Elt) ~width pp ])
+       @ [ Line.elapsed ()
+         ; (bar ?color ~style ~total (module Elt) : elt Line.t)
+           ++ const " "
+           ++ percentage_of total (module Elt)
+         ])
 
 module Config = struct
   include Config

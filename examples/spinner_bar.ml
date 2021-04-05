@@ -8,7 +8,7 @@ let stages =
 let spin = Line.spinner ~stages ()
 
 let bar =
-  Progress.make ~init:()
+  Progress.make
     Line.(const "[" ++ spin ++ spin ++ spin ++ spin ++ spin ++ const "]")
 
 let run () =

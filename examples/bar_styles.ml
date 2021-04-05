@@ -6,15 +6,15 @@ let bars =
   ; ( "Vertical:   "
     , `Custom [ " "; "▁"; "▂"; "▃"; "▄"; "▅"; "▆"; "▇"; "█" ]
     , `Green )
-  ; ("Fade in:    ", `Custom [ " "; "░"; "▒"; "▓"; "█" ], `Blue)
   ; ("Blocky:     ", `Custom [ " "; "▖"; "▌"; "▛"; "█" ], `Magenta)
+  ; ("Fade in:    ", `Custom [ " "; "░"; "▒"; "▓"; "█" ], `Blue)
   ]
   |> List.map (fun (label, style, color) ->
          let open Progress.Line in
-         Expert.box_winsize ~max:50
-         @@ Expert.accumulator ( + ) 0
-         @@ (const label ++ bar ~style ~color (fun x -> float_of_int x /. 1000.)))
-  |> Progress.make_list ~init:0
+         const label
+         ++ bar ~style ~color ~total:1000 (module Int)
+         ++ percentage_of 100 (module Int))
+  |> Progress.make_list
 
 let pick_random_function l =
   Random.self_init ();

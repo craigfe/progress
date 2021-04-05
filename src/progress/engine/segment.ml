@@ -30,6 +30,20 @@ type 'a t =
   | Group of 'a t array
   | Pair : { left : 'a t; sep : unit t; right : 'b t } -> ('a * 'b) t
 
+let[@warning "-unused-value-declaration"] rec pp_dump : type a. a t pp =
+ fun ppf -> function
+  | Noop -> Fmt.string ppf "Noop"
+  | Pp_unsized _ -> Fmt.string ppf "Pp_unsized _"
+  | Pp_fixed { width; _ } -> Fmt.pf ppf "Pp_fixed { width = %d }" width
+  | Const { width; _ } -> Fmt.pf ppf "Const { width = %d }" width
+  | Cond { then_; _ } -> Fmt.pf ppf "Cond { then_ = %a }" pp_dump then_
+  | Contramap (x, _) -> Fmt.pf ppf "Contramap ( %a )" pp_dump x
+  | Staged f -> Fmt.pf ppf "Staged ( %a )" pp_dump (f ())
+  | Box { contents; _ } -> Fmt.pf ppf "Box ( %a )" pp_dump contents
+  | Group xs -> Fmt.Dump.array pp_dump ppf xs
+  | Pair { left; sep; right } ->
+      Fmt.pf ppf "(%a, %a, %a)" pp_dump left pp_dump sep pp_dump right
+
 let noop () = Noop
 let array ts = Group ts
 
@@ -84,6 +98,29 @@ let accumulator combine zero s =
           state := combine !state a;
           !state))
 
+module Sta_dyn : sig
+  type 'a t = Static of 'a | Dynamic of (unit -> 'a)
+
+  val get : 'a t -> 'a
+  val lift : ('a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+  val pp : 'a pp -> 'a t pp
+end = struct
+  type 'a t = Static of 'a | Dynamic of (unit -> 'a)
+
+  let get = function Static x -> x | Dynamic f -> f ()
+
+  let lift add x y =
+    let ( ++ ) = add in
+    match (x, y) with
+    | Static x, Static y -> Static (x ++ y)
+    | Dynamic f, Static x | Static x, Dynamic f -> Dynamic (fun () -> x ++ f ())
+    | Dynamic f, Dynamic g -> Dynamic (fun () -> f () ++ g ())
+
+  let pp pp_elt ppf = function
+    | Static x -> Fmt.pf ppf "Static %a" pp_elt x
+    | Dynamic f -> Fmt.pf ppf "Dynamic %a" pp_elt (f ())
+end
+
 (** The [compile] step transforms a pure [t] term in to a potentially-impure
     [Compiled.t] term to be used for a single display lifecycle. It has three
     purposes:
@@ -101,7 +138,7 @@ module Compiled = struct
     | Cond of
         { if_ : 'a -> bool
         ; then_ : 'a t
-        ; width : int
+        ; width : int Sta_dyn.t
         ; mutable latest : 'a
         ; mutable latest_span : Line_buffer.Span.t
         }
@@ -114,8 +151,9 @@ module Compiled = struct
     | Pp _ -> Fmt.string ppf "Pp _"
     | Const _ -> Fmt.string ppf "Const _"
     | Cond { then_; latest_span; width; _ } ->
-        Fmt.pf ppf "Cond { if_ = <opaque>; then_ = %a; width = %d; span = %a }"
-          pp_dump then_ width Line_buffer.Span.pp latest_span
+        Fmt.pf ppf "Cond { if_ = <opaque>; then_ = %a; width = %a; span = %a }"
+          pp_dump then_ (Sta_dyn.pp Fmt.int) width Line_buffer.Span.pp
+          latest_span
     | Contramap (x, _) -> Fmt.pf ppf "Contramap ( %a )" pp_dump x
     | Group xs ->
         Fmt.string ppf "[ ";
@@ -125,124 +163,168 @@ module Compiled = struct
         Fmt.pf ppf "(%a, %a, %a)" pp_dump left pp_dump sep pp_dump right
 end
 
-type 'a state =
-  { consumed : int
-  ; expand : (unit -> int, [ `Msg of string ]) result
-  ; initial : 'a
-  }
+module Compiler_state : sig
+  type ('a, 'i, 'j) t
 
-let array_fold_left_map f acc input_array =
-  let len = Array.length input_array in
-  if len = 0 then (acc, [||])
-  else
-    let acc, elt = f acc (Array.unsafe_get input_array 0) in
-    let output_array = Array.make len elt in
-    let acc = ref acc in
-    for i = 1 to len - 1 do
-      let acc', elt = f !acc (Array.unsafe_get input_array i) in
-      acc := acc';
-      Array.unsafe_set output_array i elt
-    done;
-    (!acc, output_array)
+  (* State monad instance: *)
+  val return : 'a -> ('a, 'i, 'i) t
+  val ( let+ ) : ('a, 'i, 'j) t -> ('a -> 'b) -> ('b, 'i, 'j) t
+  val ( let* ) : ('a, 'i, 'j) t -> ('a -> ('b, 'j, 'k) t) -> ('b, 'i, 'k) t
 
-let expansion_occurred =
-  Result.errorf
-    "Multiple expansion points encountered. Cannot pack two unsized segments \
-     in a single box."
+  (* Interacting with the state: *)
+  val consume_space : int -> (unit, 'i, 'i) t
+  val measure_consumed : ('a, 'i, 'j) t -> ('a * int Sta_dyn.t, 'i, 'j) t
+  val initial : ('a, 'a, 'a) t
+  val with_initial : ('i -> 'j) -> ('a, 'j, 'j) t -> ('a, 'i, 'i) t
+  val expand : (unit -> int, 'i, 'i) t
+  val with_expansion_point : (unit -> int) -> ('a, 'i, 'j) t -> ('a, 'i, 'j) t
 
-let compile =
-  let rec inner : type a. a state -> a t -> a Compiled.t * a state =
-   fun state -> function
-    | Noop -> (Noop, state)
+  (* Threading state through the compuation: *)
+  val run : initial:'a -> ('b, 'a, 'a) t -> 'b
+end = struct
+  type 'a state =
+    { consumed : int Sta_dyn.t
+    ; expand : [ `Ok of unit -> int | `No_expansion_point | `Already_expanded ]
+    ; initial : 'a
+    }
+
+  type ('a, 'i, 'j) t = 'i state -> 'a * 'j state
+
+  let return x s = (x, s)
+
+  let ( let+ ) at fab s =
+    let a, s = at s in
+    (fab a, s)
+
+  let ( let* ) at fabt s =
+    let a, s = at s in
+    let bt = fabt a in
+    bt s
+
+  let consume_space v s =
+    ((), { s with consumed = Sta_dyn.lift ( + ) (Static v) s.consumed })
+
+  let measure_consumed at s =
+    let a, s' = at s in
+    let width = Sta_dyn.lift ( - ) s'.consumed s.consumed in
+    ((a, width), s')
+
+  let initial s = (s.initial, s)
+
+  let with_initial f at s =
+    let a, s' = at { s with initial = f s.initial } in
+    (a, { s' with initial = s.initial })
+
+  let expand s =
+    match s.expand with
+    | `No_expansion_point ->
+        invalid_arg
+          "Encountered an expanding element that is not contained in a box"
+    | `Already_expanded ->
+        invalid_arg
+          "Multiple expansion points encountered. Cannot pack two unsized \
+           segments in a single box."
+    | `Ok f -> (f, { s with expand = `Already_expanded })
+
+  let run ~initial at =
+    let initial_state =
+      { consumed = Static 0; expand = `No_expansion_point; initial }
+    in
+    fst (at initial_state)
+
+  let with_expansion_point outer_width at s =
+    let f = ref (fun () -> assert false) in
+    let expand () = !f () in
+    let x, s_inner =
+      at { consumed = Static 0; expand = `Ok expand; initial = s.initial }
+    in
+    let () =
+      match s_inner.expand with
+      | `Ok _ -> () (* NOTE: we don't fail if the box isn't used *)
+      | `No_expansion_point -> assert false
+      | `Already_expanded ->
+          f := fun () -> outer_width () - Sta_dyn.get s_inner.consumed
+    in
+
+    ( x
+    , { s with
+        consumed = Sta_dyn.lift ( + ) s.consumed s_inner.consumed
+      ; initial = s_inner.initial
+      } )
+end
+
+let compile ~initial top =
+  let rec inner : type a. a t -> (a Compiled.t, a, a) Compiler_state.t =
+    let open Compiler_state in
+    function
+    | Noop -> return Compiled.Noop
+    | Staged s -> inner (s ())
     | Const { pp; width } ->
         (* TODO: join adjacent [Const] nodes as an optimisation step *)
         let pp ppf =
           pp ppf;
           width
         in
-        (Const { pp }, { state with consumed = state.consumed + width })
+        let+ () = consume_space width in
+        Compiled.Const { pp }
     | Pp_unsized { pp } ->
-        let width = Result.get_or_invalid_arg state.expand in
+        let* width = Compiler_state.expand in
+        let+ latest = Compiler_state.initial in
         let pp ppf x = pp ~width ppf x in
-        ( Pp { pp; latest = state.initial }
-        , { state with expand = expansion_occurred } )
+        Compiled.Pp { pp; latest }
     | Pp_fixed { pp; width } ->
         let pp ppf x =
           pp ppf x;
           width
         in
-        ( Pp { pp; latest = state.initial }
-        , { state with consumed = state.consumed + width } )
+        let* () = consume_space width in
+        let+ latest = Compiler_state.initial in
+        Compiled.Pp { pp; latest }
     | Contramap (t, f) ->
-        let initial_a = state.initial in
-        let inner, state = inner { state with initial = f initial_a } t in
-        (Contramap (inner, f), { state with initial = initial_a })
+        let+ inner = Compiler_state.with_initial f (inner t) in
+        Compiled.Contramap (inner, f)
     | Cond { if_; then_ } ->
-        let state' =
-          { consumed = 0
-          ; expand =
-              Result.errorf "Conditional element have a fixed-length child"
-          ; initial = state.initial
-          }
-        in
-        let then_, state' = inner state' then_ in
-        let width = state'.consumed in
-        let state = { state with consumed = state.consumed + width } in
-        ( Cond
-            { if_
-            ; then_
-            ; width
-            ; latest = state.initial
-            ; latest_span = Line_buffer.Span.empty
-            }
-        , state )
-    | Staged s -> inner state (s ())
+        (* let state' =
+         *   { consumed = 0
+         *   ; expand =
+         *       Result.errorf "Conditional element must have a fixed-length child"
+         *   ; initial = state.initial
+         *   }
+         * in *)
+        let* then_, width = Compiler_state.measure_consumed (inner then_) in
+        let+ latest = Compiler_state.initial in
+        Compiled.Cond
+          { if_; then_; width; latest; latest_span = Line_buffer.Span.empty }
     | Box { contents; width } ->
-        let f = ref (fun () -> assert false) in
-        let expand = Ok (fun () -> !f ()) in
-        let inner, state = inner { state with expand } contents in
-        (f := fun () -> width () - state.consumed);
-        (inner, { state with expand = expansion_occurred })
+        Compiler_state.with_expansion_point width (inner contents)
     | Group g ->
-        let state, g =
-          array_fold_left_map
-            (fun state elt ->
-              let b, a = inner state elt in
-              (a, b))
-            state g
+        let+ g =
+          ArrayLabels.fold_left g ~init:(return []) ~f:(fun acc elt ->
+              let* acc = acc in
+              let+ elt = inner elt in
+              elt :: acc)
         in
-        let rec aux :
-            type a.
-            a state -> a Compiled.t array -> a state * a Compiled.t list list =
-         fun state g ->
-          Array.fold_left
-            (fun (state, acc) -> function
-              | Compiled.Group g ->
-                  let state, acc' = aux state g in
-                  (state, acc' @ acc)
-              | a -> (state, [ a ] :: acc))
-            (state, []) g
+        let g = List.rev g |> Array.of_list in
+        let rec aux : type a. a Compiled.t array -> a Compiled.t list list =
+         fun g ->
+          ArrayLabels.fold_left g ~init:[] ~f:(fun acc -> function
+            | Compiled.Group g ->
+                let acc' = aux g in
+                acc' @ acc
+            | a ->
+                let acc = acc in
+                [ a ] :: acc)
         in
-        let state, inners = g |> aux state in
+        let inners = aux g in
         let inners = inners |> List.rev |> List.concat |> Array.of_list in
-        (Group inners, state)
+        Compiled.Group inners
     | Pair { left; sep; right } ->
-        let initial = state.initial in
-        let left, state = inner { state with initial = fst initial } left in
-        let sep, state = inner { state with initial = () } sep in
-        let right, state = inner { state with initial = snd initial } right in
-        (Pair { left; sep; right }, { state with initial })
+        let* left = Compiler_state.with_initial fst (inner left) in
+        let* sep = Compiler_state.with_initial (fun _ -> ()) (inner sep) in
+        let+ right = Compiler_state.with_initial snd (inner right) in
+        Compiled.Pair { left; sep; right }
   in
-  fun ~initial x ->
-    inner
-      { consumed = 0
-      ; expand =
-          Result.errorf
-            "Encountered an expanding element that is not contained in a box"
-      ; initial
-      }
-      x
-    |> fst
+  Compiler_state.run ~initial (inner top)
 
 let report compiled =
   let rec aux : type a. a Compiled.t -> (Line_buffer.t -> a -> int) Staged.t =
@@ -262,18 +344,19 @@ let report compiled =
           t.latest <- x;
           if t.if_ x then (
             let start = Line_buffer.current_position buf in
-            let reported_width = then_ buf x in
+            let _reported_width = then_ buf x in
             let finish = Line_buffer.current_position buf in
             t.latest_span <- Line_buffer.Span.between_marks start finish;
-            if reported_width <> t.width then
-              Fmt.failwith
-                "Conditional segment not respecting stated width: expected %d, \
-                 reported %d"
-                t.width reported_width;
-            t.width)
+            (* if reported_width <> t.width then
+             *   Fmt.failwith
+             *     "Conditional segment not respecting stated width: expected %d, \
+             *      reported %d. Segment:@,\
+             *      %a"
+             *     t.width reported_width Compiled.pp_dump elt; *)
+            Sta_dyn.get t.width)
           else (
             Line_buffer.skip buf t.latest_span;
-            t.width)
+            Sta_dyn.get t.width)
     | Group g ->
         let reporters = Array.map (aux >> Staged.prj) g in
         Staged.inj (fun buf v ->
@@ -288,7 +371,7 @@ let report compiled =
   in
   aux compiled
 
-let update =
+let update top =
   let rec aux : type a. a Compiled.t -> (bool -> Line_buffer.t -> int) Staged.t
       = function
     | Noop -> Staged.inj (fun _ _ -> 0)
@@ -299,18 +382,19 @@ let update =
         fun unconditional buf ->
           if unconditional || t.if_ t.latest then (
             let start = Line_buffer.current_position buf in
-            let actual_width = then_ unconditional buf in
+            let _reported_width = then_ unconditional buf in
             let finish = Line_buffer.current_position buf in
             t.latest_span <- Line_buffer.Span.between_marks start finish;
-            if actual_width <> t.width then
-              Fmt.failwith
-                "Conditional segment not respecting stated width: expected %d, \
-                 found %d"
-                t.width actual_width;
-            t.width)
+            (* if actual_width <> t.width then
+             *   Fmt.failwith
+             *     "Conditional segment not respecting stated width: expected %d, \
+             *      found %d. Segment:@,\
+             *      %a"
+             *     t.width actual_width Compiled.pp_dump elt; *)
+            Sta_dyn.get t.width)
           else (
             Line_buffer.skip buf t.latest_span;
-            t.width)
+            Sta_dyn.get t.width)
     | Contramap (inner, _) -> aux inner
     | Group g ->
         let updaters = Array.map (aux >> Staged.prj) g in
@@ -324,6 +408,5 @@ let update =
           let z = right uncond ppf in
           x + y + z
   in
-  fun compiled ->
-    let$ f = aux compiled in
-    fun ~unconditional buf : int -> f unconditional buf
+  let$ f = aux top in
+  fun ~unconditional buf : int -> f unconditional buf

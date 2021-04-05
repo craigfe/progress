@@ -1,3 +1,10 @@
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+   Distributed under the MIT license. See terms at the end of this file.
+  ————————————————————————————————————————————————————————————————————————————*)
+
+open! Import
+
 type t
 (** A line buffer is a variant of [Stdlib.Buffer] that supports {i skipping}
     some section of the underlying bytestring when doing a write pass. *)
@@ -13,6 +20,11 @@ val add_char : t -> char -> unit
 val add_string : t -> string -> unit
 val add_substring : t -> string -> off:int -> len:int -> unit
 val add_style_code : t -> Ansi.style -> unit
+
+val lift_write :
+     len:int
+  -> write:('a -> into:bytes -> pos:int -> unit)
+  -> (t -> 'a -> unit) Staged.t
 
 val contents : t -> string
 (** Reset the write head to the start of the buffer and return a copy of the

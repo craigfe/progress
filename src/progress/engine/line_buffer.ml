@@ -1,3 +1,10 @@
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+   Distributed under the MIT license. See terms at the end of this file.
+  ————————————————————————————————————————————————————————————————————————————*)
+
+open! Import
+
 type t =
   { mutable buffer : bytes
   ; mutable position : int
@@ -7,7 +14,7 @@ type t =
 (** Invariants:
 
     - [0 <= position <= length]
-    - [length = Bytes.length buffer]*)
+    - [length = Bytes.length buffer] *)
 
 let resize t more =
   let old_pos = t.position and old_len = t.length in
@@ -27,6 +34,12 @@ let advance t len =
   let new_position = t.position + len in
   if new_position > t.length then resize t len;
   t.position <- new_position
+
+let lift_write ~len ~write =
+  Staged.inj (fun t x ->
+      let position = t.position in
+      advance t len;
+      write x ~into:t.buffer ~pos:position)
 
 let add_char b c =
   let pos = b.position in

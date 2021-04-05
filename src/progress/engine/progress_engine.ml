@@ -3,6 +3,7 @@
 module Ansi = Ansi
 module Config = Config
 module Duration = Duration
+module Elt = Elt
 module Line = Line
 module Stdlib_ext = Stdlib_ext
 module Renderer = Renderer

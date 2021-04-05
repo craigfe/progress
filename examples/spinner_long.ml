@@ -8,7 +8,7 @@ let stages =
   ]
 
 let bar =
-  Progress.make ~init:()
+  Progress.make
     Progress.Line.(spinner ~color:`Blue ~stages () ++ const "  Calculating...")
 
 let run () =

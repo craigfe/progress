@@ -56,6 +56,15 @@ module Duration = struct
     Format.fprintf ppf "%02.0f:%02.0f"
       (Float.div seconds 60. |> Float.floor)
       (Float.rem seconds 60. |> Float.floor)
+
+  let mm_ss_print =
+    let to_string span =
+      let seconds = Mtime.Span.to_s span in
+      Printf.sprintf "%02.0f:%02.0f"
+        (Float.div seconds 60. |> Float.floor)
+        (Float.rem seconds 60. |> Float.floor)
+    in
+    Print.of_to_string ~len:5 to_string
 end
 
 (*————————————————————————————————————————————————————————————————————————————

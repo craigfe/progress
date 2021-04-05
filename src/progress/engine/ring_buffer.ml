@@ -1,20 +1,22 @@
-type t =
-  { get_time : unit -> Mtime.t
-  ; data : int64 array
+type 'a t =
+  { data : 'a array
   ; timestamps : Mtime.t array
   ; max_length : int
   ; mutable most_recently_added : int
   ; mutable length : int
+  ; get_time : unit -> Mtime.t
+  ; elt : (module Elt.S with type t = 'a)
   }
 
-let create ~clock:get_time ~size:max_length =
+let create (type a) ~clock:get_time ~size:max_length ~elt : a t =
   let start_time = get_time () in
   { get_time
-  ; data = Array.make max_length 0L
+  ; data = Array.make max_length (Obj.magic None)
   ; timestamps = Array.make max_length start_time
   ; max_length
   ; most_recently_added = -1
   ; length = 0
+  ; elt
   }
 
 let is_empty t = t.most_recently_added = -1
@@ -45,13 +47,15 @@ let fold =
   in
   fun t ~f ~init -> aux t.data f init (t.length - 1)
 
-let rate_per_second t =
-  if is_empty t then 0.
+let rate_per_second : type a. a t -> a =
+ fun t ->
+  let (module Elt) = t.elt in
+  if is_empty t then Elt.zero
   else
     let interval =
       let start_time = t.timestamps.(oldest_index t) in
       let end_time = t.timestamps.(t.most_recently_added) in
       Mtime.Span.to_s (Mtime.span start_time end_time)
     in
-    let sum = Int64.to_float (fold t ~f:Int64.add ~init:0L) in
-    sum /. interval
+    let sum = fold t ~f:Elt.add ~init:Elt.zero in
+    Elt.of_float (Elt.to_float sum /. interval)
