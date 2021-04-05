@@ -6,9 +6,12 @@ let bar ~total =
   let rate = Progress.Units.Bytes.(rate ~width of_float) (module Int) in
   let eta = eta ~total (module Int) in
   list ~sep:(const " ")
-    [ spinner ~color:`Green ()
+    [ spinner ~color:(Progress.Ansi.Color.of_ansi `Green) ()
     ; const "[" ++ elapsed () ++ const "]"
-    ; bar ~color:`Cyan ~style:`ASCII ~total (module Int)
+    ; bar
+        ~color:(Progress.Ansi.Color.of_ansi `Cyan)
+        ~style:`ASCII ~total
+        (module Int)
     ; bytes ++ const " / " ++ const total_bytes
     ; const "(" ++ rate ++ const ", " ++ eta ++ const ")"
     ]

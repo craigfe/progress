@@ -80,6 +80,7 @@ module Timer = struct
 end
 
 type 'a t =
+  | Noop
   | Basic of 'a Expert.t
   | List of 'a t list
   | Contramap : ('b t * ('a -> 'b)) -> 'a t
@@ -98,6 +99,7 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
   let compile : type a. a t -> config:render_config -> a Expert.t =
    fun t ~config ->
     let rec inner : type a. a t -> (unit -> bool) -> a Expert.t = function
+      | Noop -> fun _ -> Expert.noop ()
       | Pair (a, sep, b) ->
           let a = inner a in
           let sep = inner sep in
@@ -141,6 +143,8 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
 
   (* Basic utilities for combining segments *)
 
+  let noop () = Noop
+
   let const s =
     let len = String.length s and len_utf8 = String.Utf8.length s in
     let segment =
@@ -162,27 +166,34 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
 
   let of_pp (type elt) ~elt ~width pp =
     let (module Integer : Integer.S with type t = elt) = elt in
-    let pp buf = Line_buffer.with_ppf buf pp in
-    let initial ppf = pp ppf Integer.zero in
     let segment =
-      Expert.contramap ~f:Acc.total @@ Expert.alpha ~width ~initial pp
+      Expert.contramap ~f:Acc.total
+      @@ Expert.alpha ~width ~initial:(`Val Integer.zero) (fun buf x ->
+             let s = Format.asprintf "%a" pp x in
+             Line_buffer.add_string buf s)
     in
     Acc { segment; elt }
 
-  let pair ?(sep = Basic (Expert.noop ())) a b = Pair (a, sep, b)
-  let list ?(sep = const "  ") x = List (List.intersperse ~sep x)
+  let pair ?(sep = noop ()) a b = Pair (a, sep, b)
+
+  let list ?(sep = const "  ") xs =
+    let xs =
+      ListLabels.filter_map xs ~f:(function Noop -> None | x -> Some x)
+    in
+    List (List.intersperse ~sep xs)
+
   let ( ++ ) a b = List [ a; b ]
   let using f x = Contramap (x, f)
 
   (* Spinners *)
 
-  let with_style_opt ~style buf f =
-    match style with
+  let with_color_opt color buf f =
+    match color with
     | None -> f ()
     | Some s ->
-        Line_buffer.add_style_code buf s;
+        Line_buffer.add_string buf Ansi.Style.(code (fg s));
         let a = f () in
-        Line_buffer.add_style_code buf `None;
+        Line_buffer.add_string buf Ansi.Style.(code none);
         a
 
   let modulo_counter : int -> (unit -> int) Staged.t =
@@ -213,7 +224,7 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
       (Segment.stateful (fun () ->
            let tick = Staged.prj (modulo_counter stage_count) in
            Segment.theta ~width (fun buf ->
-               with_style_opt buf ~style:color (fun () ->
+               with_color_opt color buf (fun () ->
                    Line_buffer.add_string buf stages.(tick ())))))
 
   let bytes =
@@ -234,14 +245,21 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
 
   let string =
     let segment =
-      Segment.alpha_unsized
-        ~initial:(fun ~width:_ _ -> 0)
-        (fun ~width buf s ->
-          let len = String.length s in
-          if len <= width () then (
-            Line_buffer.add_string buf s;
-            len)
-          else assert false)
+      Segment.alpha_unsized ~initial:(`Val "") (fun ~width buf s ->
+          let input_len = String.length s in
+          let output_len = width () in
+          let () =
+            match input_len <= output_len with
+            | true ->
+                Line_buffer.add_string buf s;
+                for _ = input_len to output_len do
+                  Line_buffer.add_char buf ' '
+                done
+            | false ->
+                Line_buffer.add_substring buf s ~off:0 ~len:(output_len - 4);
+                Line_buffer.add_string buf " ..."
+          in
+          output_len)
     in
     Basic segment
 
@@ -253,10 +271,7 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
     let width = String.length total in
     let segment =
       Expert.contramap ~f:Acc.total
-      @@ Expert.alpha
-           ~initial:(fun _ -> ())
-           ~width
-           (fun lb x ->
+      @@ Expert.alpha ~initial:(`Val Integer.zero) ~width (fun lb x ->
              let x = Integer.to_string x in
              for _ = String.length x to width - 1 do
                Line_buffer.add_char lb ' '
@@ -278,7 +293,7 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
     let filled = min squares bar_width in
     let not_filled = bar_width - filled - 1 in
     Line_buffer.add_string buf "│";
-    with_style_opt ~style:color buf (fun () ->
+    with_color_opt color buf (fun () ->
         for _ = 1 to filled do
           Line_buffer.add_string buf stages.(final_stage)
         done);
@@ -287,10 +302,10 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
         let chunks = Float.to_int (squaresf *. Float.of_int final_stage) in
         let index = chunks - (filled * final_stage) in
         if index >= 0 && index < final_stage then
-          with_style_opt ~style:color buf (fun () ->
+          with_color_opt color buf (fun () ->
               Line_buffer.add_string buf stages.(index));
 
-        with_style_opt ~style:color_empty buf (fun () ->
+        with_color_opt color_empty buf (fun () ->
             for _ = 1 to not_filled do
               Line_buffer.add_string buf stages.(0)
             done))
@@ -307,11 +322,11 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
     in
     let not_filled = bar_width - filled in
     Line_buffer.add_char buf '[';
-    with_style_opt ~style:color buf (fun () ->
+    with_color_opt color buf (fun () ->
         for _ = 1 to filled do
           Line_buffer.add_char buf '#'
         done);
-    with_style_opt ~style:color_empty buf (fun () ->
+    with_color_opt color_empty buf (fun () ->
         for _ = 1 to not_filled do
           Line_buffer.add_char buf '-'
         done);
@@ -339,16 +354,12 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
             (match width with
             | `Fixed width ->
                 if width < 3 then failwith "Not enough space for a progress bar";
-                Segment.alpha ~width
-                  ~initial:(fun _ -> ())
-                  (fun buf x ->
+                Segment.alpha ~width ~initial:(`Val 0.) (fun buf x ->
                     ignore
                       (bar ~style ~color ~color_empty (fun _ -> width) x buf
                         : int))
             | `Expand ->
-                Segment.alpha_unsized
-                  ~initial:(fun ~width:_ _ -> 0)
-                  (fun ~width ppf x ->
+                Segment.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf x ->
                     bar ~style ~color ~color_empty width x ppf))
       ; elt = (module Integer)
       }
@@ -377,15 +388,13 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
     in
     Basic segment
 
-  let rate ~width pp (type elt) (module Integer : Integer.S with type t = elt) :
+  let rate (type elt) ~width pp (module Integer : Integer.S with type t = elt) :
       elt t =
     let segment =
       let pp ppf x = Fmt.pf ppf "%a/s" pp x in
       Expert.contramap
         ~f:(Acc.ring_buffer >> Ring_buffer.rate_per_second >> Integer.to_float)
-        (expert_of_pp ~width
-           ~initial:(fun buf -> Line_buffer.add_string buf "  /s")
-           pp)
+        (expert_of_pp ~width ~initial:(`Val 0.) pp)
     in
     Acc { segment; elt = (module Integer) }
 
@@ -403,9 +412,7 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
             Mtime.Span.of_uint64_ns
               (Int64.of_float
                  (todo /. Integer.to_float per_second *. 1_000_000_000.)))
-        (expert_of_pp ~width
-           ~initial:(fun buf -> Line_buffer.add_string buf "ETA:  ")
-           pp)
+        (expert_of_pp ~width ~initial:(`Val Mtime.Span.max_span) pp)
     in
     Acc { elt = (module Integer); segment }
 end

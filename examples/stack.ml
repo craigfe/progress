@@ -6,10 +6,10 @@ let bar color message =
 let main () =
   Progress.(
     with_reporters
-      (bar `Red "index.html     "
-      / bar `Yellow "sitemap.xml    "
-      / bar `Green "img/kittens.jpg"
-      / bar `Blue "img/puppies.jpg"))
+      (bar (Ansi.Color.of_ansi `Red) "index.html     "
+      / bar (Ansi.Color.of_ansi `Yellow) "sitemap.xml    "
+      / bar (Ansi.Color.of_ansi `Green) "img/kittens.jpg"
+      / bar (Ansi.Color.of_ansi `Blue) "img/puppies.jpg"))
   @@ fun a b c d ->
   let pick_random () =
     match Random.int 100 with

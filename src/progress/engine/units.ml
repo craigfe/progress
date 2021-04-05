@@ -6,11 +6,11 @@
 open! Import
 
 module Percentage = struct
-  let clamp (lower, upper) = Float.min upper >> Float.max lower
+  let clamp (lower, upper) = min upper >> max lower
 
   let of_float ppf proportion =
-    let percentage = clamp (0., 100.) (Float.trunc (proportion *. 100.)) in
-    Format.fprintf ppf "%3.0f%%" percentage
+    let percentage = clamp (0, 100) (Float.to_int (proportion *. 100.)) in
+    Format.fprintf ppf "%3.0d%%" percentage
 
   let width = 4
 end

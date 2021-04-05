@@ -1,17 +1,21 @@
 let bars =
-  [ ("Rough bar:  ", `Custom [ " "; "█" ], `Red)
+  [ ("Rough bar:  ", `Custom [ " "; "█" ], "#DC2F02")
   ; ( "Fine bar:   "
     , `Custom [ " "; "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉"; "█" ]
-    , `Yellow )
+    , "#E85D04" )
   ; ( "Vertical:   "
     , `Custom [ " "; "▁"; "▂"; "▃"; "▄"; "▅"; "▆"; "▇"; "█" ]
-    , `Green )
-  ; ("Blocky:     ", `Custom [ " "; "▖"; "▌"; "▛"; "█" ], `Blue)
-  ; ("Fade in:    ", `Custom [ " "; "░"; "▒"; "▓"; "█" ], `Magenta)
+    , "#F48C06" )
+  ; ("Blocky:     ", `Custom [ " "; "▖"; "▌"; "▛"; "█" ], "#FAA307")
+  ; ("Fade in:    ", `Custom [ " "; "░"; "▒"; "▓"; "█" ], "#FFBA08")
   ]
   |> List.map (fun (label, style, color) ->
          let open Progress.Line in
-         const label ++ bar ~style ~color ~total:1000 (module Int))
+         const label
+         ++ bar ~style
+              ~color:(Progress.Ansi.Color.of_hex color)
+              ~total:1000
+              (module Int))
   |> Progress.make_list
 
 let pick_random_function l =

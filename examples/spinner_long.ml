@@ -9,7 +9,9 @@ let stages =
 
 let bar =
   Progress.make
-    Progress.Line.(spinner ~color:`Blue ~stages () ++ const "  Calculating...")
+    Progress.Line.(
+      spinner ~color:(Progress.Ansi.Color.of_ansi `Blue) ~stages ()
+      ++ const "  Calculating...")
 
 let run () =
   Progress.with_reporters ~config:(Progress.Config.create ~persistent:false ())

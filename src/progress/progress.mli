@@ -46,7 +46,7 @@ type bar_style = [ `ASCII | `UTF8 | `Custom of string list ]
 
 val counter :
      total:'elt
-  -> ?color:Ansi.style
+  -> ?color:Ansi.Color.t
   -> ?style:bar_style
   -> ?message:string
   -> ?pp:(Format.formatter -> 'elt -> unit) * int

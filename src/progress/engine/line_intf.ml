@@ -48,6 +48,8 @@ module type S = sig
   (** {!const_fmt} is a variant of {!const} that takes a fixed-width
       pretty-printer rather than a string. *)
 
+  val noop : unit -> _ t
+
   val of_pp :
        elt:(module Integer.S with type t = 'a)
     -> width:int
@@ -57,12 +59,12 @@ module type S = sig
       pretty-printer to render the value. The pretty-printer must never emit
       newline characters. *)
 
-  val spinner : ?color:Ansi.style -> ?stages:string list -> unit -> _ t
+  val spinner : ?color:Ansi.Color.t -> ?stages:string list -> unit -> _ t
 
   val bar :
        ?style:[ `ASCII | `UTF8 | `Custom of string list ]
-    -> ?color:Ansi.style
-    -> ?color_empty:Ansi.style
+    -> ?color:Ansi.Color.t
+    -> ?color_empty:Ansi.Color.t
     -> ?width:[ `Fixed of int | `Expand ]
     -> total:'elt
     -> (module Integer.S with type t = 'elt)

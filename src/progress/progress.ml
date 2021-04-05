@@ -44,7 +44,7 @@ module Reporters = Renderer.Reporters
 type bar_style = [ `ASCII | `UTF8 | `Custom of string list ]
 
 let renderer_config : Line.render_config =
-  { interval = Some Duration.millisecond; max_width = Some 120 }
+  { interval = None; max_width = Some 120 }
 
 let make x =
   let seg = Line.compile x ~config:renderer_config in
@@ -60,14 +60,13 @@ let counter (type elt) ~(total : elt) ?color ?(style = `ASCII) ?message ?pp
   let open Line in
   make
   @@ list
-       (Option.fold ~none:[] message ~some:(fun s -> [ const s ])
-       @ Option.fold ~none:[] pp ~some:(fun (pp, width) ->
-             [ Line.of_pp ~elt:(module Integer) ~width pp ])
-       @ [ Line.elapsed ()
-         ; (bar ?color ~style ~total (module Integer) : elt Line.t)
-           ++ const " "
-           ++ percentage_of total (module Integer)
-         ])
+       [ Option.fold ~none:(noop ()) message ~some:(fun s -> const s)
+       ; Option.fold ~none:(noop ()) pp ~some:(fun (pp, width) ->
+             Line.of_pp ~elt:(module Integer) ~width pp)
+       ; Line.elapsed ()
+       ; (bar ?color ~style ~total (module Integer) : elt Line.t)
+       ; percentage_of total (module Integer)
+       ]
 
 module Config = struct
   include Config

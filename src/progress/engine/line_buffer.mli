@@ -19,7 +19,6 @@ val with_ppf : t -> (Format.formatter -> 'a) -> 'a
 val add_char : t -> char -> unit
 val add_string : t -> string -> unit
 val add_substring : t -> string -> off:int -> len:int -> unit
-val add_style_code : t -> Ansi.style -> unit
 
 val lift_write :
      len:int
