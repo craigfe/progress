@@ -4,8 +4,7 @@ let examples =
     ; ("Download", Download.run)
     ; ("Installer", Installer.run)
     ; ("Interject", Interject.run)
-    ; ("Spinner_bar", Spinner_bar.run)
-    ; ("Spinner_long", Spinner_long.run)
+    ; ("Spinners", Spinners.run)
     ; ("Stack", Stack.run)
     ]
 

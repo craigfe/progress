@@ -11,7 +11,7 @@ let bars =
   ]
   |> List.map (fun (name, style, color) ->
          let open Progress.Line in
-         rpad 11 (const name ++ const ":")
+         lpad 13 (const name ++ const "  ")
          ++ bar ~style
               ~color:(Progress.Ansi.Color.of_hex color)
               ~total:1000

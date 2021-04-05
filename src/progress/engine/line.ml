@@ -181,8 +181,8 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
     let pp = Staged.prj (Printer.to_line_printer printer) in
     let segment =
       Expert.contramap ~f:Acc.total
-      @@ Expert.alpha ~width:(Printer.width printer) ~initial:(`Val Integer.zero)
-           pp
+      @@ Expert.alpha ~width:(Printer.width printer)
+           ~initial:(`Val Integer.zero) pp
     in
     Acc { segment; elt }
 
@@ -287,6 +287,7 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
     in
     Acc { segment; elt = (module Integer) }
 
+  let lpad sz t = Map (Expert.box_fixed ~pad:`left sz, t)
   let rpad sz t = Map (Expert.box_fixed ~pad:`right sz, t)
 
   (* Progress bars *)
@@ -386,7 +387,9 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
    *   { segment; } *)
 
   let elapsed () =
-    let print_time = Staged.prj (Printer.to_line_printer Units.Duration.mm_ss) in
+    let print_time =
+      Staged.prj (Printer.to_line_printer Units.Duration.mm_ss)
+    in
     let segment =
       Expert.stateful (fun () ->
           let start_time = Clock.counter () in
@@ -415,7 +418,9 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
   let eta (type elt) ~total (module Integer : Integer.S with type t = elt) =
     let segment =
       let printer =
-        let pp_val = Staged.prj (Printer.to_line_printer Units.Duration.mm_ss) in
+        let pp_val =
+          Staged.prj (Printer.to_line_printer Units.Duration.mm_ss)
+        in
         fun buf x ->
           Line_buffer.add_string buf "ETA: ";
           pp_val buf x
