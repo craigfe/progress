@@ -1,6 +1,6 @@
 let bar color message =
   Progress.counter ~color ~style:`UTF8 ~total:1_000_000_000L ~message
-    ~pp:Progress.Units.Bytes.(of_int64, width)
+    ~pp:Progress.Units.Bytes.of_int64
     (module Int64)
 
 let main () =

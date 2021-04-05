@@ -112,11 +112,10 @@ end = struct
 
   let rerender_line (E { config = { ppf; _ }; latest_widths; _ })
       ~width:new_width ~idx data =
-    let _old_width = latest_widths.(idx) in
+    let old_width = latest_widths.(idx) in
     latest_widths.(idx) <- new_width;
     Format.pp_print_string ppf data;
-    (* if new_width < old_width then *)
-    Format.pp_print_string ppf Ansi.erase_line
+    if new_width < old_width then Format.pp_print_string ppf Ansi.erase_line
 
   let rerender_all_from_top ~unconditional
       (E { config = { ppf; _ }; bars; bar_count; _ } as t) =

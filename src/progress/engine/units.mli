@@ -1,10 +1,6 @@
-type 'a pp := Format.formatter -> 'a -> unit
-
 module Duration : sig
-  val mm_ss : Mtime.Span.t pp
+  val mm_ss : Mtime.Span.t Printer.t
   (** Renders a time span in fixed-width [MM:SS] form. *)
-
-  val mm_ss_print : Mtime.Span.t Print.t
 end
 
 (** {2 Assorted pretty-printing utilities} *)
@@ -20,8 +16,7 @@ end
 
     {b Note:} values will be clamped into the range [\[0., 1.\]]. *)
 module Percentage : sig
-  val of_float : float pp
-  val width : int
+  val of_float : float Printer.t
 end
 
 (** Prints a numeric value as as a byte count. e.g.
@@ -34,10 +29,9 @@ end
       1024 * 1024 - 1  ↦  "1023.9 KiB"
     ]}*)
 module Bytes : sig
-  val of_int : int pp
-  val of_float : float pp
-  val of_int64 : int64 pp
-  val width : int
+  val of_int : int Printer.t
+  val of_float : float Printer.t
+  val of_int64 : int64 Printer.t
 
   (** Quick builders for base-2 byte counts *)
 

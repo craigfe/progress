@@ -60,9 +60,9 @@ let counter (type elt) ~(total : elt) ?color ?(style = `ASCII) ?message ?pp
   let open Line in
   make
   @@ list
-       [ Option.fold ~none:(noop ()) message ~some:(fun s -> const s)
-       ; Option.fold ~none:(noop ()) pp ~some:(fun (pp, width) ->
-             Line.of_pp ~elt:(module Integer) ~width pp)
+       [ Option.fold ~none:(noop ()) message ~some:const
+       ; Option.fold ~none:(noop ()) pp
+           ~some:(Line.of_printer ~elt:(module Integer))
        ; Line.elapsed ()
        ; (bar ?color ~style ~total (module Integer) : elt Line.t)
        ; percentage_of total (module Integer)
@@ -81,4 +81,5 @@ end
 
 module Ansi = Ansi
 module Duration = Duration
+module Printer = Printer
 module Units = Units

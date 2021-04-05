@@ -1,3 +1,10 @@
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+   Distributed under the MIT license. See terms at the end of this file.
+  ————————————————————————————————————————————————————————————————————————————*)
+
+type 'a pp = Format.formatter -> 'a -> unit
+
 let ( >> ) f g x = g (f x)
 
 let trace fmt x =
@@ -55,3 +62,42 @@ end = struct
     let ( and$ ) a b = (a, b)
   end
 end
+
+module Sta_dyn : sig
+  type 'a t = Static of 'a | Dynamic of (unit -> 'a)
+
+  val get : 'a t -> 'a
+  val lift : ('a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+  val pp : 'a pp -> 'a t pp
+end = struct
+  type 'a t = Static of 'a | Dynamic of (unit -> 'a)
+
+  let get = function Static x -> x | Dynamic f -> f ()
+
+  let lift add x y =
+    let ( ++ ) = add in
+    match (x, y) with
+    | Static x, Static y -> Static (x ++ y)
+    | Dynamic f, Static x | Static x, Dynamic f -> Dynamic (fun () -> x ++ f ())
+    | Dynamic f, Dynamic g -> Dynamic (fun () -> f () ++ g ())
+
+  let pp pp_elt ppf = function
+    | Static x -> Fmt.pf ppf "Static %a" pp_elt x
+    | Dynamic f -> Fmt.pf ppf "Dynamic %a" pp_elt (f ())
+end
+
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+
+   Permission to use, copy, modify, and/or distribute this software for any
+   purpose with or without fee is hereby granted, provided that the above
+   copyright notice and this permission notice appear in all copies.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+   THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE SOFTWARE.
+  ————————————————————————————————————————————————————————————————————————————*)

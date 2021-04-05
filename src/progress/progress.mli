@@ -42,6 +42,11 @@ module Duration : sig
   (** @inline *)
 end
 
+module Printer : sig
+  include module type of Printer
+  (** @inline *)
+end
+
 type bar_style = [ `ASCII | `UTF8 | `Custom of string list ]
 
 val counter :
@@ -49,7 +54,7 @@ val counter :
   -> ?color:Ansi.Color.t
   -> ?style:bar_style
   -> ?message:string
-  -> ?pp:(Format.formatter -> 'elt -> unit) * int
+  -> ?pp:'elt Printer.t
   -> ?width:int
   -> ?sampling_interval:int
   -> (module Integer.S with type t = 'elt)

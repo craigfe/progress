@@ -19,6 +19,7 @@ val with_ppf : t -> (Format.formatter -> 'a) -> 'a
 val add_char : t -> char -> unit
 val add_string : t -> string -> unit
 val add_substring : t -> string -> off:int -> len:int -> unit
+val add_line_buffer : dst:t -> src:t -> unit
 
 val lift_write :
      len:int
@@ -28,6 +29,8 @@ val lift_write :
 val contents : t -> string
 (** Reset the write head to the start of the buffer and return a copy of the
     intervening contents. *)
+
+val reset : t -> unit
 
 type mark
 

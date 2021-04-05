@@ -82,6 +82,7 @@ end
 type 'a t =
   | Noop
   | Basic of 'a Expert.t
+  | Map of ('a Expert.t -> 'a Expert.t) * 'a t
   | List of 'a t list
   | Contramap : ('b t * ('a -> 'b)) -> 'a t
   | Pair : 'a t * unit t * 'b t -> ('a * 'b) t
@@ -110,6 +111,7 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
       | Contramap (x, f) ->
           let x = inner x in
           fun y -> Expert.contramap ~f (x y)
+      | Map (f, x) -> fun a -> f (inner x a)
       | List xs ->
           let xs = List.map inner xs in
           fun should_update ->
@@ -160,9 +162,9 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
     in
     Basic segment
 
-  let expert_of_pp ~width ~initial pp =
-    Expert.alpha ~width ~initial (fun buf x ->
-        Line_buffer.with_ppf buf (fun ppf -> pp ppf x))
+  (* let _expert_of_pp ~width ~initial pp =
+   *   Expert.alpha ~width ~initial (fun buf x ->
+   *       Line_buffer.with_ppf buf (fun ppf -> pp ppf x)) *)
 
   let of_pp (type elt) ~elt ~width pp =
     let (module Integer : Integer.S with type t = elt) = elt in
@@ -171,6 +173,16 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
       @@ Expert.alpha ~width ~initial:(`Val Integer.zero) (fun buf x ->
              let s = Format.asprintf "%a" pp x in
              Line_buffer.add_string buf s)
+    in
+    Acc { segment; elt }
+
+  let of_printer (type elt) ~elt printer =
+    let (module Integer : Integer.S with type t = elt) = elt in
+    let pp = Staged.prj (Printer.to_line_printer printer) in
+    let segment =
+      Expert.contramap ~f:Acc.total
+      @@ Expert.alpha ~width:(Printer.width printer) ~initial:(`Val Integer.zero)
+           pp
     in
     Acc { segment; elt }
 
@@ -227,27 +239,22 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
                with_color_opt color buf (fun () ->
                    Line_buffer.add_string buf stages.(tick ())))))
 
-  let bytes =
-    of_pp ~elt:(module Integer.Int) ~width:Units.Bytes.width Units.Bytes.of_int
-
-  let bytes_int64 =
-    of_pp
-      ~elt:(module Integer.Int64)
-      ~width:Units.Bytes.width Units.Bytes.of_int64
+  let bytes = of_printer ~elt:(module Integer.Int) Units.Bytes.of_int
+  let bytes_int64 = of_printer ~elt:(module Integer.Int64) Units.Bytes.of_int64
 
   let percentage_of (type elt) total
       (module Integer : Integer.S with type t = elt) =
-    let pp ppf x =
-      Units.Percentage.of_float ppf
-        (Integer.to_float x /. Integer.to_float total)
+    let printer =
+      Printer.using Units.Percentage.of_float ~f:(fun x ->
+          Integer.to_float x /. Integer.to_float total)
     in
-    of_pp ~elt:(module Integer) ~width:Units.Percentage.width pp
+    of_printer ~elt:(module Integer) printer
 
   let string =
     let segment =
       Segment.alpha_unsized ~initial:(`Val "") (fun ~width buf s ->
           let input_len = String.length s in
-          let output_len = width () in
+          let output_len = width () - 1 (* XXX: why is -1 necessary? *) in
           let () =
             match input_len <= output_len with
             | true ->
@@ -279,6 +286,8 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
              Line_buffer.add_string lb x)
     in
     Acc { segment; elt = (module Integer) }
+
+  let rpad sz t = Map (Expert.box_fixed ~pad:`right sz, t)
 
   (* Progress bars *)
 
@@ -367,7 +376,7 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
   (* TODO: common start time by using something like Acc *)
   (* let elapsed () =
    *   let print_time =
-   *     Staged.prj (Print.to_line_buffer Units.Duration.mm_ss_print)
+   *     Staged.prj (Printer.to_line_buffer Units.Duration.mm_ss_print)
    *   in
    *   let segment =
    *     Expert.contramap ~f: (fun acc ->
@@ -377,9 +386,7 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
    *   { segment; } *)
 
   let elapsed () =
-    let print_time =
-      Staged.prj (Print.to_line_buffer Units.Duration.mm_ss_print)
-    in
+    let print_time = Staged.prj (Printer.to_line_printer Units.Duration.mm_ss) in
     let segment =
       Expert.stateful (fun () ->
           let start_time = Clock.counter () in
@@ -388,20 +395,33 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
     in
     Basic segment
 
-  let rate (type elt) ~width pp (module Integer : Integer.S with type t = elt) :
+  let rate (type elt) pp_val (module Integer : Integer.S with type t = elt) :
       elt t =
     let segment =
-      let pp ppf x = Fmt.pf ppf "%a/s" pp x in
+      let pp_rate =
+        let pp_val = Staged.prj (Printer.to_line_printer pp_val) in
+        fun buf x ->
+          pp_val buf x;
+          Line_buffer.add_string buf "/s"
+      in
+      let width = Printer.width pp_val + 2 in
       Expert.contramap
         ~f:(Acc.ring_buffer >> Ring_buffer.rate_per_second >> Integer.to_float)
-        (expert_of_pp ~width ~initial:(`Val 0.) pp)
+        (Expert.alpha ~width ~initial:(`Val 0.) pp_rate)
     in
+
     Acc { segment; elt = (module Integer) }
 
   let eta (type elt) ~total (module Integer : Integer.S with type t = elt) =
     let segment =
-      let pp ppf x = Fmt.pf ppf "ETA: %a" Units.Duration.mm_ss x in
-      let width = 10 in
+      let printer =
+        let pp_val = Staged.prj (Printer.to_line_printer Units.Duration.mm_ss) in
+        fun buf x ->
+          Line_buffer.add_string buf "ETA: ";
+          pp_val buf x
+      in
+      let width = Printer.width Units.Duration.mm_ss + 4 in
+      let initial = `Val Mtime.Span.max_span in
       Expert.contramap
         ~f:(fun acc ->
           let per_second = Acc.ring_buffer acc |> Ring_buffer.rate_per_second in
@@ -412,8 +432,9 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
             Mtime.Span.of_uint64_ns
               (Int64.of_float
                  (todo /. Integer.to_float per_second *. 1_000_000_000.)))
-        (expert_of_pp ~width ~initial:(`Val Mtime.Span.max_span) pp)
+        (Expert.alpha ~width ~initial printer)
     in
+
     Acc { elt = (module Integer); segment }
 end
 

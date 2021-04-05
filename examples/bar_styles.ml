@@ -1,17 +1,17 @@
 let bars =
-  [ ("Rough bar:  ", `Custom [ " "; "█" ], "#DC2F02")
-  ; ( "Fine bar:   "
+  [ ("Rough bar", `Custom [ " "; "█" ], "#DC2F02")
+  ; ( "Fine bar"
     , `Custom [ " "; "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉"; "█" ]
     , "#E85D04" )
-  ; ( "Vertical:   "
+  ; ( "Vertical"
     , `Custom [ " "; "▁"; "▂"; "▃"; "▄"; "▅"; "▆"; "▇"; "█" ]
     , "#F48C06" )
-  ; ("Blocky:     ", `Custom [ " "; "▖"; "▌"; "▛"; "█" ], "#FAA307")
-  ; ("Fade in:    ", `Custom [ " "; "░"; "▒"; "▓"; "█" ], "#FFBA08")
+  ; ("Blocky", `Custom [ " "; "▖"; "▌"; "▛"; "█" ], "#FAA307")
+  ; ("Fade in", `Custom [ " "; "░"; "▒"; "▓"; "█" ], "#FFBA08")
   ]
-  |> List.map (fun (label, style, color) ->
+  |> List.map (fun (name, style, color) ->
          let open Progress.Line in
-         const label
+         rpad 11 (const name ++ const ":")
          ++ bar ~style
               ~color:(Progress.Ansi.Color.of_hex color)
               ~total:1000

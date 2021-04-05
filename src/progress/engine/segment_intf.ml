@@ -63,11 +63,12 @@ module type S = sig
   (** Certain segments can have their size determined dynamically by being
       wrapped inside one of the following boxes: *)
 
-  val box_dynamic : (unit -> int) -> 'a t -> 'a t
+  val box_dynamic :
+    ?pad:[ `left | `right | `none ] -> (unit -> int) -> 'a t -> 'a t
   (** [box w] is a box that wraps a dynamically-sized segment and sets it to
       have size [w ()] on each tick. *)
 
-  val box_fixed : int -> 'a t -> 'a t
+  val box_fixed : ?pad:[ `left | `right | `none ] -> int -> 'a t -> 'a t
   (** [box-fixed n s] fixes the size of the dynamic segment [s] to be [n]. *)
 
   module Platform_dependent (_ : Platform.S) : sig

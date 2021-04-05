@@ -18,8 +18,6 @@ open Staged.Syntax
 
 type 'a pp = Format.formatter -> 'a -> unit
 
-[@@@ocaml.warning "-32-37"]
-
 type 'a t =
   | Noop
   | Theta of { pp : Line_buffer.t -> unit; width : int }
@@ -36,7 +34,11 @@ type 'a t =
   | Staged of (unit -> 'a t)
   | Contramap : 'a t * ('b -> 'a) -> 'b t
   | Cond of { if_ : 'a -> bool; then_ : 'a t }
-  | Box of { contents : 'a t; width : unit -> int }
+  | Box of
+      { contents : 'a t
+      ; width : int Sta_dyn.t
+      ; pad : [ `left | `right | `none ]
+      }
   | Group of 'a t array
   | Pair : { left : 'a t; sep : unit t; right : 'b t } -> ('a * 'b) t
 
@@ -85,8 +87,11 @@ let periodic interval t =
           let should_update = ticker interval in
           conditional (fun _ -> should_update ()) t)
 
-let box_dynamic width contents = Box { contents; width }
-let box_fixed width = box_dynamic (fun () -> width)
+let box_dynamic ?(pad = `none) width contents =
+  Box { contents; width = Dynamic width; pad }
+
+let box_fixed ?(pad = `none) width contents =
+  Box { contents; width = Static width; pad }
 
 module Platform_dependent (Platform : Platform.S) = struct
   let box_winsize ?max ?(fallback = 80) s =
@@ -108,29 +113,6 @@ let accumulator combine zero s =
           state := combine !state a;
           !state))
 
-module Sta_dyn : sig
-  type 'a t = Static of 'a | Dynamic of (unit -> 'a)
-
-  val get : 'a t -> 'a
-  val lift : ('a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val pp : 'a pp -> 'a t pp
-end = struct
-  type 'a t = Static of 'a | Dynamic of (unit -> 'a)
-
-  let get = function Static x -> x | Dynamic f -> f ()
-
-  let lift add x y =
-    let ( ++ ) = add in
-    match (x, y) with
-    | Static x, Static y -> Static (x ++ y)
-    | Dynamic f, Static x | Static x, Dynamic f -> Dynamic (fun () -> x ++ f ())
-    | Dynamic f, Dynamic g -> Dynamic (fun () -> f () ++ g ())
-
-  let pp pp_elt ppf = function
-    | Static x -> Fmt.pf ppf "Static %a" pp_elt x
-    | Dynamic f -> Fmt.pf ppf "Dynamic %a" pp_elt (f ())
-end
-
 (** The [compile] step transforms a pure [t] term in to a potentially-impure
     [Compiled.t] term to be used for a single display lifecycle. It has three
     purposes:
@@ -148,6 +130,11 @@ module Compiled = struct
         }
     | Theta of { pp : Line_buffer.t -> int }
     | Contramap : 'a t * ('b -> 'a) -> 'b t
+    | Pad of
+        { contents : 'a t
+        ; dir : [ `left of Line_buffer.t | `right ]
+        ; width : int Sta_dyn.t
+        }
     | Cond of
         { if_ : 'a -> bool
         ; then_ : 'a t
@@ -168,6 +155,11 @@ module Compiled = struct
           pp_dump then_ (Sta_dyn.pp Fmt.int) width Line_buffer.Span.pp
           latest_span
     | Contramap (x, _) -> Fmt.pf ppf "Contramap ( %a )" pp_dump x
+    | Pad { contents; dir; width } ->
+        Fmt.pf ppf "Pad { contents = %a;@,dir = %s;@,width = %a }" pp_dump
+          contents
+          (match dir with `left _ -> "`left" | `right -> "`right")
+          (Sta_dyn.pp Fmt.int) width
     | Group xs -> Fmt.Dump.array pp_dump ppf xs
     | Pair { left; sep; right } ->
         Fmt.pf ppf "(%a, %a, %a)" pp_dump left pp_dump sep pp_dump right
@@ -177,15 +169,19 @@ module Compiler_state : sig
   type 'a t
 
   (* State monad instance: *)
-  val return : 'a -> 'a t
-  val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
-  val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+  module Syntax : sig
+    val return : 'a -> 'a t
+    val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
+    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+  end
 
   (* Interacting with the state: *)
-  val consume_space : int -> unit t
+  val consume_space : int Sta_dyn.t -> unit t
   val measure_consumed : 'a t -> ('a * int Sta_dyn.t) t
   val expand : (unit -> int) t
-  val with_expansion_point : (unit -> int) -> 'a t -> 'a t
+
+  val with_expansion_point :
+    int Sta_dyn.t -> 'a t -> ('a * [ `used | `not_used ] * int Sta_dyn.t) t
 
   (* Threading state through the compuation: *)
   val run : 'a t -> 'a
@@ -198,23 +194,25 @@ end = struct
 
   type 'a t = state -> 'a * state
 
-  let return x s = (x, s)
+  module Syntax = struct
+    let return x s = (x, s)
 
-  let ( let+ ) at fab s =
-    let a, s = at s in
-    (fab a, s)
+    let ( let* ) at fabt s =
+      let a, s = at s in
+      let bt = fabt a in
+      bt s
 
-  let ( let* ) at fabt s =
-    let a, s = at s in
-    let bt = fabt a in
-    bt s
+    let ( let+ ) at fab s =
+      let a, s = at s in
+      (fab a, s)
+  end
 
   let consume_space v s =
-    ( ()
-    , { s with
-        consumed_static = v + s.consumed_static
-      ; consumed = Sta_dyn.lift ( + ) (Static v) s.consumed
-      } )
+    let consumed_static =
+      (match v with Sta_dyn.Static x -> x | Dynamic _ -> 0)
+      + s.consumed_static
+    in
+    ((), { s with consumed_static; consumed = Sta_dyn.lift ( + ) v s.consumed })
 
   let measure_consumed at s =
     let a, s' = at s in
@@ -249,29 +247,29 @@ end = struct
     let x, s_inner =
       at { consumed = Static 0; consumed_static = 0; expand = `Ok expand }
     in
-    let () =
+    let typ =
       match s_inner.expand with
-      | `Ok _ -> () (* NOTE: we don't fail if the box isn't used *)
+      | `Ok _ -> `not_used
       | `No_expansion_point -> assert false
       | `Already_expanded ->
-          f := fun () -> outer_width () - s_inner.consumed_static
+          (f := fun () -> Sta_dyn.get outer_width - s_inner.consumed_static);
+          `used
     in
-    (x, { s with consumed = Sta_dyn.lift ( + ) s_inner.consumed s.consumed })
+    ((x, typ, s_inner.consumed), s)
 end
 
 let compile top =
   let rec inner : type a. a t -> a Compiled.t Compiler_state.t =
-    let open Compiler_state in
+    let open Compiler_state.Syntax in
     function
     | Noop -> return Compiled.Noop
     | Staged s -> inner (s ())
     | Theta { pp; width } ->
-        (* TODO: join adjacent [Theta] nodes as an optimisation step *)
         let pp ppf =
           pp ppf;
           width
         in
-        let+ () = consume_space width in
+        let+ () = Compiler_state.consume_space (Static width) in
         Compiled.Theta { pp }
     | Alpha_unsized { pp; initial } ->
         let+ width = Compiler_state.expand in
@@ -285,7 +283,7 @@ let compile top =
           pp ppf x;
           width
         in
-        let+ () = consume_space width in
+        let+ () = Compiler_state.consume_space (Static width) in
         let latest buf =
           match initial with
           | `Val v -> pp buf v
@@ -306,8 +304,28 @@ let compile top =
           ; latest = None
           ; latest_span = Line_buffer.Span.empty
           }
-    | Box { contents; width } ->
-        Compiler_state.with_expansion_point width (inner contents)
+    | Box { contents; width; pad } -> (
+        let* contents, point, inner_width =
+          Compiler_state.with_expansion_point width (inner contents)
+        in
+        match (point, pad) with
+        | `used, `none
+        (* The padding {i should} never happen. TODO: be more defensive *)
+        | `used, (`left | `right)
+        | `not_used, `none ->
+            let+ () = Compiler_state.consume_space inner_width in
+            contents
+        | `not_used, ((`left | `right) as dir) ->
+            let dir =
+              match dir with
+              | `right -> `right
+              | `left ->
+                  (* Here we access a dynamic value before (strictly) starting
+                     the process, but it's OK since it's just an estimation. *)
+                  `left (Line_buffer.create ~size:(min 64 (Sta_dyn.get width)))
+            in
+            let+ () = Compiler_state.consume_space width in
+            Compiled.Pad { contents; dir; width })
     | Group g ->
         let+ g =
           ArrayLabels.fold_left g ~init:(return []) ~f:(fun acc elt ->
@@ -337,6 +355,27 @@ let compile top =
   in
   Compiler_state.run (inner top)
 
+let apply_padding dir width =
+  match dir with
+  | `right ->
+      Staged.inj (fun inner buf ->
+          let inner_width = inner buf in
+          let outer_width = Sta_dyn.get width in
+          for _ = inner_width + 1 to outer_width do
+            Line_buffer.add_char buf ' '
+          done;
+          outer_width)
+  | `left intermediate_buf ->
+      Staged.inj (fun inner buf ->
+          let inner_width = inner intermediate_buf in
+          let outer_width = Sta_dyn.get width in
+          for _ = inner_width + 1 to outer_width do
+            Line_buffer.add_char buf ' '
+          done;
+          Line_buffer.add_line_buffer ~src:intermediate_buf ~dst:buf;
+          Line_buffer.reset intermediate_buf;
+          outer_width)
+
 let report compiled =
   let rec aux : type a. a Compiled.t -> (Line_buffer.t -> a -> int) Staged.t =
     function
@@ -349,22 +388,28 @@ let report compiled =
     | Contramap (t, f) ->
         let$ inner = aux t in
         fun buf a -> inner buf (f a)
-    | Cond t as elt ->
+    | Cond t as _elt ->
         let$ then_ = aux t.then_ in
         fun buf x ->
           t.latest <- Some x;
           if t.if_ x then (
             let start = Line_buffer.current_position buf in
-            let reported_width = then_ buf x in
+            let _reported_width = then_ buf x in
             let finish = Line_buffer.current_position buf in
             t.latest_span <- Line_buffer.Span.between_marks start finish;
             let width = Sta_dyn.get t.width in
-            if reported_width <> width then
-              Fmt.failwith
-                "Conditional segment not respecting stated width: expected %a, \
-                 reported %d. Segment:@,\
-                 %a"
-                (Sta_dyn.pp Fmt.int) t.width reported_width Compiled.pp_dump elt;
+
+            (* TODO: Since dynamic widths aren't memoized over a single run,
+               it's possible for this to fail due to changing width in the
+               middle of a render, which isn't a bug. Should fix the race
+               condition and then be more defensive here. *)
+
+            (* if reported_width <> width then
+             *   Fmt.failwith
+             *     "Conditional segment not respecting stated width: expected %a, \
+             *      reported %d. Segment:@,\
+             *      %a"
+             *     (Sta_dyn.pp Fmt.int) t.width reported_width Compiled.pp_dump elt; *)
             width)
           else (
             Line_buffer.skip buf t.latest_span;
@@ -380,7 +425,11 @@ let report compiled =
           let y = sep buf () in
           let z = right buf v_right in
           x + y + z
+    | Pad { contents; dir; width } ->
+        let$ contents = aux contents and$ pad = apply_padding dir width in
+        fun buf x -> pad (fun buf -> contents buf x) buf
   in
+
   aux compiled
 
 let update top =
@@ -389,6 +438,9 @@ let update top =
     | Noop -> Staged.inj (fun _ _ -> 0)
     | Theta { pp } -> Staged.inj (fun _ -> pp)
     | Alpha pp -> Staged.inj (fun _ buf -> pp.latest buf)
+    | Pad { contents; dir; width } ->
+        let$ contents = aux contents and$ pad = apply_padding dir width in
+        fun y buf -> pad (fun buf -> contents y buf) buf
     | Cond t -> (
         let$ then_ = aux t.then_ in
         let update_with buf unconditional =

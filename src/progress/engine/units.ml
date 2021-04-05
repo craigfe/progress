@@ -8,11 +8,11 @@ open! Import
 module Percentage = struct
   let clamp (lower, upper) = min upper >> max lower
 
-  let of_float ppf proportion =
-    let percentage = clamp (0, 100) (Float.to_int (proportion *. 100.)) in
-    Format.fprintf ppf "%3.0d%%" percentage
-
-  let width = 4
+  let of_float =
+    let percentage x = clamp (0, 100) (Float.to_int (x *. 100.)) in
+    let pp ppf x = Format.fprintf ppf "%3.0d%%" (percentage x) in
+    let to_string x = Format.asprintf "%3.0d%%" (percentage x) in
+    Printer.create ~string_len:4 ~to_string ~pp
 end
 
 module Bytes = struct
@@ -25,46 +25,54 @@ module Bytes = struct
   let pib = conv 5
 
   (** Pretty-printer for byte counts *)
-  let pp_fixed to_float =
-    (* Round down to the nearest 0.1 *)
-    let tr f = Float.trunc (f *. 10.) /. 10. in
-    let num = format_of_string "%6.1f " in
-    let fpr = Format.fprintf in
-    fun ppf ->
-      to_float >> function
-      | n when n < 1024. -> fpr ppf (num ^^ "B  ") (tr n)
-      | n when n < 1024. ** 2. -> fpr ppf (num ^^ "KiB") (tr (n /. 1024.))
-      | n when n < 1024. ** 3. ->
-          fpr ppf (num ^^ "MiB") (tr (n /. (1024. ** 2.)))
-      | n when n < 1024. ** 4. ->
-          fpr ppf (num ^^ "GiB") (tr (n /. (1024. ** 3.)))
-      | n when n < 1024. ** 5. ->
-          fpr ppf (num ^^ "TiB") (tr (n /. (1024. ** 4.)))
-      | n when n < 1024. ** 6. ->
-          fpr ppf (num ^^ "PiB") (tr (n /. (1024. ** 5.)))
-      | n -> fpr ppf (num ^^ "EiB") (tr (n /. (1024. ** 6.)))
+  let generic to_float =
+    let process_components x k =
+      let mantissa, unit, rpad =
+        match[@ocamlformat "disable"] to_float x with
+        | n when n < 1024.       -> (n                 , "B"  , "  ")
+        | n when n < 1024. ** 2. -> (n /. 1024.        , "KiB", "")
+        | n when n < 1024. ** 3. -> (n /. (1024. ** 2.), "MiB", "")
+        | n when n < 1024. ** 4. -> (n /. (1024. ** 3.), "GiB", "")
+        | n when n < 1024. ** 5. -> (n /. (1024. ** 4.), "TiB", "")
+        | n when n < 1024. ** 6. -> (n /. (1024. ** 5.), "PiB", "")
+        | n                      -> (n /. (1024. ** 6.), "EiB", "")
+      in
+      (* Round down to the nearest 0.1 *)
+      let mantissa = Float.trunc (mantissa *. 10.) /. 10. in
+      let lpad =
+        match mantissa with
+        | n when n < 10. -> "   "
+        | n when n < 100. -> "  "
+        | n when n < 1000. -> " "
+        | _ -> ""
+      in
+      k ~mantissa ~unit ~rpad ~lpad
+    in
+    let pp ppf x =
+      process_components x (fun ~mantissa ~unit ~rpad:_ ~lpad:_ ->
+          Fmt.pf ppf "%.1f %s" mantissa unit)
+    in
+    let to_string x =
+      process_components x (fun ~mantissa ~unit ~rpad ~lpad ->
+          Printf.sprintf "%s%.1f %s%s" lpad mantissa unit rpad)
+    in
+    let string_len = 10 in
+    Printer.create ~to_string ~string_len ~pp
 
-  let width = 10
-  let of_int = pp_fixed Int.to_float
-  let of_int64 = pp_fixed Int64.to_float
-  let of_float = pp_fixed Fun.id
+  let of_int = generic Int.to_float
+  let of_int64 = generic Int64.to_float
+  let of_float = generic Fun.id
 end
 
 module Duration = struct
-  let mm_ss ppf span =
-    let seconds = Mtime.Span.to_s span in
-    Format.fprintf ppf "%02.0f:%02.0f"
-      (Float.div seconds 60. |> Float.floor)
-      (Float.rem seconds 60. |> Float.floor)
-
-  let mm_ss_print =
+  let mm_ss =
     let to_string span =
       let seconds = Mtime.Span.to_s span in
       Printf.sprintf "%02.0f:%02.0f"
         (Float.div seconds 60. |> Float.floor)
         (Float.rem seconds 60. |> Float.floor)
     in
-    Print.of_to_string ~len:5 to_string
+    Printer.of_to_string ~len:5 to_string
 end
 
 (*————————————————————————————————————————————————————————————————————————————

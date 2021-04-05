@@ -62,6 +62,12 @@ let add_string b s =
   Bytes.unsafe_blit_string s 0 b.buffer b.position len;
   b.position <- new_position
 
+let add_line_buffer ~dst ~src =
+  let position = dst.position in
+  let len = src.position in
+  advance dst len;
+  Bytes.unsafe_blit src.buffer 0 dst.buffer position len
+
 let create ~size =
   let buffer = Bytes.create size in
   let rec ppf =
@@ -82,9 +88,11 @@ let with_ppf t f =
   Format.pp_print_flush ppf ();
   a
 
+let reset t = t.position <- 0
+
 let contents t =
   let res = Bytes.sub_string t.buffer 0 t.position in
-  t.position <- 0;
+  reset t;
   res
 
 type mark = int
