@@ -1,8 +1,15 @@
 let bar color message =
+  let total = 1_000_000_000L in
   Progress.Multi.v
-  @@ Progress.counter ~color ~style:`UTF8 ~total:1_000_000_000L ~message
-       ~pp:Progress.Units.Bytes.of_int64
-       (module Int64)
+  @@
+  let open Progress.Line in
+  list
+    [ const message
+    ; Int64.bytes
+    ; elapsed ()
+    ; Int64.bar ~color ~style:`UTF8 ~total ()
+    ; Int64.percentage_of total
+    ]
 
 let main () =
   Progress.(

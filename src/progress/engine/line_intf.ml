@@ -34,10 +34,13 @@ module type Integer_dependent = sig
       {[ [#######################################................] ]}
 
       which occupies [width]-many columns and uses [f] to determine the
-      proportion of the bar that is filled.
+      proportion of the bar that is filled. Optional parameters are as follows:
 
-      If [~width:`Expand] is passed – which is the default – this segment
-      must be contained inside a {{!boxes} box} that determines its size. *)
+      - [?style] specifies whether to use a UTF-8 or an ASCII encoding for the
+        progress bar. The UTF-8 encoding shows a higher resolution of progress,
+        but may not be supported in all terminals. The default is [`ASCII].
+
+      - [?width] is the width of the bar in columns. Defaults to [`Expand]. *)
 end
 
 module type S = sig

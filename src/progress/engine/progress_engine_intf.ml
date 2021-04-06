@@ -74,43 +74,6 @@ module type S = sig
         consecutively to the {!with_reporters} continuation when rendering. *)
   end
 
-  type bar_style = [ `ASCII | `UTF8 | `Custom of string list ]
-
-  val counter :
-       total:'elt
-    -> ?color:Ansi.Color.t
-    -> ?style:bar_style
-    -> ?message:string
-    -> ?pp:'elt Printer.t
-    -> ?width:int
-    -> ?sampling_interval:int
-    -> (module Integer.S with type t = 'elt)
-    -> 'elt Line.t
-  (** [counter ~total (module Int)] is a progress bar of the form:
-
-      {[ <message?>  <count?>  [########..............................]  XX% ]}
-
-      where each reported value contributes cumulatively towards an eventual
-      total of [total]. Optional parameters are as follows:
-
-      - [?style] specifies whether to use a UTF-8 or an ASCII encoding for the
-        progress bar. The UTF-8 encoding shows a higher resolution of progress,
-        but may not be supported in all terminals. The default is [`ASCII].
-
-      - [?pp] is used to pretty-print the [<count>] segment, if passed. For
-        example, {!Units.bytes} can be used for totals measured in bytes. The
-        default is to not display this segment.
-
-      - [?width] is the width of the bar in columns. Defaults to the width of
-        [stdout], if it is a terminal.
-
-      - [?sampling_interval] specifies the number of reported values that must
-        be passed for each update of the display (not including the update
-        during finalisation, which always occurs). This is useful when progress
-        is being reported from a hot-loop, where the cost of re-displaying the
-        progress bar is non-negligible. The default value is [1], meaning that
-        all updates are displayed immediately. *)
-
   (** A list of reporters of differing types. *)
   module Reporters : sig
     type 'a t = [] : unit t | ( :: ) : 'a * 'b t -> ('a -> 'b) t

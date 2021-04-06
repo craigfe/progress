@@ -9,7 +9,10 @@ let line_prefix ~stages =
 let config = Progress.Config.create ~persistent:false ()
 
 let with_plain_bar ~total f =
-  Progress.(with_reporter ~config @@ counter ~total (module Int)) f
+  Progress.(
+    with_reporter ~config
+      Line.(list [ elapsed (); bar ~total (); percentage_of total ])
+      f)
 
 let with_bars f =
   let bar_names = [ "alcotest"; "ctypes"; "irmin"; "fmt"; "logs" ] in

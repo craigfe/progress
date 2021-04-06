@@ -56,24 +56,6 @@ module Make (Platform : Platform.S) = struct
   let with_reporter ?config b f = with_reporters ?config (Multi.v b) f
 
   module Reporters = Renderer.Reporters
-
-  type bar_style = [ `ASCII | `UTF8 | `Custom of string list ]
-
-  let counter (type elt) ~(total : elt) ?color ?(style = `ASCII) ?message ?pp
-      ?width:_ ?sampling_interval:(_ = 1)
-      (module Integer : Integer.S with type t = elt) =
-    let module Line = struct
-      include Line
-      include Line.Integer_dependent (Integer)
-    end in
-    let open Line in
-    list
-      [ Option.fold ~none:(noop ()) message ~some:const
-      ; Option.fold ~none:(noop ()) pp ~some:Line.of_printer
-      ; Line.elapsed ()
-      ; bar ?color ~style ~total ()
-      ; percentage_of total
-      ]
 end
 
 module Integer = Integer
