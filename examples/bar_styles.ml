@@ -1,17 +1,16 @@
-let bars =
-  [ ("Rough bar", `Custom [ " "; "█" ], "#DC2F02")
-  ; ( "Fine bar"
-    , `Custom [ " "; "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉"; "█" ]
-    , "#E85D04" )
-  ; ( "Vertical"
-    , `Custom [ " "; "▁"; "▂"; "▃"; "▄"; "▅"; "▆"; "▇"; "█" ]
-    , "#F48C06" )
-  ; ("Blocky", `Custom [ " "; "▖"; "▌"; "▛"; "█" ], "#FAA307")
-  ; ("Fade in", `Custom [ " "; "░"; "▒"; "▓"; "█" ], "#FFBA08")
+let[@ocamlformat "disable"] bars =
+  [ "Rough bar", `Custom [ " "; "█" ]                                   , "#DC2F02"
+  ; "Fine bar" , `Custom [ " "; "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉"; "█" ], "#E85D04"
+  ; "Vertical" , `Custom [ " "; "▁"; "▂"; "▃"; "▄"; "▅"; "▆"; "▇"; "█" ], "#F48C06"
+  ; "Blocky"   , `Custom [ " "; "▖"; "▌"; "▛"; "█" ]                    , "#FAA307"
+  ; "Fade in"  , `Custom [ " "; "░"; "▒"; "▓"; "█" ]                    , "#FFBA08"
   ]
+
+let bars =
+  bars
   |> List.map (fun (name, style, color) ->
          let open Progress.Line in
-         lpad 13 (const name ++ const "  ")
+         lpad 13 (constf "%s  " name)
          ++ bar ~style ~color:(Progress.Ansi.Color.of_hex color) ~total:1000 ())
   |> Progress.Multi.v_list
 
