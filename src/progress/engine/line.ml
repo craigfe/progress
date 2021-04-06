@@ -19,7 +19,7 @@ open! Import
 module Acc = struct
   type 'a t =
     { mutable latest : 'a
-    ; mutable total : 'a (* TODO: rename to accumulator *)
+    ; mutable accumulator : 'a
     ; mutable pending : 'a
     ; render_start : Mtime.t
     ; ring_buffer : 'a Ring_buffer.t
@@ -40,7 +40,7 @@ module Acc = struct
         let render_start = clock () in
         let state =
           { latest = Integer.zero
-          ; total = Integer.zero
+          ; accumulator = Integer.zero
           ; pending = Integer.zero
           ; render_start
           ; ring_buffer
@@ -51,13 +51,13 @@ module Acc = struct
             state.pending <- Integer.add a state.pending)
         @@ Expert.conditional (fun _ -> should_update ())
         @@ Expert.contramap ~f:(fun () ->
-               state.total <- Integer.add state.pending state.total;
+               state.accumulator <- Integer.add state.pending state.accumulator;
                state.latest <- state.pending;
                state.pending <- Integer.zero;
                state)
         @@ inner)
 
-  let total t = t.total
+  let accumulator t = t.accumulator
   let ring_buffer t = t.ring_buffer
 end
 
@@ -175,7 +175,7 @@ module Platform_dependent (Platform : Platform.S) = struct
   let of_pp (type elt) ~elt ~width pp =
     let (module Integer : Integer.S with type t = elt) = elt in
     let segment =
-      Expert.contramap ~f:Acc.total
+      Expert.contramap ~f:Acc.accumulator
       @@ Expert.alpha ~width ~initial:(`Val Integer.zero) (fun buf x ->
              let s = Format.asprintf "%a" pp x in
              Line_buffer.add_string buf s)
@@ -186,7 +186,7 @@ module Platform_dependent (Platform : Platform.S) = struct
     let (module Integer : Integer.S with type t = elt) = elt in
     let pp = Staged.prj (Printer.to_line_printer printer) in
     let segment =
-      Expert.contramap ~f:Acc.total
+      Expert.contramap ~f:Acc.accumulator
       @@ Expert.alpha ~width:(Printer.width printer)
            ~initial:(`Val Integer.zero) pp
     in
@@ -248,11 +248,11 @@ module Platform_dependent (Platform : Platform.S) = struct
   let bytes = of_printer ~elt:(module Integer.Int) Units.Bytes.of_int
   let bytes_int64 = of_printer ~elt:(module Integer.Int64) Units.Bytes.of_int64
 
-  let percentage_of (type elt) total
+  let percentage_of (type elt) accumulator
       (module Integer : Integer.S with type t = elt) =
     let printer =
       Printer.using Units.Percentage.of_float ~f:(fun x ->
-          Integer.to_float x /. Integer.to_float total)
+          Integer.to_float x /. Integer.to_float accumulator)
     in
     of_printer ~elt:(module Integer) printer
 
@@ -283,7 +283,7 @@ module Platform_dependent (Platform : Platform.S) = struct
     let total = Integer.to_string total in
     let width = String.length total in
     let segment =
-      Expert.contramap ~f:Acc.total
+      Expert.contramap ~f:Acc.accumulator
       @@ Expert.alpha ~initial:(`Val Integer.zero) ~width (fun lb x ->
              let x = Integer.to_string x in
              for _ = String.length x to width - 1 do
@@ -366,7 +366,7 @@ module Platform_dependent (Platform : Platform.S) = struct
     Acc
       { segment =
           Segment.contramap
-            ~f:(fun x -> Acc.total x |> proportion)
+            ~f:(Acc.accumulator >> proportion)
             (match width with
             | `Fixed width ->
                 if width < 3 then failwith "Not enough space for a progress bar";
@@ -436,7 +436,7 @@ module Platform_dependent (Platform : Platform.S) = struct
       Expert.contramap
         ~f:(fun acc ->
           let per_second = Acc.ring_buffer acc |> Ring_buffer.rate_per_second in
-          let acc = Acc.total acc in
+          let acc = Acc.accumulator acc in
           if per_second = Integer.zero then Mtime.Span.max_span
           else
             let todo = Integer.(to_float (sub total acc)) in
