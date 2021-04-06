@@ -1,20 +1,14 @@
 open Progress
 
 let bar ~total =
-  let total_bytes =
-    Format.asprintf "%a" (Printer.to_pp Units.Bytes.of_int) total
-  in
   let open Line in
-  let rate = rate Units.Bytes.of_float (module Int) in
-  let eta = eta ~total (module Int) in
+  let rate = rate Units.Bytes.of_float in
+  let eta = eta ~total in
   list ~sep:(const " ")
     [ spinner ~color:(Progress.Ansi.Color.of_ansi `Green) ()
     ; const "[" ++ elapsed () ++ const "]"
-    ; bar
-        ~color:(Progress.Ansi.Color.of_ansi `Cyan)
-        ~style:`ASCII ~total
-        (module Int)
-    ; bytes ++ const " / " ++ const total_bytes
+    ; bar ~color:(Progress.Ansi.Color.of_ansi `Cyan) ~style:`ASCII ~total ()
+    ; bytes ++ constf " / %a" (Printer.to_pp Units.Bytes.of_int) total
     ; const "(" ++ rate ++ const ", " ++ eta ++ const ")"
     ]
 

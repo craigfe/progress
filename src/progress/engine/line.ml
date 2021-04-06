@@ -165,33 +165,7 @@ module Platform_dependent (Platform : Platform.S) = struct
     in
     Basic segment
 
-  let const_fmt ~width pp =
-    let segment =
-      Expert.theta ~width (fun buf ->
-          Line_buffer.with_ppf buf (fun ppf -> pp ppf))
-    in
-    Basic segment
-
-  let of_pp (type elt) ~elt ~width pp =
-    let (module Integer : Integer.S with type t = elt) = elt in
-    let segment =
-      Expert.contramap ~f:Acc.accumulator
-      @@ Expert.alpha ~width ~initial:(`Val Integer.zero) (fun buf x ->
-             let s = Format.asprintf "%a" pp x in
-             Line_buffer.add_string buf s)
-    in
-    Acc { segment; elt }
-
-  let of_printer (type elt) ~elt printer =
-    let (module Integer : Integer.S with type t = elt) = elt in
-    let pp = Staged.prj (Printer.to_line_printer printer) in
-    let segment =
-      Expert.contramap ~f:Acc.accumulator
-      @@ Expert.alpha ~width:(Printer.width printer)
-           ~initial:(`Val Integer.zero) pp
-    in
-    Acc { segment; elt }
-
+  let constf fmt = Format.kasprintf const fmt
   let pair ?(sep = noop ()) a b = Pair (a, sep, b)
 
   let list ?(sep = const "  ") xs =
@@ -202,6 +176,29 @@ module Platform_dependent (Platform : Platform.S) = struct
 
   let ( ++ ) a b = List [ a; b ]
   let using f x = Contramap (x, f)
+
+  let string =
+    let segment =
+      Segment.alpha_unsized ~initial:(`Val "") (fun ~width buf s ->
+          let input_len = String.length s in
+          let output_len = width () - 1 (* XXX: why is -1 necessary? *) in
+          let () =
+            match input_len <= output_len with
+            | true ->
+                Line_buffer.add_string buf s;
+                for _ = input_len to output_len do
+                  Line_buffer.add_char buf ' '
+                done
+            | false ->
+                Line_buffer.add_substring buf s ~off:0 ~len:(output_len - 4);
+                Line_buffer.add_string buf " ..."
+          in
+          output_len)
+    in
+    Basic segment
+
+  let lpad sz t = Map (Expert.box_fixed ~pad:`left sz, t)
+  let rpad sz t = Map (Expert.box_fixed ~pad:`right sz, t)
 
   (* Spinners *)
 
@@ -245,140 +242,158 @@ module Platform_dependent (Platform : Platform.S) = struct
                with_color_opt color buf (fun () ->
                    Line_buffer.add_string buf stages.(tick ())))))
 
-  let bytes = of_printer ~elt:(module Integer.Int) Units.Bytes.of_int
-  let bytes_int64 = of_printer ~elt:(module Integer.Int64) Units.Bytes.of_int64
+  module Integer_dependent (Integer : Integer.S) = struct
+    let acc segment = Acc { segment; elt = (module Integer) }
 
-  let percentage_of (type elt) accumulator
-      (module Integer : Integer.S with type t = elt) =
-    let printer =
-      Printer.using Units.Percentage.of_float ~f:(fun x ->
-          Integer.to_float x /. Integer.to_float accumulator)
-    in
-    of_printer ~elt:(module Integer) printer
+    let of_printer printer =
+      let pp = Staged.prj (Printer.to_line_printer printer) in
+      acc
+      @@ Expert.contramap ~f:Acc.accumulator
+      @@ Expert.alpha ~width:(Printer.width printer)
+           ~initial:(`Val Integer.zero) pp
 
-  let string =
-    let segment =
-      Segment.alpha_unsized ~initial:(`Val "") (fun ~width buf s ->
-          let input_len = String.length s in
-          let output_len = width () - 1 (* XXX: why is -1 necessary? *) in
-          let () =
-            match input_len <= output_len with
-            | true ->
-                Line_buffer.add_string buf s;
-                for _ = input_len to output_len do
-                  Line_buffer.add_char buf ' '
-                done
-            | false ->
-                Line_buffer.add_substring buf s ~off:0 ~len:(output_len - 4);
-                Line_buffer.add_string buf " ..."
-          in
-          output_len)
-    in
-    Basic segment
+    let bytes = of_printer (Units.Bytes.generic (module Integer))
 
-  let max (type elt) total (module Integer : Integer.S with type t = elt) =
-    const (Integer.to_string total)
+    let percentage_of accumulator =
+      let printer =
+        Printer.using Units.Percentage.of_float ~f:(fun x ->
+            Integer.to_float x /. Integer.to_float accumulator)
+      in
+      of_printer printer
 
-  let count (type elt) total (module Integer : Integer.S with type t = elt) =
-    let total = Integer.to_string total in
-    let width = String.length total in
-    let segment =
-      Expert.contramap ~f:Acc.accumulator
+    let max total = const (Integer.to_string total)
+
+    let count total =
+      let total = Integer.to_string total in
+      let width = String.length total in
+      acc
+      @@ Expert.contramap ~f:Acc.accumulator
       @@ Expert.alpha ~initial:(`Val Integer.zero) ~width (fun lb x ->
              let x = Integer.to_string x in
              for _ = String.length x to width - 1 do
                Line_buffer.add_char lb ' '
              done;
              Line_buffer.add_string lb x)
-    in
-    Acc { segment; elt = (module Integer) }
 
-  let lpad sz t = Map (Expert.box_fixed ~pad:`left sz, t)
-  let rpad sz t = Map (Expert.box_fixed ~pad:`right sz, t)
+    (* Progress bars *)
 
-  (* Progress bars *)
+    let bar_custom ~stages ~color ~color_empty width proportion buf =
+      let color_empty = Option.(color_empty || color) in
+      let stages = Array.of_list stages in
+      let final_stage = Array.length stages - 1 in
+      let width = width () in
+      let bar_width = width - 2 in
+      let squaresf = Float.of_int bar_width *. proportion in
+      let squares = Float.to_int squaresf in
+      let filled = min squares bar_width in
+      let not_filled = bar_width - filled - 1 in
+      Line_buffer.add_string buf "│";
+      with_color_opt color buf (fun () ->
+          for _ = 1 to filled do
+            Line_buffer.add_string buf stages.(final_stage)
+          done);
+      let () =
+        if filled <> bar_width then (
+          let chunks = Float.to_int (squaresf *. Float.of_int final_stage) in
+          let index = chunks - (filled * final_stage) in
+          if index >= 0 && index < final_stage then
+            with_color_opt color buf (fun () ->
+                Line_buffer.add_string buf stages.(index));
 
-  let bar_custom ~stages ~color ~color_empty width proportion buf =
-    let color_empty = Option.(color_empty || color) in
-    let stages = Array.of_list stages in
-    let final_stage = Array.length stages - 1 in
-    let width = width () in
-    let bar_width = width - 2 in
-    let squaresf = Float.of_int bar_width *. proportion in
-    let squares = Float.to_int squaresf in
-    let filled = min squares bar_width in
-    let not_filled = bar_width - filled - 1 in
-    Line_buffer.add_string buf "│";
-    with_color_opt color buf (fun () ->
-        for _ = 1 to filled do
-          Line_buffer.add_string buf stages.(final_stage)
-        done);
-    let () =
-      if filled <> bar_width then (
-        let chunks = Float.to_int (squaresf *. Float.of_int final_stage) in
-        let index = chunks - (filled * final_stage) in
-        if index >= 0 && index < final_stage then
-          with_color_opt color buf (fun () ->
-              Line_buffer.add_string buf stages.(index));
+          with_color_opt color_empty buf (fun () ->
+              for _ = 1 to not_filled do
+                Line_buffer.add_string buf stages.(0)
+              done))
+      in
+      Line_buffer.add_string buf "│";
+      width
 
-        with_color_opt color_empty buf (fun () ->
-            for _ = 1 to not_filled do
-              Line_buffer.add_string buf stages.(0)
-            done))
-    in
-    Line_buffer.add_string buf "│";
-    width
+    let bar_ascii ~color ~color_empty width proportion buf =
+      let color_empty = Option.(color_empty || color) in
+      let width = width () in
+      let bar_width = width - 2 in
+      let filled =
+        min (Float.to_int (Float.of_int bar_width *. proportion)) bar_width
+      in
+      let not_filled = bar_width - filled in
+      Line_buffer.add_char buf '[';
+      with_color_opt color buf (fun () ->
+          for _ = 1 to filled do
+            Line_buffer.add_char buf '#'
+          done);
+      with_color_opt color_empty buf (fun () ->
+          for _ = 1 to not_filled do
+            Line_buffer.add_char buf '-'
+          done);
+      Line_buffer.add_char buf ']';
+      width
 
-  let bar_ascii ~color ~color_empty width proportion buf =
-    let color_empty = Option.(color_empty || color) in
-    let width = width () in
-    let bar_width = width - 2 in
-    let filled =
-      min (Float.to_int (Float.of_int bar_width *. proportion)) bar_width
-    in
-    let not_filled = bar_width - filled in
-    Line_buffer.add_char buf '[';
-    with_color_opt color buf (fun () ->
-        for _ = 1 to filled do
-          Line_buffer.add_char buf '#'
-        done);
-    with_color_opt color_empty buf (fun () ->
-        for _ = 1 to not_filled do
-          Line_buffer.add_char buf '-'
-        done);
-    Line_buffer.add_char buf ']';
-    width
+    let bar ~style =
+      match style with
+      | `ASCII -> bar_ascii
+      | `Custom stages -> bar_custom ~stages
+      | `UTF8 ->
+          let stages =
+            [ " "; "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉"; "█" ]
+          in
+          bar_custom ~stages
 
-  let bar ~style =
-    match style with
-    | `ASCII -> bar_ascii
-    | `Custom stages -> bar_custom ~stages
-    | `UTF8 ->
-        let stages =
-          [ " "; "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉"; "█" ]
+    let bar ?(style = `UTF8) ?color ?color_empty ?(width = `Expand) ~total () =
+      let proportion x = Integer.to_float x /. Integer.to_float total in
+      acc
+      @@ Segment.contramap ~f:(Acc.accumulator >> proportion)
+      @@
+      match width with
+      | `Fixed width ->
+          if width < 3 then failwith "Not enough space for a progress bar";
+          Segment.alpha ~width ~initial:(`Val 0.) (fun buf x ->
+              ignore
+                (bar ~style ~color ~color_empty (fun _ -> width) x buf : int))
+      | `Expand ->
+          Segment.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf x ->
+              bar ~style ~color ~color_empty width x ppf)
+
+    let rate pp_val =
+      let pp_rate =
+        let pp_val = Staged.prj (Printer.to_line_printer pp_val) in
+        fun buf x ->
+          pp_val buf x;
+          Line_buffer.add_string buf "/s"
+      in
+      let width = Printer.width pp_val + 2 in
+      acc
+      @@ Expert.contramap
+           ~f:
+             (Acc.ring_buffer >> Ring_buffer.rate_per_second >> Integer.to_float)
+      @@ Expert.alpha ~width ~initial:(`Val 0.) pp_rate
+
+    let eta ~total =
+      let printer =
+        let pp_val =
+          Staged.prj (Printer.to_line_printer Units.Duration.mm_ss)
         in
-        bar_custom ~stages
+        fun buf x ->
+          Line_buffer.add_string buf "ETA: ";
+          pp_val buf x
+      in
+      let width = Printer.width Units.Duration.mm_ss + 4 in
+      let initial = `Val Mtime.Span.max_span in
+      acc
+      @@ Expert.contramap ~f:(fun acc ->
+             let per_second =
+               Acc.ring_buffer acc |> Ring_buffer.rate_per_second
+             in
+             let acc = Acc.accumulator acc in
+             if per_second = Integer.zero then Mtime.Span.max_span
+             else
+               let todo = Integer.(to_float (sub total acc)) in
+               Mtime.Span.of_uint64_ns
+                 (Int64.of_float
+                    (todo /. Integer.to_float per_second *. 1_000_000_000.)))
+      @@ Expert.alpha ~width ~initial printer
+  end
 
-  let bar ?(style = `UTF8) ?color ?color_empty ?(width = `Expand) (type elt)
-      ~total (module Integer : Integer.S with type t = elt) : elt t =
-    let proportion x = Integer.to_float x /. Integer.to_float total in
-
-    Acc
-      { segment =
-          Segment.contramap
-            ~f:(Acc.accumulator >> proportion)
-            (match width with
-            | `Fixed width ->
-                if width < 3 then failwith "Not enough space for a progress bar";
-                Segment.alpha ~width ~initial:(`Val 0.) (fun buf x ->
-                    ignore
-                      (bar ~style ~color ~color_empty (fun _ -> width) x buf
-                        : int))
-            | `Expand ->
-                Segment.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf x ->
-                    bar ~style ~color ~color_empty width x ppf))
-      ; elt = (module Integer)
-      }
+  include Integer_dependent (Int)
 
   (* TODO: common start time by using something like Acc *)
   (* let elapsed () =
@@ -403,50 +418,6 @@ module Platform_dependent (Platform : Platform.S) = struct
           Expert.theta ~width:5 pp)
     in
     Basic segment
-
-  let rate (type elt) pp_val (module Integer : Integer.S with type t = elt) :
-      elt t =
-    let segment =
-      let pp_rate =
-        let pp_val = Staged.prj (Printer.to_line_printer pp_val) in
-        fun buf x ->
-          pp_val buf x;
-          Line_buffer.add_string buf "/s"
-      in
-      let width = Printer.width pp_val + 2 in
-      Expert.contramap
-        ~f:(Acc.ring_buffer >> Ring_buffer.rate_per_second >> Integer.to_float)
-        (Expert.alpha ~width ~initial:(`Val 0.) pp_rate)
-    in
-
-    Acc { segment; elt = (module Integer) }
-
-  let eta (type elt) ~total (module Integer : Integer.S with type t = elt) =
-    let segment =
-      let printer =
-        let pp_val =
-          Staged.prj (Printer.to_line_printer Units.Duration.mm_ss)
-        in
-        fun buf x ->
-          Line_buffer.add_string buf "ETA: ";
-          pp_val buf x
-      in
-      let width = Printer.width Units.Duration.mm_ss + 4 in
-      let initial = `Val Mtime.Span.max_span in
-      Expert.contramap
-        ~f:(fun acc ->
-          let per_second = Acc.ring_buffer acc |> Ring_buffer.rate_per_second in
-          let acc = Acc.accumulator acc in
-          if per_second = Integer.zero then Mtime.Span.max_span
-          else
-            let todo = Integer.(to_float (sub total acc)) in
-            Mtime.Span.of_uint64_ns
-              (Int64.of_float
-                 (todo /. Integer.to_float per_second *. 1_000_000_000.)))
-        (Expert.alpha ~width ~initial printer)
-    in
-
-    Acc { elt = (module Integer); segment }
 end
 
 (*————————————————————————————————————————————————————————————————————————————

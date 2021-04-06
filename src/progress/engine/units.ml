@@ -25,10 +25,10 @@ module Bytes = struct
   let pib = conv 5
 
   (** Pretty-printer for byte counts *)
-  let generic to_float =
+  let generic (type a) (module Integer : Integer.S with type t = a) =
     let process_components x k =
       let mantissa, unit, rpad =
-        match[@ocamlformat "disable"] to_float x with
+        match[@ocamlformat "disable"] Integer.to_float x with
         | n when n < 1024.       -> (n                 , "B"  , "  ")
         | n when n < 1024. ** 2. -> (n /. 1024.        , "KiB", "")
         | n when n < 1024. ** 3. -> (n /. (1024. ** 2.), "MiB", "")
@@ -59,9 +59,9 @@ module Bytes = struct
     let string_len = 10 in
     Printer.create ~to_string ~string_len ~pp
 
-  let of_int = generic Int.to_float
-  let of_int64 = generic Int64.to_float
-  let of_float = generic Fun.id
+  let of_int = generic (module Integer.Int)
+  let of_int64 = generic (module Integer.Int64)
+  let of_float = generic (module Integer.Float)
 end
 
 module Duration = struct

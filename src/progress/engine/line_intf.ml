@@ -1,57 +1,32 @@
-module type S = sig
+module type Integer_dependent = sig
   type 'a t
-  (** The type of segments of progress bars that display reported values of type
-      ['a]. *)
+  type integer
 
-  (** {2 Pre-provided segments} *)
-
-  val bytes : int t
-  val bytes_int64 : int64 t
-  val percentage_of : 'a -> (module Integer.S with type t = 'a) -> 'a t
-  val string : string t
-  val max : 'a -> (module Integer.S with type t = 'a) -> 'a t
-  val count : 'a -> (module Integer.S with type t = 'a) -> 'a t
-
-  val elapsed : unit -> 'a t
-  (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
-
-  val lpad : int -> 'a t -> 'a t
-  val rpad : int -> 'a t -> 'a t
-  val rate : float Printer.t -> (module Integer.S with type t = 'a) -> 'a t
-  val eta : total:'a -> (module Integer.S with type t = 'a) -> 'a t
-
-  val const : string -> _ t
-  (** [const s] is the segment that always displays [s]. [s] must not contain
-      any newline characters. *)
-
-  val const_fmt : width:int -> (Format.formatter -> unit) -> _ t
-  (** {!const_fmt} is a variant of {!const} that takes a fixed-width
-      pretty-printer rather than a string. *)
-
-  val noop : unit -> _ t
-
-  val of_pp :
-       elt:(module Integer.S with type t = 'a)
-    -> width:int
-    -> (Format.formatter -> 'a -> unit)
-    -> 'a t
+  val of_printer : integer Printer.t -> integer t
   (** [of_pp ~width pp] is a segment that uses the supplied fixed-width
       pretty-printer to render the value. The pretty-printer must never emit
       newline characters. *)
 
-  val of_printer :
-    elt:(module Integer.S with type t = 'a) -> 'a Printer.t -> 'a t
+  val count : integer -> integer t
+  (** [counter pp] is a segment that uses the supplied fixed-width
+      pretty-printer to print the {i accumulated} total of all values.
 
-  val spinner : ?color:Ansi.Color.t -> ?stages:string list -> unit -> _ t
+      The pretty-printer must never emit newline characters. *)
+
+  val bytes : integer t
+  val percentage_of : integer -> integer t
+  val max : integer -> integer t
+  val rate : float Printer.t -> integer t
+  val eta : total:integer -> integer t
 
   val bar :
        ?style:[ `ASCII | `UTF8 | `Custom of string list ]
     -> ?color:Ansi.Color.t
     -> ?color_empty:Ansi.Color.t
     -> ?width:[ `Fixed of int | `Expand ]
-    -> total:'elt
-    -> (module Integer.S with type t = 'elt)
-    -> 'elt t
+    -> total:integer
+    -> unit
+    -> integer t
   (** [bar ~width f] is a progress bar of the form:
 
       {[ [#######################################................] ]}
@@ -61,6 +36,38 @@ module type S = sig
 
       If [~width:`Expand] is passed – which is the default – this segment
       must be contained inside a {{!boxes} box} that determines its size. *)
+end
+
+module type S = sig
+  type 'a t
+  (** The type of segments of progress bars that display reported values of type
+      ['a]. *)
+
+  (** {2 Pre-provided segments} *)
+
+  val const : string -> _ t
+  (** [const s] is the segment that always displays [s]. [s] must not contain
+      any newline characters. *)
+
+  val constf : ('a, Format.formatter, unit, _ t) format4 -> 'a
+  (** Like {!const}, but takes a format string and placeholder values rather
+      than a string. i.e. [constf fmt a b c ...] is equivalent to
+      [const (Format.asprintf fmt a b c ...)]. *)
+
+  val string : string t
+
+  val elapsed : unit -> 'a t
+  (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
+
+  val lpad : int -> 'a t -> 'a t
+  val rpad : int -> 'a t -> 'a t
+  val spinner : ?color:Ansi.Color.t -> ?stages:string list -> unit -> _ t
+
+  (** @inline *)
+  include Integer_dependent with type 'a t := 'a t and type integer := int
+
+  module Integer_dependent (Integer : Integer.S) :
+    Integer_dependent with type 'a t := 'a t and type integer := Integer.t
 
   (** {2 Combining segments} *)
 
@@ -78,6 +85,9 @@ module type S = sig
   val using : ('a -> 'b) -> 'b t -> 'a t
   (** [using f s] is a segment that first applies [f] to the reported value and
       then behaves as segment [s]. *)
+
+  val noop : unit -> _ t
+  (** A line segment that does nothing. *)
 
   module Expert : sig
     include Segment.S with type 'a t = 'a Segment.t

@@ -29,6 +29,7 @@ end
       1024 * 1024 - 1  ↦  "1023.9 KiB"
     ]}*)
 module Bytes : sig
+  val generic : (module Integer.S with type t = 't) -> 't Printer.t
   val of_int : int Printer.t
   val of_float : float Printer.t
   val of_int64 : int64 Printer.t

@@ -12,10 +12,7 @@ let bars =
   |> List.map (fun (name, style, color) ->
          let open Progress.Line in
          lpad 13 (const name ++ const "  ")
-         ++ bar ~style
-              ~color:(Progress.Ansi.Color.of_hex color)
-              ~total:1000
-              (module Int))
+         ++ bar ~style ~color:(Progress.Ansi.Color.of_hex color) ~total:1000 ())
   |> Progress.make_list
 
 let pick_random_function l =

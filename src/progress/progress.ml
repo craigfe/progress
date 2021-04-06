@@ -48,15 +48,18 @@ let make_list xs =
 let counter (type elt) ~(total : elt) ?color ?(style = `ASCII) ?message ?pp
     ?width:_ ?sampling_interval:(_ = 1)
     (module Integer : Integer.S with type t = elt) =
+  let module Line = struct
+    include Line
+    include Line.Integer_dependent (Integer)
+  end in
   let open Line in
   make
   @@ list
        [ Option.fold ~none:(noop ()) message ~some:const
-       ; Option.fold ~none:(noop ()) pp
-           ~some:(Line.of_printer ~elt:(module Integer))
+       ; Option.fold ~none:(noop ()) pp ~some:Line.of_printer
        ; Line.elapsed ()
-       ; (bar ?color ~style ~total (module Integer) : elt Line.t)
-       ; percentage_of total (module Integer)
+       ; bar ?color ~style ~total ()
+       ; percentage_of total
        ]
 
 module Config = struct
