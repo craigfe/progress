@@ -61,13 +61,6 @@ module Bar_list = struct
     | Plus (xs, ys) -> length xs + length ys
 end
 
-let make : type a b. a Segment.t -> (a reporter -> b, b) t =
- fun segment -> One { segment }
-
-let make_list : type a b. a Segment.t list -> (a reporter list -> b, b) t =
- fun segments ->
-  Many (List.map (fun segment -> Segment_list.{ segment }) segments)
-
 module Uid : sig
   type t
 
@@ -199,7 +192,9 @@ end = struct
     Format.fprintf ppf "%s%!" (if hide_cursor then Ansi.show_cursor else "")
 end
 
-module Platform_dependent (Platform : Platform.S) = struct
+module Make (Platform : Platform.S) = struct
+  module Config = Config
+
   module Global : sig
     val active_display : unit -> Display.t option
     val set_active_exn : Display.t -> unit
@@ -311,11 +306,23 @@ module Platform_dependent (Platform : Platform.S) = struct
         Display.finalize display;
         Global.set_inactive ()
 
+  let renderer_config : Line.render_config =
+    { interval = None; max_width = Some 120 }
+
   let with_reporters ?config t f =
     let reporters, display = start ?config t in
     Fun.protect
       (fun () -> Hlist.apply_all f reporters)
       ~finally:(fun () -> finalize display)
+
+  (** TODO: move this description elsewhere; it's not renderer related. *)
+
+  module Line = Line.Platform_dependent (Platform)
+
+  let with_reporter ?config b f =
+    with_reporters ?config
+      (Segment_list.One { segment = Line.compile b ~config:renderer_config })
+      f
 
   let start ?config t =
     let hlist, disp = start ?config t in

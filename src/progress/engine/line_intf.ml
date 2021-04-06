@@ -1,8 +1,10 @@
 module type Integer_dependent = sig
   type 'a t
   type integer
+  type color
+  type 'a printer
 
-  val of_printer : integer Printer.t -> integer t
+  val of_printer : integer printer -> integer t
   (** [of_pp ~width pp] is a segment that uses the supplied fixed-width
       pretty-printer to render the value. The pretty-printer must never emit
       newline characters. *)
@@ -16,13 +18,13 @@ module type Integer_dependent = sig
   val bytes : integer t
   val percentage_of : integer -> integer t
   val max : integer -> integer t
-  val rate : float Printer.t -> integer t
+  val rate : float printer -> integer t
   val eta : total:integer -> integer t
 
   val bar :
        ?style:[ `ASCII | `UTF8 | `Custom of string list ]
-    -> ?color:Ansi.Color.t
-    -> ?color_empty:Ansi.Color.t
+    -> ?color:color
+    -> ?color_empty:color
     -> ?width:[ `Fixed of int | `Expand ]
     -> total:integer
     -> unit
@@ -39,6 +41,9 @@ module type Integer_dependent = sig
 end
 
 module type S = sig
+  type color
+  type 'a printer
+
   type 'a t
   (** The type of segments of progress bars that display reported values of type
       ['a]. *)
@@ -61,24 +66,32 @@ module type S = sig
 
   val lpad : int -> 'a t -> 'a t
   val rpad : int -> 'a t -> 'a t
-  val spinner : ?color:Ansi.Color.t -> ?stages:string list -> unit -> _ t
+  val spinner : ?color:color -> ?stages:string list -> unit -> _ t
 
-  (** {1 Integer line segments}*)
+  (** {1 Integer line segments} *)
 
   (** @inline *)
-  include Integer_dependent with type 'a t := 'a t and type integer := int
+  include
+    Integer_dependent
+      with type 'a t := 'a t
+       and type color := color
+       and type 'a printer := 'a printer
+       and type integer := int
 
-  module Int32 :
-    Integer_dependent with type 'a t := 'a t and type integer := int32
+  module type Integer_dependent = sig
+    include
+      Integer_dependent
+        with type 'a t := 'a t
+         and type color := color
+         and type 'a printer := 'a printer
+  end
 
-  module Int64 :
-    Integer_dependent with type 'a t := 'a t and type integer := int64
-
-  module Float :
-    Integer_dependent with type 'a t := 'a t and type integer := float
+  module Int32 : Integer_dependent with type integer := int32
+  module Int64 : Integer_dependent with type integer := int64
+  module Float : Integer_dependent with type integer := float
 
   module Integer_dependent (Integer : Integer.S) :
-    Integer_dependent with type 'a t := 'a t and type integer := Integer.t
+    Integer_dependent with type integer := Integer.t
 
   (** {1 Combining segments} *)
 
@@ -100,7 +113,10 @@ module type S = sig
   val noop : unit -> _ t
   (** A line segment that does nothing. *)
 
+  (** {1 Primitive line segment DSL} *)
   module Expert : sig
+    module Line_buffer = Line_buffer
+
     include Segment.S with type 'a t = 'a Segment.t
     (** @inline *)
 
@@ -125,7 +141,11 @@ module type Line = sig
   type 'a t
 
   module Platform_dependent (_ : Platform.S) : sig
-    include S with type 'a t := 'a t
+    include
+      S
+        with type 'a t := 'a t
+         and type color := Ansi.Color.t
+         and type 'a printer := 'a Printer.t
 
     val compile : 'a t -> config:render_config -> 'a Expert.t
   end

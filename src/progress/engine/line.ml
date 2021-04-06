@@ -95,6 +95,7 @@ module Platform_dependent (Platform : Platform.S) = struct
   module Clock = Platform.Clock
 
   module Expert = struct
+    module Line_buffer = Line_buffer
     include Expert
 
     let box_winsize ?max ?(fallback = 80) s =
@@ -394,6 +395,15 @@ module Platform_dependent (Platform : Platform.S) = struct
   end
 
   include Integer_dependent (Integer.Int)
+
+  module type Integer_dependent = sig
+    include
+      Integer_dependent
+        with type 'a t := 'a t
+         and type color := Ansi.Color.t
+         and type 'a printer := 'a Printer.t
+  end
+
   module Int32 = Integer_dependent (Integer.Int32)
   module Int64 = Integer_dependent (Integer.Int64)
   module Float = Integer_dependent (Integer.Float)

@@ -1,5 +1,5 @@
 module Duration : sig
-  val mm_ss : Mtime.Span.t Printer.t
+  val mm_ss : Duration.t Printer.t
   (** Renders a time span in fixed-width [MM:SS] form. *)
 end
 

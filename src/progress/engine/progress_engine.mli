@@ -1,13 +1,6 @@
-(** A library for displaying progress bars, including support for rendering
-    multiple bars at once. Start by {{!description} describing} of a sequence of
-    progress bars, then begin {{!rendering} rendering} them to get access to
-    their respective reporting functions.
+(** [Progres_engine] provides a platform-independent progress bar renderer. *)
 
-    - See {!Progress_logs} for related extensions to the
-      {{:https://erratique.ch/software/logs} Logs} library.
-    - See {!Progress_engine} for non-Unix-dependent utilities. *)
-
-include Progress_engine.S
+include Progress_engine_intf.Progress_engine
 (** @inline *)
 
 (*————————————————————————————————————————————————————————————————————————————
