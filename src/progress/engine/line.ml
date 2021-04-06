@@ -81,6 +81,7 @@ end
 
 type 'a t =
   | Noop
+  | Primitive of 'a Expert.t
   | Basic of 'a Expert.t
   | Map of ('a Expert.t -> 'a Expert.t) * 'a t
   | List of 'a t list
@@ -106,12 +107,14 @@ module Platform_dependent (Platform : Platform.S) = struct
         match max with None -> real_width | Some m -> min m real_width
       in
       box_dynamic get_width s
+
+    let to_line t = Primitive t
   end
 
   let compile : type a. a t -> config:render_config -> a Expert.t =
-   fun t ~config ->
     let rec inner : type a. a t -> (unit -> bool) -> a Expert.t = function
       | Noop -> fun _ -> Expert.noop ()
+      | Primitive x -> fun _ -> x
       | Pair (a, sep, b) ->
           let a = inner a in
           let sep = inner sep in
@@ -136,23 +139,27 @@ module Platform_dependent (Platform : Platform.S) = struct
             Acc.wrap ~elt:(module Integer) ~clock:Clock.now ~should_update
             @@ segment
     in
-    let inner = inner t in
-    let segment =
-      Expert.stateful (fun () ->
-          let should_update =
-            let state = { Timer.render_latest = Clock.now () } in
-            Staged.prj
-              (Timer.should_update ~clock:Clock.now ~interval:config.interval
-                 state)
+    fun t ~config ->
+      match t with
+      | Primitive x -> x
+      | t ->
+          let inner = inner t in
+          let segment =
+            Expert.stateful (fun () ->
+                let should_update =
+                  let state = { Timer.render_latest = Clock.now () } in
+                  Staged.prj
+                    (Timer.should_update ~clock:Clock.now
+                       ~interval:config.interval state)
+                in
+                let x = ref true in
+                Expert.contramap ~f:(fun a ->
+                    x := should_update ();
+                    a)
+                @@ Expert.box_winsize ?max:config.max_width
+                @@ inner (fun () -> !x))
           in
-          let x = ref true in
-          Expert.contramap ~f:(fun a ->
-              x := should_update ();
-              a)
-          @@ Expert.box_winsize ?max:config.max_width
-          @@ inner (fun () -> !x))
-    in
-    segment
+          segment
 
   (* Basic utilities for combining segments *)
 
@@ -246,6 +253,11 @@ module Platform_dependent (Platform : Platform.S) = struct
   module Integer_dependent (Integer : Integer.S) = struct
     let acc segment = Acc { segment; elt = (module Integer) }
 
+    let basic ~init printer =
+      let pp = Staged.prj (Printer.to_line_printer printer) in
+      Basic
+        (Expert.alpha ~width:(Printer.width printer) ~initial:(`Val init) pp)
+
     let of_printer printer =
       let pp = Staged.prj (Printer.to_line_printer printer) in
       acc
@@ -338,6 +350,22 @@ module Platform_dependent (Platform : Platform.S) = struct
             [ " "; "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉"; "█" ]
           in
           bar_custom ~stages
+
+    let bar_unaccumulated ?(style = `UTF8) ?color ?color_empty
+        ?(width = `Expand) ~total () =
+      let proportion x = Integer.to_float x /. Integer.to_float total in
+      Basic
+        (Segment.contramap ~f:proportion
+        @@
+        match width with
+        | `Fixed width ->
+            if width < 3 then failwith "Not enough space for a progress bar";
+            Segment.alpha ~width ~initial:(`Val 0.) (fun buf x ->
+                ignore
+                  (bar ~style ~color ~color_empty (fun _ -> width) x buf : int))
+        | `Expand ->
+            Segment.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf x ->
+                bar ~style ~color ~color_empty width x ppf))
 
     let bar ?(style = `UTF8) ?color ?color_empty ?(width = `Expand) ~total () =
       let proportion x = Integer.to_float x /. Integer.to_float total in

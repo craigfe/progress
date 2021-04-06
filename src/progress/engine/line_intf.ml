@@ -41,6 +41,16 @@ module type Integer_dependent = sig
         but may not be supported in all terminals. The default is [`ASCII].
 
       - [?width] is the width of the bar in columns. Defaults to [`Expand]. *)
+
+  val bar_unaccumulated :
+       ?style:[ `ASCII | `UTF8 | `Custom of string list ]
+    -> ?color:color
+    -> ?color_empty:color
+    -> ?width:[ `Fixed of int | `Expand ]
+    -> total:integer
+    -> unit
+    -> integer t
+  (** TODO: better distinction here *)
 end
 
 module type S = sig
@@ -70,6 +80,10 @@ module type S = sig
   val lpad : int -> 'a t -> 'a t
   val rpad : int -> 'a t -> 'a t
   val spinner : ?color:color -> ?stages:string list -> unit -> _ t
+
+  val basic : init:'a -> 'a printer -> 'a t
+  (** TODO: Rename to [of_printer] and keep a distinction between accumulated
+      printers. *)
 
   (** {1 Integer line segments} *)
 
@@ -118,6 +132,8 @@ module type S = sig
 
   (** {1 Primitive line segment DSL} *)
   module Expert : sig
+    type 'a line
+
     module Line_buffer = Line_buffer
 
     include Segment.S with type 'a t = 'a Segment.t
@@ -129,7 +145,10 @@ module type S = sig
 
         @param fallback defaults to [80].
         @param max defaults to no limit. *)
+
+    val to_line : 'a t -> 'a line
   end
+  with type 'a line := 'a t
 end
 
 module Types = struct

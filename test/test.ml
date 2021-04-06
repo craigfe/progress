@@ -1,6 +1,6 @@
 open Astring
 
-let ( - ), ( / ) = Int64.(sub, div)
+let ( -- ), ( // ) = Int64.(sub, div)
 let almost f = f -. Float.epsilon
 let ( let@ ) f x = f x
 
@@ -18,22 +18,16 @@ let check_bar expected =
 
 let clear_test_state () = ignore (Format.flush_str_formatter () : string)
 
-let check_no_bar () =
-  Format.flush_str_formatter () |> Alcotest.(check string) "Expected no bar" ""
-
-module Units = struct end
-
 let test_pair () =
   let bar =
     Progress.(
       Line.(
         pair ~sep:(const ", ")
-          (of_pp ~width:1 Format.pp_print_int)
-          (of_pp ~width:1 Format.pp_print_string))
-      |> make ~init:(0, "foo"))
+          (basic ~init:0 (Printer.int ~width:1))
+          (basic ~init:"foo" (Printer.string ~width:3))))
   in
   let () =
-    let@ report = Progress.with_reporters ~config bar in
+    let@ report = Progress.with_reporter ~config bar in
     check_bar "0, foo";
     report (1, "bar");
     check_bar "1, bar"
@@ -43,10 +37,9 @@ let test_pair () =
 let test_unicode_bar () =
   let () =
     let@ report =
-      Progress.(
-        Line.bar ~style:`UTF8 ~width:(`Fixed 3) Fun.id
-        |> make ~init:0.
-        |> with_reporters ~config)
+      Progress.Line.Float.bar_unaccumulated ~style:`UTF8 ~width:(`Fixed 3)
+        ~total:1. ()
+      |> Progress.with_reporter ~config
     in
     let expect s f =
       report f;
@@ -77,9 +70,9 @@ let test_unicode_bar () =
   clear_test_state ();
   let () =
     let@ report =
-      Progress.Line.bar ~style:`UTF8 ~width:(`Fixed 5) Fun.id
-      |> Progress.make ~init:0.
-      |> Progress.with_reporters ~config
+      Progress.Line.Float.bar_unaccumulated ~style:`UTF8 ~width:(`Fixed 5)
+        ~total:1. ()
+      |> Progress.with_reporter ~config
     in
     let expect s f =
       report f;
@@ -96,17 +89,22 @@ let test_unicode_bar () =
 let test_progress_bar_lifecycle () =
   let open Progress.Units.Bytes in
   let@ report =
-    Progress.counter ~style:`ASCII ~total:(gib 1) ~sampling_interval:1 ~width:53
-      ~message:"<msg>" ~pp:(of_int64, width)
-      (module Int64)
-    |> Progress.with_reporters ~config
+    let open Progress.Line in
+    list
+      [ const "<msg>"
+      ; Int64.bytes
+      ; Int64.bar ~style:`ASCII ~width:(`Fixed 29) ~total:(gib 1) ()
+        ++ const " "
+        ++ Int64.percentage_of (gib 1)
+      ]
+    |> Progress.with_reporter ~config
   in
   check_bar "<msg>     0.0 B    [---------------------------]   0%";
-  report (kib 1 - 1L);
+  report (kib 1 -- 1L);
   check_bar "<msg>  1023.0 B    [---------------------------]   0%";
   report 1L;
   check_bar "<msg>     1.0 KiB  [---------------------------]   0%";
-  report (mib 1 - kib 1 - 1L);
+  report (mib 1 -- kib 1 -- 1L);
   (* Should always round downwards. *)
   check_bar "<msg>  1023.9 KiB  [---------------------------]   0%";
   report 1L;
@@ -115,61 +113,49 @@ let test_progress_bar_lifecycle () =
   check_bar "<msg>    50.0 MiB  [#--------------------------]   4%";
   report (mib 450);
   check_bar "<msg>   500.0 MiB  [#############--------------]  48%";
-  report (gib 1 - mib 500 - 1L);
+  report (gib 1 -- mib 500 -- 1L);
   (* 1 byte from completion. Should show 99% and not a full 1024 MiB. *)
   check_bar "<msg>  1023.9 MiB  [##########################-]  99%";
   report 1L;
   (* Now exactly complete *)
   check_bar "<msg>     1.0 GiB  [###########################] 100%";
   (* Subsequent reports don't overflow the bar *)
-  report (gib 1 / 2L);
+  report (gib 1 // 2L);
   check_bar "<msg>     1.5 GiB  [###########################] 100%";
   ()
 
 let test_progress_bar_width () =
-  let check_width ~width ~message ?pp ~count_width () =
+  let check_width width =
+    clear_test_state ();
     let@ _report =
-      Progress.with_reporters ~config
-        (Progress.counter ~style:`ASCII ~total:1L ~sampling_interval:1 ~width
-           ~message ?pp
-           (module Int64))
+      let open Progress.Line in
+      Progress.with_reporter ~config
+        (Int64.bar ~style:`ASCII ~width:(`Fixed width) ~total:1L ())
+      (* Progress.with_reporters ~config
+       *   (Progress.counter ~style:`ASCII ~total:1L ~sampling_interval:1 ~width
+       *      ~message ?pp
+       *      (module Int64)) *)
     in
-    String.length (read_bar ())
-    |> Alcotest.(check int)
-         (Fmt.str
-            "Expected width for configuration { width = %d; count_width = %d; \
-             message = %S }"
-            width count_width message)
-         width
+    let s = read_bar () in
+    String.length s
+    |> Alcotest.(check int) (Fmt.str "Expected width of %d: `%S`" width s) width
   in
-  check_width ~width:80 ~message:"<msg>"
-    ~pp:Progress.Units.Bytes.(of_int64, width)
-    ~count_width:5 ();
-  clear_test_state ();
-  check_width ~width:40 ~message:""
-    ~pp:(Fmt.(const string "XX"), 2)
-    ~count_width:2 ();
-  clear_test_state ();
-  check_width ~width:40 ~message:"Very long message" ~count_width:0 ();
-
-  (* TODO: Static vs Dynamic distinction in expandable
-   *
-   * Alcotest.check_raises "Overly small progress bar"
-   *   (Invalid_argument "Not enough space for a progress bar") (fun () ->
-   *     ignore
-   *       (Progress.counter ~total:1L ~sampling_interval:1 ~width:18 ~message:""
-   *          ())); *)
-  ()
+  check_width 80;
+  check_width 40;
+  Alcotest.check_raises "Overly small progress bar"
+    (Failure "Not enough space for a progress bar") (fun () -> check_width 2)
 
 module Boxes = struct
+  let unsized =
+    Progress.Line.Expert.alpha_unsized ~initial:(`Val ()) (fun ~width:_ _ _ ->
+        0)
+
   let test_unsized_not_in_box () =
     Alcotest.check_raises "Unsized element not contained in a box"
       (Invalid_argument
          "Encountered an expanding element that is not contained in a box")
     @@ fun () ->
-    ignore
-      Progress.(
-        start @@ make ~init:0. Line.(bar ~width:`Expand ~style:`UTF8 Fun.id))
+    Progress.(with_reporter Line.Expert.(to_line unsized) Fun.id ())
 
   let test_two_unsized_in_box () =
     Alcotest.check_raises "Two unsized elements in a box"
@@ -177,34 +163,10 @@ module Boxes = struct
          "Multiple expansion points encountered. Cannot pack two unsized \
           segments in a single box.")
     @@ fun () ->
-    let open Progress in
-    let unsized = Line.bar ~style:`UTF8 Fun.id in
-    ignore
-      (start @@ make ~init:0. Line.(Expert.box_fixed 10 (unsized ++ unsized)))
-end
-
-module Stateful = struct
-  let test_periodic () =
-    let@ report =
-      Progress.(
-        Line.Expert.(accumulator ( + ) 0 (periodic 3 (of_pp ~width:1 Fmt.int)))
-        |> make ~init:0
-        |> with_reporters ~config)
-    in
-    check_bar "0";
-    report 1;
-    check_no_bar ();
-    report 1;
-    check_no_bar ();
-    report 1;
-    check_bar "3";
-    report 10;
-    check_no_bar ();
-    report 10;
-    check_no_bar ();
-    report 10;
-    check_bar "33";
-    ()
+    Progress.(
+      with_reporter
+        Line.Expert.(to_line @@ box_fixed 10 (array [| unsized; unsized |]))
+        Fun.id ())
 end
 
 let () =
@@ -222,6 +184,5 @@ let () =
         ; test_case "Two unsized elements in box" `Quick
             Boxes.test_two_unsized_in_box
         ] )
-    ; ("stateful", [ test_case "periodic" `Quick Stateful.test_periodic ])
     ; ("units", Test_units.tests)
     ]
