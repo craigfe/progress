@@ -5,6 +5,11 @@
 
 open! Import
 
+external unsafe_blit_string : string -> int -> bytes -> int -> int -> unit
+  = "caml_blit_string"
+  [@@noalloc]
+(** Polyfill for pre-4.09.0 *)
+
 type t =
   { mutable buffer : bytes
   ; mutable position : int
@@ -53,13 +58,13 @@ let add_substring t s ~off ~len =
     invalid_arg "Line_buffer.add_substring";
   let position = t.position in
   advance t len;
-  Bytes.unsafe_blit_string s off t.buffer position len
+  unsafe_blit_string s off t.buffer position len
 
 let add_string b s =
   let len = String.length s in
   let new_position = b.position + len in
   if new_position > b.length then resize b len;
-  Bytes.unsafe_blit_string s 0 b.buffer b.position len;
+  unsafe_blit_string s 0 b.buffer b.position len;
   b.position <- new_position
 
 let add_line_buffer ~dst ~src =

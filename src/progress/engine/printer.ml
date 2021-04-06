@@ -7,6 +7,11 @@ open! Import
 
 (** TODO: keep distinction between display columns and string length. *)
 
+external unsafe_blit_string : string -> int -> bytes -> int -> int -> unit
+  = "caml_blit_string"
+  [@@noalloc]
+(** Polyfill for pre-4.09.0 *)
+
 type 'a t =
   { write : 'a -> into:bytes -> pos:int -> unit
   ; write_len : int
@@ -16,7 +21,7 @@ type 'a t =
 
 let create ~to_string ~string_len ~pp =
   let write x ~into ~pos =
-    Bytes.unsafe_blit_string (to_string x) 0 into pos string_len
+    unsafe_blit_string (to_string x) 0 into pos string_len
   in
   { write; write_len = string_len; to_string; pp }
 
