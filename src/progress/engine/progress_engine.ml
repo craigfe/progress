@@ -11,7 +11,12 @@ module Make (Platform : Platform.S) = struct
   module Duration = Duration
   module Printer = Printer
   module Units = Units
-  module Config = Config
+
+  module Config = struct
+    include Config
+
+    type t = user_supplied
+  end
 
   module Renderer = struct
     include Renderer.Make (Platform)
@@ -23,28 +28,17 @@ module Make (Platform : Platform.S) = struct
     include Line
   end
 
-  let renderer_config : Line.render_config =
-    { interval = None; max_width = Some 120 }
-
   type 'a reporter = 'a -> unit
 
   module Multi = struct
     type ('a, 'b) t = ('a, 'b) Renderer.Segment_list.t
 
     let ( / ) top bottom = Renderer.Segment_list.append top bottom
-
-    let v x =
-      Renderer.Segment_list.One
-        { segment = Line.compile x ~config:renderer_config }
+    let v x = Renderer.Segment_list.One (fun config -> Line.compile x config)
 
     let v_list xs =
       Renderer.Segment_list.Many
-        (List.map
-           (fun x ->
-             { Renderer.Segment_list.segment =
-                 Line.compile ~config:renderer_config x
-             })
-           xs)
+        (List.map (fun x config -> Line.compile x config) xs)
   end
 
   type display = Renderer.display

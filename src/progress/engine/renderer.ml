@@ -14,8 +14,8 @@ type ('a, 'b) t = ('a, 'b) Segment_list.t
 module Bar : sig
   type 'a t
 
-  val create : 'a Segment_list.elt -> 'a t
-  val contents : _ t -> string
+  val create : Config.t -> 'a Segment_list.elt -> 'a t
+  val contents : _ t -> [ `Clean | `Dirty of string ]
   val update : unconditional:bool -> _ t -> unit -> int
   val report : 'a t -> 'a -> int
 end = struct
@@ -25,9 +25,9 @@ end = struct
     ; report : 'a -> int
     }
 
-  let create : type a. a Segment_list.elt -> a t =
-   fun { segment } ->
-    let s = Segment.compile segment in
+  let create : type a. Config.t -> a Segment_list.elt -> a t =
+   fun cfg segment ->
+    let s = Segment.compile (segment cfg) in
     let line_buffer = Line_buffer.create ~size:80 in
     let report =
       let report = Staged.prj (Segment.report s) in
@@ -50,10 +50,12 @@ module Bar_list = struct
     | Many : 'a Bar.t list -> ('a reporter list -> 'b, 'b) t
     | Plus : ('a, 'b) t * ('b, 'c) t -> ('a, 'c) t
 
-  let rec of_segments : type a b. (a, b) Segment_list.t -> (a, b) t = function
-    | One elt -> One (Bar.create elt)
-    | Many elts -> Many (List.map Bar.create elts)
-    | Plus (xs, ys) -> Plus (of_segments xs, of_segments ys)
+  let rec of_segments : type a b. Config.t -> (a, b) Segment_list.t -> (a, b) t
+      =
+   fun cfg -> function
+    | One elt -> One (Bar.create cfg elt)
+    | Many elts -> Many (List.map (fun x -> Bar.create cfg x) elts)
+    | Plus (xs, ys) -> Plus (of_segments cfg xs, of_segments cfg ys)
 
   let rec length : type a b. (a, b) t -> int = function
     | One _ -> 1
@@ -76,9 +78,12 @@ end
 module Display : sig
   type t
 
-  val create : config:Config.internal -> ('a, 'b) Bar_list.t -> t
+  val create : config:Config.t -> ('a, 'b) Bar_list.t -> t
   val uid : t -> Uid.t
-  val rerender_bar : t -> idx:int -> width:int -> string -> unit
+
+  val rerender_bar :
+    t -> idx:int -> width:int -> [ `Clean | `Dirty of string ] -> unit
+
   val rerender_all : t -> unit
   val initial_render : t -> unit
   val handle_width_change : t -> int -> unit
@@ -88,7 +93,7 @@ module Display : sig
 end = struct
   type t =
     | E :
-        { config : Config.internal
+        { config : Config.t
         ; bars : (_, _) Bar_list.t
         ; bar_count : int
         ; uid : Uid.t
@@ -117,13 +122,17 @@ end = struct
      fun ~on_right_spine ~idx -> function
       | One bar ->
           let width = Bar.update ~unconditional bar () in
-          rerender_line t ~width ~idx (Bar.contents bar);
+          (match Bar.contents bar with
+          | `Clean -> ()
+          | `Dirty contents -> rerender_line t ~width ~idx contents);
           if on_right_spine then Format.fprintf ppf "\r%!"
           else Format.pp_force_newline ppf ();
           succ idx
       | Many [ bar ] ->
           let width = Bar.update ~unconditional bar () in
-          rerender_line t ~width ~idx (Bar.contents bar);
+          (match Bar.contents bar with
+          | `Clean -> ()
+          | `Dirty contents -> rerender_line t ~width ~idx contents);
           if on_right_spine then Format.fprintf ppf "\r%!"
           else Format.pp_force_newline ppf ();
           succ idx
@@ -143,13 +152,16 @@ end = struct
 
   let rerender_bar (E { config = { ppf; _ }; bar_count; _ } as t) ~idx ~width
       data =
-    let row = bar_count - idx - 1 in
+    match data with
+    | `Clean -> ()
+    | `Dirty data ->
+        let row = bar_count - idx - 1 in
 
-    (* NOTE: we add an initial carriage return to avoid overflowing the line if
-       the user has typed into the terminal between renders. *)
-    Format.fprintf ppf "\r%a" Ansi.move_up row;
-    rerender_line t ~idx ~width data;
-    Format.fprintf ppf "%a\r%!" Ansi.move_down row
+        (* NOTE: we add an initial carriage return to avoid overflowing the line if
+           the user has typed into the terminal between renders. *)
+        Format.fprintf ppf "\r%a" Ansi.move_up row;
+        rerender_line t ~idx ~width data;
+        Format.fprintf ppf "%a\r%!" Ansi.move_down row
 
   let ceil_div x y = (x + y - 1) / y
   let overflow_rows ~old_width ~new_width = ceil_div old_width new_width - 1
@@ -182,8 +194,8 @@ end = struct
       Format.fprintf config.ppf "\n%s%!" Ansi.show_cursor
 
   let finalize
-      (E { config = { ppf; hide_cursor; persistent }; bar_count; _ } as display)
-      =
+      (E { config = { ppf; hide_cursor; persistent; _ }; bar_count; _ } as
+      display) =
     Ansi.move_up ppf (bar_count - 1);
     if persistent then (
       rerender_all_from_top ~unconditional:true display;
@@ -260,10 +272,11 @@ module Make (Platform : Platform.S) = struct
   type display = Uid.t
 
   let start :
-        'a 'b. ?config:Config.t -> ('a, 'b) t -> ('a, 'b) Hlist.t * display =
+        'a 'b.    ?config:Config.user_supplied -> ('a, 'b) t
+        -> ('a, 'b) Hlist.t * display =
    fun ?(config = Config.create ()) bars ->
-    let config = Config.to_internal config in
-    let bars = Bar_list.of_segments bars in
+    let config = Config.apply_defaults config in
+    let bars = Bar_list.of_segments config bars in
     let ppf = config.ppf in
     let display = Display.create ~config bars in
     Global.set_active_exn display;
@@ -306,9 +319,6 @@ module Make (Platform : Platform.S) = struct
         Display.finalize display;
         Global.set_inactive ()
 
-  let renderer_config : Line.render_config =
-    { interval = None; max_width = Some 120 }
-
   let with_reporters ?config t f =
     let reporters, display = start ?config t in
     Fun.protect
@@ -321,7 +331,7 @@ module Make (Platform : Platform.S) = struct
 
   let with_reporter ?config b f =
     with_reporters ?config
-      (Segment_list.One { segment = Line.compile b ~config:renderer_config })
+      (Segment_list.One (fun config -> Line.compile b config))
       f
 
   let start ?config t =

@@ -85,11 +85,42 @@ module type S = sig
 
   (** {1 Rendering} *)
 
+  (** Configuration for progress bar rendering. *)
+  module Config : sig
+    type t
+
+    val create :
+         ?ppf:Format.formatter
+      -> ?hide_cursor:bool
+      -> ?persistent:bool
+      -> ?max_width:int option
+      -> ?min_interval:Duration.t option
+      -> unit
+      -> t
+    (** @param ppf The formatter to use for rendering. Defaults to
+        [Format.err_formatter].
+        @param hide_cursor Whether or not to hide the terminal cursor (using the
+        {{:https://en.wikipedia.org/wiki/ANSI_escape_code} [DECTCEM]} ANSI
+        escape codes) during progress bar rendering. Defaults to [true]. *)
+
+    val ( || ) : t -> t -> t
+
+    module Default : sig
+      val ppf : Format.formatter
+      val hide_cursor : bool
+      val persistent : bool
+      val max_width : int option
+      val min_interval : Duration.t option
+    end
+  end
+
   (** @inline *)
   include
     Renderer.S
-      with type 'a line := 'a Line.t
+      with type 'a reporter := 'a reporter
+       and type 'a line := 'a Line.t
        and type ('a, 'b) multi := ('a, 'b) Multi.t
+       and type config := Config.t
 end
 
 module type Progress_engine = sig

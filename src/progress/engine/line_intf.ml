@@ -153,14 +153,8 @@ module type S = sig
   with type 'a line := 'a t
 end
 
-module Types = struct
-  type render_config = { interval : Mtime.span option; max_width : int option }
-end
-
 module type Line = sig
   module type S = S
-
-  include module type of Types
 
   type 'a t
 
@@ -171,7 +165,7 @@ module type Line = sig
          and type color := Ansi.Color.t
          and type 'a printer := 'a Printer.t
 
-    val compile : 'a t -> config:render_config -> 'a Expert.t
+    val compile : 'a t -> Config.t -> 'a Expert.t
   end
 end
 

@@ -29,7 +29,7 @@ module Reporters = struct
 end
 
 module Segment_list = struct
-  type 'a elt = { segment : 'a Segment.t }
+  type 'a elt = Config.t -> 'a Segment.t
 
   type (_, _) t =
     | One : 'a elt -> ('a reporter -> 'b, 'b) t
@@ -41,37 +41,14 @@ module Segment_list = struct
 end
 
 module type S = sig
+  type 'a reporter
   type 'a line
   type ('a, 'b) multi
+  type config
 
-  (** Configuration for progress bar rendering. *)
-  module Config : sig
-    type t = Config.t
+  val with_reporter : ?config:config -> 'a line -> ('a reporter -> 'b) -> 'b
 
-    val create :
-         ?ppf:Format.formatter
-      -> ?hide_cursor:bool
-      -> ?persistent:bool
-      -> unit
-      -> t
-    (** @param ppf The formatter to use for rendering. Defaults to
-        [Format.err_formatter].
-        @param hide_cursor Whether or not to hide the terminal cursor (using the
-        {{:https://en.wikipedia.org/wiki/ANSI_escape_code} [DECTCEM]} ANSI
-        escape codes) during progress bar rendering. Defaults to [true]. *)
-
-    val ( || ) : t -> t -> t
-
-    module Default : sig
-      val ppf : Format.formatter
-      val hide_cursor : bool
-      val persistent : bool
-    end
-  end
-
-  val with_reporter : ?config:Config.t -> 'a line -> ('a reporter -> 'b) -> 'b
-
-  val with_reporters : ?config:Config.t -> ('a, 'b) multi -> 'a -> 'b
+  val with_reporters : ?config:config -> ('a, 'b) multi -> 'a -> 'b
   (** [with_reporters bars f] renders [bars] inside the continuation [f], after
       supplying [f] with the necessary reporting functions. For example:
 
@@ -121,7 +98,7 @@ module type S = sig
       properly {!finalize}d, and it is not possible to interleave rendering of
       displays. *)
 
-  val start : ?config:Config.t -> ('a, unit) multi -> 'a Reporters.t * display
+  val start : ?config:config -> ('a, unit) multi -> 'a Reporters.t * display
   (** Initiate rendering of a progress bar display.
 
       @raise Failure if there is already an active progress bar display. *)
@@ -141,6 +118,25 @@ module type Renderer = sig
 
   module Make (_ : Platform.S) :
     S
-      with type 'a line := 'a Line.t
+      with type 'a reporter := 'a reporter
+       and type 'a line := 'a Line.t
        and type ('a, 'b) multi := ('a, 'b) Segment_list.t
+       and type config := Config.user_supplied
 end
+
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+
+   Permission to use, copy, modify, and/or distribute this software for
+   any purpose with or without fee is hereby granted, provided that the
+   above copyright notice and this permission notice appear in all
+   copies.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+   IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+   CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+   TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+   SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+  ————————————————————————————————————————————————————————————————————————*)

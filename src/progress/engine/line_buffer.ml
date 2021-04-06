@@ -14,6 +14,9 @@ type t =
   { mutable buffer : bytes
   ; mutable position : int
   ; mutable length : int
+  ; mutable last : string
+        (** Cache latest delivered contents to avoid unnecessary re-rendering *)
+  ; mutable last_len : int  (** Avoids some string comparisons on [last] *)
   ; ppf : Format.formatter Lazy.t
   }
 (** Invariants:
@@ -84,7 +87,9 @@ let create ~size =
        in
        Fmt.set_style_renderer ppf `Ansi_tty;
        ppf)
-  and t = { buffer; position = 0; length = size; ppf } in
+  and t =
+    { buffer; position = 0; length = size; ppf; last = ""; last_len = 0 }
+  in
   t
 
 let with_ppf t f =
@@ -96,9 +101,20 @@ let with_ppf t f =
 let reset t = t.position <- 0
 
 let contents t =
-  let res = Bytes.sub_string t.buffer 0 t.position in
+  let last = t.last in
+  let last_len = t.last_len in
+  let current_len = t.position in
+  (* NOTE: Without an efficient substring equality function, we have no choice
+           but to copy here even if the buffer is clean... *)
+  let current = Bytes.sub_string t.buffer 0 current_len in
   reset t;
-  res
+
+  match Int.equal last_len current_len && String.equal last current with
+  | true -> `Clean
+  | false ->
+      t.last <- current;
+      t.last_len <- current_len;
+      `Dirty current
 
 type mark = int
 

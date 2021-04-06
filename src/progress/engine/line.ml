@@ -4,7 +4,6 @@
   ————————————————————————————————————————————————————————————————————————————*)
 
 include Line_intf
-include Line_intf.Types
 module Expert = Segment
 open! Import
 
@@ -48,13 +47,13 @@ module Acc = struct
         in
 
         Expert.contramap ~f:(fun a ->
+            Ring_buffer.record state.ring_buffer a;
             state.pending <- Integer.add a state.pending)
         @@ Expert.conditional (fun _ -> should_update ())
         @@ Expert.contramap ~f:(fun () ->
                let to_record = state.pending in
                state.accumulator <- Integer.add to_record state.accumulator;
                state.latest <- to_record;
-               Ring_buffer.record state.ring_buffer to_record;
                state.pending <- Integer.zero;
                state)
         @@ inner)
@@ -92,8 +91,6 @@ type 'a t =
   | Acc of
       { segment : 'a Acc.t Expert.t; elt : (module Integer.S with type t = 'a) }
 
-type render_config = { interval : Mtime.span option; max_width : int option }
-
 module Platform_dependent (Platform : Platform.S) = struct
   module Clock = Platform.Clock
 
@@ -113,7 +110,7 @@ module Platform_dependent (Platform : Platform.S) = struct
     let to_line t = Primitive t
   end
 
-  let compile : type a. a t -> config:render_config -> a Expert.t =
+  let compile : type a. a t -> Config.t -> a Expert.t =
     let rec inner : type a. a t -> (unit -> bool) -> a Expert.t = function
       | Noop -> fun _ -> Expert.noop ()
       | Primitive x -> fun _ -> x
@@ -141,7 +138,7 @@ module Platform_dependent (Platform : Platform.S) = struct
             Acc.wrap ~elt:(module Integer) ~clock:Clock.now ~should_update
             @@ segment
     in
-    fun t ~config ->
+    fun t (config : Config.t) ->
       match t with
       | Primitive x -> x
       | t ->
@@ -152,7 +149,7 @@ module Platform_dependent (Platform : Platform.S) = struct
                   let state = { Timer.render_latest = Clock.now () } in
                   Staged.prj
                     (Timer.should_update ~clock:Clock.now
-                       ~interval:config.interval state)
+                       ~interval:config.min_interval state)
                 in
                 let x = ref true in
                 Expert.contramap ~f:(fun a ->
