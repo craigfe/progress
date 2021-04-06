@@ -43,7 +43,7 @@ module type S = sig
   (** The type of segments of progress bars that display reported values of type
       ['a]. *)
 
-  (** {2 Pre-provided segments} *)
+  (** {1 Basic line segments} *)
 
   val const : string -> _ t
   (** [const s] is the segment that always displays [s]. [s] must not contain
@@ -56,20 +56,31 @@ module type S = sig
 
   val string : string t
 
-  val elapsed : unit -> 'a t
+  val elapsed : unit -> _ t
   (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
 
   val lpad : int -> 'a t -> 'a t
   val rpad : int -> 'a t -> 'a t
   val spinner : ?color:Ansi.Color.t -> ?stages:string list -> unit -> _ t
 
+  (** {1 Integer line segments}*)
+
   (** @inline *)
   include Integer_dependent with type 'a t := 'a t and type integer := int
+
+  module Int32 :
+    Integer_dependent with type 'a t := 'a t and type integer := int32
+
+  module Int64 :
+    Integer_dependent with type 'a t := 'a t and type integer := int64
+
+  module Float :
+    Integer_dependent with type 'a t := 'a t and type integer := float
 
   module Integer_dependent (Integer : Integer.S) :
     Integer_dependent with type 'a t := 'a t and type integer := Integer.t
 
-  (** {2 Combining segments} *)
+  (** {1 Combining segments} *)
 
   val ( ++ ) : 'a t -> 'a t -> 'a t
   (** Horizontally join two segments of the same reported value type. *)

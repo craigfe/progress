@@ -1,10 +1,9 @@
 let bar =
-  Progress.make
-    Progress.Line.(
-      bar ~style:`UTF8 ~total:100 () ++ const " " ++ count 100 ++ const "/100")
+  Progress.Line.(
+    bar ~style:`UTF8 ~total:100 () ++ const " " ++ count 100 ++ const "/100")
 
 let run () =
-  Progress.with_reporters bar (fun f ->
+  Progress.with_reporter bar (fun f ->
       for i = 1 to 100 do
         f 1;
         Progress.interject_with (fun () ->

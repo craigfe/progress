@@ -10,6 +10,7 @@ module type S = sig
 end
 
 module Int : S with type t = int = Int
+module Int32 : S with type t = int32 = Int32
 module Int64 : S with type t = int64 = Int64
 
 module Float : S with type t = float = struct

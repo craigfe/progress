@@ -1,15 +1,17 @@
 let bar color message =
-  Progress.counter ~color ~style:`UTF8 ~total:1_000_000_000L ~message
-    ~pp:Progress.Units.Bytes.of_int64
-    (module Int64)
+  Progress.Multi.v
+  @@ Progress.counter ~color ~style:`UTF8 ~total:1_000_000_000L ~message
+       ~pp:Progress.Units.Bytes.of_int64
+       (module Int64)
 
 let main () =
   Progress.(
     with_reporters
-      (bar (Ansi.Color.of_ansi `Red) "index.html     "
-      / bar (Ansi.Color.of_ansi `Yellow) "sitemap.xml    "
-      / bar (Ansi.Color.of_ansi `Green) "img/kittens.jpg"
-      / bar (Ansi.Color.of_ansi `Blue) "img/puppies.jpg"))
+      Multi.(
+        bar (Ansi.Color.of_ansi `Red) "index.html     "
+        / bar (Ansi.Color.of_ansi `Yellow) "sitemap.xml    "
+        / bar (Ansi.Color.of_ansi `Green) "img/kittens.jpg"
+        / bar (Ansi.Color.of_ansi `Blue) "img/puppies.jpg"))
   @@ fun a b c d ->
   let pick_random () =
     match Random.int 100 with

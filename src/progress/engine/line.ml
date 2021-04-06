@@ -393,7 +393,10 @@ module Platform_dependent (Platform : Platform.S) = struct
       @@ Expert.alpha ~width ~initial printer
   end
 
-  include Integer_dependent (Int)
+  include Integer_dependent (Integer.Int)
+  module Int32 = Integer_dependent (Integer.Int32)
+  module Int64 = Integer_dependent (Integer.Int64)
+  module Float = Integer_dependent (Integer.Float)
 
   (* TODO: common start time by using something like Acc *)
   (* let elapsed () =

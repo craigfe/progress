@@ -16,8 +16,7 @@ let ( / ) = Stdlib.( / )
 
 let run () =
   let total = 231231231 in
-  let bar = make (bar ~total) in
-  with_reporters bar @@ fun report ->
+  with_reporter (bar ~total) @@ fun report ->
   let step = 22321 in
   for _ = 1 to (total / step) + 1 do
     report step;

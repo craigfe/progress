@@ -9,7 +9,7 @@ let line_prefix ~stages =
 let config = Progress.Config.create ~persistent:false ()
 
 let with_plain_bar ~total f =
-  Progress.(with_reporters ~config @@ counter ~total (module Int)) f
+  Progress.(with_reporter ~config @@ counter ~total (module Int)) f
 
 let with_bars f =
   let bar_names = [ "alcotest"; "ctypes"; "irmin"; "fmt"; "logs" ] in
@@ -19,7 +19,7 @@ let with_bars f =
         spinner ~color:(Progress.Ansi.Color.of_ansi `Green) ()
         ++ constf " %s: " name
         ++ string)
-    |> Progress.make_list
+    |> Progress.Multi.v_list
   in
   Progress.(with_reporters ~config @@ bars) f
 

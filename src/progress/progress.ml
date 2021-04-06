@@ -1,8 +1,6 @@
 open! Import
 open Progress_engine
 
-type 'a reporter = 'a -> unit
-
 module Platform = struct
   module Clock = Mtime_clock
   module Terminal_width = Terminal_width
@@ -18,32 +16,32 @@ module Line = struct
   include Line
 end
 
-type ('a, 'b) t = ('a, 'b) Renderer.t
+let renderer_config : Line.render_config =
+  { interval = None; max_width = Some 120 }
+
+module Multi = struct
+  type 'a reporter = 'a -> unit
+  type ('a, 'b) t = ('a, 'b) Renderer.t
+
+  let ( / ) top bottom = Renderer.Segment_list.append top bottom
+  let v x = Renderer.make (Line.compile x ~config:renderer_config)
+
+  let v_list xs =
+    Renderer.make_list (List.map (Line.compile ~config:renderer_config) xs)
+end
+
 type display = Renderer.display
 
-let make = Renderer.make
-let make_list = Renderer.make_list
 let start = Renderer.start
 let tick = Renderer.tick
 let finalize = Renderer.finalize
 let interject_with = Renderer.interject_with
 let with_reporters = Renderer.with_reporters
-let ( / ) top bottom = Renderer.Segment_list.append top bottom
+let with_reporter ?config b f = with_reporters ?config (Multi.v b) f
 
 module Reporters = Renderer.Reporters
 
 type bar_style = [ `ASCII | `UTF8 | `Custom of string list ]
-
-let renderer_config : Line.render_config =
-  { interval = None; max_width = Some 120 }
-
-let make x =
-  let seg = Line.compile x ~config:renderer_config in
-  make seg
-
-let make_list xs =
-  let xs = List.map (Line.compile ~config:renderer_config) xs in
-  make_list xs
 
 let counter (type elt) ~(total : elt) ?color ?(style = `ASCII) ?message ?pp
     ?width:_ ?sampling_interval:(_ = 1)
@@ -53,14 +51,13 @@ let counter (type elt) ~(total : elt) ?color ?(style = `ASCII) ?message ?pp
     include Line.Integer_dependent (Integer)
   end in
   let open Line in
-  make
-  @@ list
-       [ Option.fold ~none:(noop ()) message ~some:const
-       ; Option.fold ~none:(noop ()) pp ~some:Line.of_printer
-       ; Line.elapsed ()
-       ; bar ?color ~style ~total ()
-       ; percentage_of total
-       ]
+  list
+    [ Option.fold ~none:(noop ()) message ~some:const
+    ; Option.fold ~none:(noop ()) pp ~some:Line.of_printer
+    ; Line.elapsed ()
+    ; bar ?color ~style ~total ()
+    ; percentage_of total
+    ]
 
 module Config = struct
   include Config

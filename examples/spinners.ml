@@ -34,7 +34,7 @@ let arrows =
 let run () =
   print_endline "";
   with_reporters
-    (make_list
+    (Multi.v_list
        Line.
          [ lpad 20 (const "unlimited bar  :  ") ++ unlimited_bar
          ; lpad 20 (const "arrows  :  ") ++ arrows

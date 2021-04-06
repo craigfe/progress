@@ -11,26 +11,41 @@
 
 open Progress_engine
 
-type 'a reporter = 'a -> unit
-(** A {i reporter} for values of type ['a]. In this library, each progress bar
-    has its own reporting function. *)
+(** {2 Multiple progress bars} *)
 
-type ('a, 'b) t
-(** The type of sequences of progress bars. The parameter ['a] stores a list of
-    the reporting functions associated with each bar, terminating with ['b]. For
-    example:
+module Multi : sig
+  type 'a reporter = 'a -> unit
+  (** A {i reporter} for values of type ['a]. In this library, each progress bar
+      has its own reporting function. *)
 
-    {[
-      (* Single progress bar, taking a [float] value. *)
-      (float reporter -> 'b, 'b) t
+  type ('a, 'b) t
+  (** The type of sequences of progress bars. The parameter ['a] stores a list
+      of the reporting functions associated with each bar, terminating with
+      ['b]. For example:
 
-      (* A two-bar layout, where the top bar takes [int64]s and the bottom one
-         takes [string * float] pairs. *)
-      (int64 reporter -> (string * float) reporter -> 'b, 'b) t
-    ]}
+      {[
+        (* Single progress bar, taking a [float] value. *)
+        (float reporter -> 'b, 'b) t
 
-    These reporting functions are supplied when beginning the {{!rendering}
-    rendering} process. *)
+        (* A two-bar layout, where the top bar takes [int64]s and the bottom one
+           takes [string * float] pairs. *)
+        (int64 reporter -> (string * float) reporter -> 'b, 'b) t
+      ]}
+
+      These reporting functions are supplied when beginning the {{!rendering}
+      rendering} process. *)
+
+  val v : 'a Line.t -> ('a reporter -> 'b, 'b) t
+  (** Define a new progress bar from a specification, with the given initial
+      value. *)
+
+  val v_list : 'a Line.t list -> ('a reporter list -> 'b, 'b) t
+
+  val ( / ) : ('a, 'b) t -> ('b, 'c) t -> ('a, 'c) t
+  (** Stack progress bars vertically. [a / b] is a set with [a] stacked on top
+      of [b]. The two bars have separate reporting functions, passed
+      consecutively to the {!with_reporters} continuation when rendering. *)
+end
 
 module Ansi : sig
   include module type of Ansi
@@ -58,7 +73,7 @@ val counter :
   -> ?width:int
   -> ?sampling_interval:int
   -> (module Integer.S with type t = 'elt)
-  -> ('elt reporter -> 'a, 'a) t
+  -> 'elt Line.t
 (** [counter ~total (module Int)] is a progress bar of the form:
 
     {[ <message?>  <count?>  [########..............................]  XX% ]}
@@ -86,22 +101,9 @@ val counter :
 
 (** [Line] contains a DSL for defining custom progress bars. *)
 module Line : sig
-  include Line.S
+  include Line.S with type 'a t = 'a Line.t
   (** @inline *)
 end
-
-val make : 'a Line.t -> ('a reporter -> 'b, 'b) t
-(** Define a new progress bar from a specification, with the given initial
-    value. *)
-
-val make_list : 'a Line.t list -> ('a reporter list -> 'b, 'b) t
-
-(** {2 Multiple progress bars} *)
-
-val ( / ) : ('a, 'b) t -> ('b, 'c) t -> ('a, 'c) t
-(** Stack progress bars vertically. [a / b] is a set with [a] stacked on top of
-    [b]. The two bars have separate reporting functions, passed consecutively to
-    the {!with_reporters} continuation when rendering. *)
 
 (** A list of reporters of differing types. *)
 module Reporters : sig
@@ -131,7 +133,9 @@ module Config : sig
   end
 end
 
-val with_reporters : ?config:Config.t -> ('a, 'b) t -> 'a -> 'b
+val with_reporter : ?config:Config.t -> 'a Line.t -> (('a -> unit) -> 'b) -> 'b
+
+val with_reporters : ?config:Config.t -> ('a, 'b) Multi.t -> 'a -> 'b
 (** [with_reporters bars f] renders [bars] inside the continuation [f], after
     supplying [f] with the necessary reporting functions. For example:
 
@@ -181,7 +185,7 @@ type display
     properly {!finalize}d, and it is not possible to interleave rendering of
     displays. *)
 
-val start : ?config:Config.t -> ('a, unit) t -> 'a Reporters.t * display
+val start : ?config:Config.t -> ('a, unit) Multi.t -> 'a Reporters.t * display
 (** Initiate rendering of a progress bar display.
 
     @raise Failure if there is already an active progress bar display. *)
