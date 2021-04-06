@@ -19,7 +19,7 @@ let with_bars f =
   let bars =
     ListLabels.map bar_names ~f:(fun name ->
         let open Progress.Line in
-        spinner ~color:(Progress.Ansi.Color.of_ansi `Green) ()
+        spinner ~color:(Progress.Color.of_ansi `Green) ()
         ++ constf " %s: " name
         ++ string)
     |> Progress.Multi.v_list

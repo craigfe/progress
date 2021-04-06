@@ -7,6 +7,14 @@ open Mtime.Span
 
 type nonrec t = t
 
+let equal = Mtime.Span.equal
+let compare = Mtime.Span.compare
+let compare_zero (f : int -> int -> _) a b = f (compare a b) 0 [@@inlined]
+let ( < ) = compare_zero ( < )
+let ( <= ) = compare_zero ( <= )
+let ( = ) = compare_zero ( = )
+let ( >= ) = compare_zero ( >= )
+let ( > ) = compare_zero ( > )
 let v = of_uint64_ns
 let ( * ) = Int64.mul
 let nanosecond = v 1L
@@ -20,6 +28,8 @@ let of_ns x = v (Int64.of_float x)
 let of_us x = v (Int64.of_float (x *. 1e3))
 let of_ms x = v (Int64.of_float (x *. 1e6))
 let of_sec x = v (Int64.of_float (x *. 1e9))
+let of_int64_ms x = v (Int64.mul x 1_000_000L)
+let of_int_ms x = of_int64_ms (Int64.of_int x)
 let of_int64_sec x = v (Int64.mul x 1_000_000_000L)
 let of_int_sec x = of_int64_sec (Int64.of_int x)
 

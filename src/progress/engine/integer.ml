@@ -4,6 +4,7 @@ module type S = sig
   val zero : t
   val add : t -> t -> t
   val sub : t -> t -> t
+  val equal : t -> t -> bool
   val to_string : t -> string
   val to_float : t -> float
   val of_float : float -> t

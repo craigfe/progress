@@ -108,9 +108,11 @@ module Span = struct
 end
 
 let skip t (span : Span.t) =
-  if t.position <> span.pos then
-    Fmt.failwith "Misaligned span %a inside line buffer at position %d" Span.pp
-      span t.position;
+  (* XXX: this can cause spurious failures when zooming the terminal, so for the
+     moment we don't validate positions whatsoever. *)
+  (* if t.position <> span.pos then
+   *   Fmt.failwith "Misaligned span %a inside line buffer at position %d" Span.pp
+   *     span t.position; *)
   advance t span.len
 
 (*————————————————————————————————————————————————————————————————————————————

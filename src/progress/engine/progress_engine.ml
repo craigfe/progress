@@ -6,7 +6,8 @@
 include Progress_engine_intf
 
 module Make (Platform : Platform.S) = struct
-  module Ansi = Ansi
+  module Color = Ansi.Color
+  module Ansi = Ansi.Style
   module Duration = Duration
   module Printer = Printer
   module Units = Units

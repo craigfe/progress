@@ -6,9 +6,13 @@
 module type S = sig
   (** {2 Preliminary types and utilities} *)
 
-  module Ansi : sig
-    include module type of Ansi
+  module Color : sig
+    include module type of Ansi.Color
     (** @inline *)
+  end
+
+  module Ansi : sig
+    include module type of Ansi.Style
   end
 
   module Duration : sig
@@ -39,7 +43,7 @@ module type S = sig
     include
       Line.S
         with type 'a t = 'a Line.t
-         and type color := Ansi.Color.t
+         and type color := Color.t
          and type 'a printer := 'a Printer.t
   end
 

@@ -35,7 +35,7 @@ module Acc = struct
    fun ~elt:(module Integer) ~clock ~should_update inner ->
     Expert.stateful (fun () ->
         let ring_buffer =
-          Ring_buffer.create ~clock ~size:16 ~elt:(module Integer)
+          Ring_buffer.create ~clock ~size:32 ~elt:(module Integer)
         in
         let render_start = clock () in
         let state =
@@ -51,8 +51,10 @@ module Acc = struct
             state.pending <- Integer.add a state.pending)
         @@ Expert.conditional (fun _ -> should_update ())
         @@ Expert.contramap ~f:(fun () ->
-               state.accumulator <- Integer.add state.pending state.accumulator;
-               state.latest <- state.pending;
+               let to_record = state.pending in
+               state.accumulator <- Integer.add to_record state.accumulator;
+               state.latest <- to_record;
+               Ring_buffer.record state.ring_buffer to_record;
                state.pending <- Integer.zero;
                state)
         @@ inner)
@@ -226,29 +228,59 @@ module Platform_dependent (Platform : Platform.S) = struct
         idx := succ !idx mod bound;
         !idx)
 
-  let spinner ?color ?stages () =
-    let stages, width =
-      match stages with
-      | None -> ([| "⠁"; "⠂"; "⠄"; "⡀"; "⢀"; "⠠"; "⠐"; "⠈" |], 1)
+  let spinner ?color ?frames () =
+    let frames, width =
+      match frames with
+      | None ->
+          ( [| "⠋"
+             ; "⠙"
+             ; "⠹"
+             ; "⠸"
+             ; "⠼"
+             ; "⠴"
+             ; "⠦"
+             ; "⠧"
+             ; "⠇"
+             ; "⠏"
+            |]
+          , 1 )
       | Some [] -> Fmt.invalid_arg "spinner must have at least one stage"
-      | Some (x :: xs as stages) ->
-          let width = String.length (* UTF8 *) x in
-          ListLabels.iter xs ~f:(fun x ->
-              let width' = String.length x in
+      | Some (x :: xs as frames) ->
+          let width = String.Utf8.length x in
+          ListLabels.iteri xs ~f:(fun i x ->
+              let width' = String.Utf8.length x in
               if width <> width' then
                 Fmt.invalid_arg
-                  "spinner stages must have the same UTF-8 length. found %d \
-                   and %d"
-                  width width');
-          (Array.of_list stages, width)
+                  "Spinner frames must have the same UTF-8 length. found %d \
+                   (at index 0) and %d (at index %d)"
+                  (i + 1) width width');
+          (Array.of_list frames, width)
     in
-    let stage_count = Array.length stages in
+    let stage_count = Array.length frames in
     Basic
       (Segment.stateful (fun () ->
            let tick = Staged.prj (modulo_counter stage_count) in
            Segment.theta ~width (fun buf ->
                with_color_opt color buf (fun () ->
-                   Line_buffer.add_string buf stages.(tick ())))))
+                   Line_buffer.add_string buf frames.(tick ())))))
+
+  let debounce interval s =
+    Map
+      ( (fun s ->
+          Expert.stateful (fun () ->
+              let latest = ref (Clock.now ()) in
+              let should_update () =
+                let now = Clock.now () in
+                match
+                  Mtime.Span.compare (Mtime.span !latest now) interval >= 0
+                with
+                | false -> false
+                | true ->
+                    latest := now;
+                    true
+              in
+              Expert.conditional (fun _ -> should_update ()) s))
+      , s )
 
   module Integer_dependent (Integer : Integer.S) = struct
     let acc segment = Acc { segment; elt = (module Integer) }
@@ -397,14 +429,7 @@ module Platform_dependent (Platform : Platform.S) = struct
       @@ Expert.alpha ~width ~initial:(`Val 0.) pp_rate
 
     let eta ~total =
-      let printer =
-        let pp_val =
-          Staged.prj (Printer.to_line_printer Units.Duration.mm_ss)
-        in
-        fun buf x ->
-          Line_buffer.add_string buf "ETA: ";
-          pp_val buf x
-      in
+      let printer = Staged.prj (Printer.to_line_printer Units.Duration.mm_ss) in
       let width = Printer.width Units.Duration.mm_ss + 4 in
       let initial = `Val Mtime.Span.max_span in
       acc
@@ -413,12 +438,14 @@ module Platform_dependent (Platform : Platform.S) = struct
                Acc.ring_buffer acc |> Ring_buffer.rate_per_second
              in
              let acc = Acc.accumulator acc in
-             if per_second = Integer.zero then Mtime.Span.max_span
+             if Integer.(equal zero) per_second then Mtime.Span.max_span
              else
                let todo = Integer.(to_float (sub total acc)) in
-               Mtime.Span.of_uint64_ns
-                 (Int64.of_float
-                    (todo /. Integer.to_float per_second *. 1_000_000_000.)))
+               if todo <= 0. then Mtime.Span.zero
+               else
+                 Mtime.Span.of_uint64_ns
+                   (Int64.of_float
+                      (todo /. Integer.to_float per_second *. 1_000_000_000.)))
       @@ Expert.alpha ~width ~initial printer
   end
 

@@ -58,4 +58,5 @@ let rate_per_second : type a. a t -> a =
       Mtime.Span.to_s (Mtime.span start_time end_time)
     in
     let sum = fold t ~f:Integer.add ~init:Integer.zero in
-    Integer.of_float (Integer.to_float sum /. interval)
+    let est = Integer.to_float sum /. interval in
+    Integer.of_float est

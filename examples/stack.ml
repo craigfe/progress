@@ -1,25 +1,26 @@
+open Progress
+
 let bar color message =
   let total = 1_000_000_000L in
-  Progress.Multi.v
-  @@
-  let open Progress.Line in
+  let open Line in
   list
-    [ const message
+    [ rpad 15 (const message)
     ; Int64.bytes
-    ; elapsed ()
+    ; Int64.(rate Units.Bytes.of_float)
     ; Int64.bar ~color ~style:`UTF8 ~total ()
     ; Int64.percentage_of total
     ]
+  |> Multi.v
 
 let main () =
-  Progress.(
-    with_reporters
-      Multi.(
-        bar (Ansi.Color.of_ansi `Red) "index.html     "
-        / bar (Ansi.Color.of_ansi `Yellow) "sitemap.xml    "
-        / bar (Ansi.Color.of_ansi `Green) "img/kittens.jpg"
-        / bar (Ansi.Color.of_ansi `Blue) "img/puppies.jpg"))
-  @@ fun a b c d ->
+  let layout =
+    let open Multi in
+    bar (Color.of_ansi `Red) "index.html"
+    / bar (Color.of_ansi `Yellow) "sitemap.xml"
+    / bar (Color.of_ansi `Green) "img/kittens.jpg"
+    / bar (Color.of_ansi `Blue) "img/puppies.jpg"
+  in
+  with_reporters layout @@ fun a b c d ->
   let pick_random () =
     match Random.int 100 with
     | n when n < 19 -> a

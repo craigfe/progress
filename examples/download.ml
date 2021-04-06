@@ -5,11 +5,11 @@ let bar ~total =
   let rate = rate Units.Bytes.of_float in
   let eta = eta ~total in
   list ~sep:(const " ")
-    [ spinner ~color:(Progress.Ansi.Color.of_ansi `Green) ()
+    [ debounce (Duration.of_ms 80.) (spinner ~color:(Color.of_ansi `Green) ())
     ; const "[" ++ elapsed () ++ const "]"
-    ; bar ~color:(Progress.Ansi.Color.of_ansi `Cyan) ~style:`ASCII ~total ()
+    ; bar ~color:(Color.of_ansi `Cyan) ~style:`ASCII ~total ()
     ; bytes ++ constf " / %a" (Printer.to_pp Units.Bytes.of_int) total
-    ; const "(" ++ rate ++ const ", " ++ eta ++ const ")"
+    ; const "(" ++ rate ++ const ", eta: " ++ eta ++ const ")"
     ]
 
 let ( / ) = Stdlib.( / )
