@@ -8,5 +8,4 @@ module Line = Line
 module Stdlib_ext = Stdlib_ext
 module Printer = Printer
 module Renderer = Renderer
-module Segment = Segment
 module Units = Units

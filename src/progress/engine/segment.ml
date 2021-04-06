@@ -93,17 +93,6 @@ let box_dynamic ?(pad = `none) width contents =
 let box_fixed ?(pad = `none) width contents =
   Box { contents; width = Static width; pad }
 
-module Platform_dependent (Platform : Platform.S) = struct
-  let box_winsize ?max ?(fallback = 80) s =
-    let get_width () =
-      match max with
-      | None -> Option.value ~default:fallback (Platform.Width.columns ())
-      | Some m ->
-          min m (Option.value ~default:fallback (Platform.Width.columns ()))
-    in
-    box_dynamic get_width s
-end
-
 let pair ?(sep = noop ()) a b = Pair { left = a; sep; right = b }
 
 let accumulator combine zero s =

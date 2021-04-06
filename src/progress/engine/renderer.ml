@@ -199,7 +199,7 @@ end = struct
     Format.fprintf ppf "%s%!" (if hide_cursor then Ansi.show_cursor else "")
 end
 
-module Make (Platform : Platform.S) = struct
+module Platform_dependent (Platform : Platform.S) = struct
   module Global : sig
     val active_display : unit -> Display.t option
     val set_active_exn : Display.t -> unit
@@ -234,7 +234,7 @@ module Make (Platform : Platform.S) = struct
     let init_handlers =
       lazy
         (at_exit cleanup;
-         Platform.Width.set_changed_callback handle_width_change)
+         Platform.Terminal_width.set_changed_callback handle_width_change)
 
     let set_active_exn display =
       if is_active () then

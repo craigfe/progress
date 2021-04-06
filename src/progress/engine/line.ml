@@ -91,10 +91,20 @@ type 'a t =
 
 type render_config = { interval : Mtime.span option; max_width : int option }
 
-module Make (Clock : Mclock) (Platform : Platform.S) = struct
+module Platform_dependent (Platform : Platform.S) = struct
+  module Clock = Platform.Clock
+
   module Expert = struct
-    include Expert.Platform_dependent (Platform)
     include Expert
+
+    let box_winsize ?max ?(fallback = 80) s =
+      let get_width () =
+        let real_width =
+          Option.value ~default:fallback (Platform.Terminal_width.get ())
+        in
+        match max with None -> real_width | Some m -> min m real_width
+      in
+      box_dynamic get_width s
   end
 
   let compile : type a. a t -> config:render_config -> a Expert.t =
@@ -161,10 +171,6 @@ module Make (Clock : Mclock) (Platform : Platform.S) = struct
           Line_buffer.with_ppf buf (fun ppf -> pp ppf))
     in
     Basic segment
-
-  (* let _expert_of_pp ~width ~initial pp =
-   *   Expert.alpha ~width ~initial (fun buf x ->
-   *       Line_buffer.with_ppf buf (fun ppf -> pp ppf x)) *)
 
   let of_pp (type elt) ~elt ~width pp =
     let (module Integer : Integer.S with type t = elt) = elt in

@@ -3,26 +3,8 @@
    Distributed under the MIT license. See terms at the end of this file.
   ————————————————————————————————————————————————————————————————————————————*)
 
-(** A platform provides a time source and access to the terminal width. *)
-module type S = sig
-  (** Signature of a monotonic clock. See [Mtime] for various implementations on
-      different plaforms. *)
-  module Clock : sig
-    val elapsed : unit -> Mtime.span
-    val now : unit -> Mtime.t
-
-    type counter
-
-    val counter : unit -> counter
-    val count : counter -> Mtime.span
-  end
-
-  (** Functions for polling (and subscribing to) the terminal width. *)
-  module Terminal_width : sig
-    val get : unit -> int option
-    val set_changed_callback : (int option -> unit) -> unit
-  end
-end
+val get : unit -> int option
+val set_changed_callback : (int option -> unit) -> unit
 
 (*————————————————————————————————————————————————————————————————————————————
    Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>

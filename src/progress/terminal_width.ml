@@ -3,26 +3,28 @@
    Distributed under the MIT license. See terms at the end of this file.
   ————————————————————————————————————————————————————————————————————————————*)
 
-(** A platform provides a time source and access to the terminal width. *)
-module type S = sig
-  (** Signature of a monotonic clock. See [Mtime] for various implementations on
-      different plaforms. *)
-  module Clock : sig
-    val elapsed : unit -> Mtime.span
-    val now : unit -> Mtime.t
+external sigwinch : unit -> int = "ocaml_progress_sigwinch"
 
-    type counter
+let on_change = ref (fun _ -> ())
+let latest_width = ref None
 
-    val counter : unit -> counter
-    val count : counter -> Mtime.span
-  end
+let initialise =
+  let handle_signal _ =
+    let width = Terminal_size.get_columns () in
+    latest_width := width;
+    !on_change width
+  in
+  lazy
+    (latest_width := Terminal_size.get_columns ();
+     Sys.set_signal (sigwinch ()) (Signal_handle handle_signal))
 
-  (** Functions for polling (and subscribing to) the terminal width. *)
-  module Terminal_width : sig
-    val get : unit -> int option
-    val set_changed_callback : (int option -> unit) -> unit
-  end
-end
+let set_changed_callback f =
+  Lazy.force initialise;
+  on_change := f
+
+let get () =
+  Lazy.force_val initialise;
+  !latest_width
 
 (*————————————————————————————————————————————————————————————————————————————
    Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>

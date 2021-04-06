@@ -88,12 +88,6 @@ val counter :
 module Line : sig
   include Line.S
   (** @inline *)
-
-  module Expert : sig
-    include Segment.S with type 'a t = 'a Expert.t
-
-    val box_winsize : ?max:int -> ?fallback:int -> 'a t -> 'a t
-  end
 end
 
 val make : 'a Line.t -> ('a reporter -> 'b, 'b) t

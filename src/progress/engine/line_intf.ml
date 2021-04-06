@@ -1,23 +1,3 @@
-(** Signature of a monotonic clock. See [mtime.clock.os] for a Unix
-    implementation. *)
-module type Mclock = sig
-  val elapsed : unit -> Mtime.span
-  val now : unit -> Mtime.t
-
-  type counter
-
-  val counter : unit -> counter
-  val count : counter -> Mtime.span
-end
-
-module type Time_sensitive = sig
-  (* val debounced_accumulator :
-   *   Duration.t -> ('a -> 'a -> 'a) -> 'a -> 'a accumulated t -> 'a t
-   * (\** [debounce span s] has the same output format as [s], but only passes
-   *     reported values doen to [s] at most once in any given time [span]. *\) *)
-
-end
-
 module type S = sig
   type 'a t
   (** The type of segments of progress bars that display reported values of type
@@ -102,6 +82,13 @@ module type S = sig
   module Expert : sig
     include Segment.S with type 'a t = 'a Segment.t
     (** @inline *)
+
+    val box_winsize : ?max:int -> ?fallback:int -> 'a t -> 'a t
+    (** A box that takes on the current size of the terminal (or [fallback] if
+        stdout is not attached to a terminal).
+
+        @param fallback defaults to [80].
+        @param max defaults to no limit. *)
   end
 end
 
@@ -116,7 +103,7 @@ module type Line = sig
 
   type 'a t
 
-  module Make (_ : Mclock) (_ : Platform.S) : sig
+  module Platform_dependent (_ : Platform.S) : sig
     include S with type 'a t := 'a t
 
     val compile : 'a t -> config:render_config -> 'a Expert.t

@@ -4,27 +4,18 @@ open Progress_engine
 type 'a reporter = 'a -> unit
 
 module Platform = struct
-  module Width = Width
+  module Clock = Mtime_clock
+  module Terminal_width = Terminal_width
 end
 
 module Renderer = struct
+  include Renderer.Platform_dependent (Platform)
   include Renderer
-  include Make (Platform)
-end
-
-module Segment = struct
-  include Segment
-  include Platform_dependent (Platform)
 end
 
 module Line = struct
+  include Line.Platform_dependent (Platform)
   include Line
-  include Line.Make (Mtime_clock) (Platform)
-
-  module Expert = struct
-    include Expert.Platform_dependent (Platform)
-    include Expert
-  end
 end
 
 type ('a, 'b) t = ('a, 'b) Renderer.t

@@ -50,7 +50,7 @@ module type Renderer = sig
   val make : 'a Segment.t -> ('a reporter -> 'b, 'b) t
   val make_list : 'a Segment.t list -> ('a reporter list -> 'b, 'b) t
 
-  module Make (_ : Platform.S) : sig
+  module Platform_dependent (_ : Platform.S) : sig
     type display
 
     val start : ?config:Config.t -> ('a, unit) t -> 'a Reporters.t * display
