@@ -19,6 +19,7 @@ progress bar formats. Supports rendering multiple progress bars simultaneously.\
   (ocaml (>= "4.08.0"))
   mtime
   terminal_size
+  uutf
   (alcotest (and (>= "1.1.0") :with-test))
   (astring :with-test)
   (fmt :with-test))
