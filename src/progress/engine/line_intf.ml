@@ -79,13 +79,17 @@ module type S = sig
 
   val lpad : int -> 'a t -> 'a t
   val rpad : int -> 'a t -> 'a t
-  val spinner : ?color:color -> ?frames:string list -> unit -> _ t
+
+  val spinner :
+       ?color:color
+    -> ?frames:string list
+    -> ?min_interval:Duration.t option
+    -> unit
+    -> _ t
 
   val basic : init:'a -> 'a printer -> 'a t
   (** TODO: Rename to [of_printer] and keep a distinction between accumulated
       printers. *)
-
-  val debounce : Duration.t -> 'a t -> 'a t
 
   (** {1 Integer line segments} *)
 

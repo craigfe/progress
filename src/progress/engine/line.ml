@@ -225,7 +225,20 @@ module Platform_dependent (Platform : Platform.S) = struct
         idx := succ !idx mod bound;
         !idx)
 
-  let spinner ?color ?frames () =
+  let debounce interval s =
+    Expert.stateful (fun () ->
+        let latest = ref (Clock.now ()) in
+        let should_update () =
+          let now = Clock.now () in
+          match Mtime.Span.compare (Mtime.span !latest now) interval >= 0 with
+          | false -> false
+          | true ->
+              latest := now;
+              true
+        in
+        Expert.conditional (fun _ -> should_update ()) s)
+
+  let spinner ?color ?frames ?(min_interval = Some (Duration.of_int_ms 80)) () =
     let frames, width =
       match frames with
       | None ->
@@ -254,30 +267,16 @@ module Platform_dependent (Platform : Platform.S) = struct
           (Array.of_list frames, width)
     in
     let stage_count = Array.length frames in
+    let apply_debounce =
+      Option.fold min_interval ~none:(fun x -> x) ~some:debounce
+    in
     Basic
       (Segment.stateful (fun () ->
            let tick = Staged.prj (modulo_counter stage_count) in
-           Segment.theta ~width (fun buf ->
-               with_color_opt color buf (fun () ->
-                   Line_buffer.add_string buf frames.(tick ())))))
-
-  let debounce interval s =
-    Map
-      ( (fun s ->
-          Expert.stateful (fun () ->
-              let latest = ref (Clock.now ()) in
-              let should_update () =
-                let now = Clock.now () in
-                match
-                  Mtime.Span.compare (Mtime.span !latest now) interval >= 0
-                with
-                | false -> false
-                | true ->
-                    latest := now;
-                    true
-              in
-              Expert.conditional (fun _ -> should_update ()) s))
-      , s )
+           apply_debounce
+           @@ Segment.theta ~width (fun buf ->
+                  with_color_opt color buf (fun () ->
+                      Line_buffer.add_string buf frames.(tick ())))))
 
   module Integer_dependent (Integer : Integer.S) = struct
     let acc segment = Acc { segment; elt = (module Integer) }

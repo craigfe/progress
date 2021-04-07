@@ -2,7 +2,53 @@ open Progress
 
 let apply_color color s = Ansi.(code color) ^ s ^ Ansi.(code none)
 
-let unlimited_bar =
+(** Examples taken from: https://github.com/sindresorhus/cli-spinners/ *)
+
+include struct
+  let spin frames min_interval = Line.spinner ~frames ~min_interval ()
+
+  let dots1     = spin [ "⠋"; "⠙"; "⠹"; "⠸"; "⠼"; "⠴"; "⠦"; "⠧"; "⠇"; "⠏" ]
+  let dots2     = spin [ "⣾"; "⣽"; "⣻"; "⢿"; "⡿"; "⣟"; "⣯"; "⣷" ]
+  let dots3     = spin [ "⠋"; "⠙"; "⠚"; "⠞"; "⠖"; "⠦"; "⠴"; "⠲"; "⠳"; "⠓" ]
+  let dots4     = spin [ "⠄"; "⠆"; "⠇"; "⠋"; "⠙"; "⠸"; "⠰"; "⠠"; "⠰"; "⠸"; "⠙"; "⠋"; "⠇"; "⠆" ]
+  let dots5     = spin [ "⠋"; "⠙"; "⠚"; "⠒"; "⠂"; "⠂"; "⠒"; "⠲"; "⠴"; "⠦"; "⠖"; "⠒"; "⠐"; "⠐"; "⠒"; "⠓"; "⠋" ]
+  let dots6     = spin [ "⠁"; "⠉"; "⠙"; "⠚"; "⠒"; "⠂"; "⠂"; "⠒"; "⠲"; "⠴"; "⠤"; "⠄"; "⠄"; "⠤"; "⠴"; "⠲"; "⠒"; "⠂"; "⠂"; "⠒"; "⠚"; "⠙"; "⠉"; "⠁" ]
+  let dots7     = spin [ "⠈"; "⠉"; "⠋"; "⠓"; "⠒"; "⠐"; "⠐"; "⠒"; "⠖"; "⠦"; "⠤"; "⠠"; "⠠"; "⠤"; "⠦"; "⠖"; "⠒"; "⠐"; "⠐"; "⠒"; "⠓"; "⠋"; "⠉"; "⠈" ]
+  let dots8     = spin [ "⢹"; "⢺"; "⢼"; "⣸"; "⣇"; "⡧"; "⡗"; "⡏" ]
+  let dots9     = spin [ "⠁"; "⠂"; "⠄"; "⡀"; "⢀"; "⠠"; "⠐"; "⠈" ]
+  let pointer   = spin [ "←"; "↖"; "↑"; "↗"; "→"; "↘"; "↓"; "↙" ]
+  let chevron   = spin [ "▹▹▹▹▹"; "▸▹▹▹▹"; "▹▸▹▹▹"; "▹▹▸▹▹"; "▹▹▹▸▹"; "▹▹▹▹▸" ]
+  let hamburger = spin [ "☱"; "☲"; "☴" ]
+  let grow_vert = spin [ " "; "▁"; "▂"; "▃"; "▄"; "▅"; "▆"; "▇"; "█"; "▇"; "▆"; "▅"; "▄"; "▃"; "▂"; "▁" ]
+  let grow_hori = spin [ "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉"; "▊"; "▋"; "▌"; "▍"; "▎" ]
+  let moon      = spin [ "🌑"; "🌒"; "🌓"; "🌔"; "🌕"; "🌖"; "🌗"; "🌘"; "🌑"; "🌒"; "🌓"; "🌔"; "🌕"; "🌖"; "🌗"; "🌘" ]
+  let earth     = spin [ "🌍 "; "🌎 "; "🌏 " ]
+  let clock     = spin [ "🕛"; "🕚"; "🕙"; "🕘"; "🕗"; "🕖"; "🕕"; "🕔"; "🕓"; "🕒"; "🕑"; "🕐"]
+  let toggle    = spin [ "⊶"; "⊷" ]
+  let triangle  = spin [ "◢"; "◣"; "◤"; "◥" ]
+
+  let bouncing_bar =
+    spin
+      [ "[    ]"
+      ; "[=   ]"
+      ; "[==  ]"
+      ; "[=== ]"
+      ; "[ ===]"
+      ; "[  ==]"
+      ; "[   =]"
+      ; "[    ]"
+      ; "[   =]"
+      ; "[  ==]"
+      ; "[ ===]"
+      ; "[====]"
+      ; "[=== ]"
+      ; "[==  ]"
+      ; "[=   ]"
+      ]
+end
+[@@ocamlformat "disable"]
+
+let unlimited_bar min_interval =
   let frames =
     let width = 6 in
     List.init width (fun i ->
@@ -11,54 +57,8 @@ let unlimited_bar =
                if x = i then apply_color (Ansi.fg @@ Color.of_ansi `Cyan) ">"
                else apply_color Ansi.faint "-")))
   in
-  let spin = Line.spinner ~frames () in
+  let spin = Line.spinner ~min_interval ~frames () in
   Line.(const "[" ++ spin ++ spin ++ spin ++ spin ++ spin ++ const "]")
-
-(** Examples taken from: https://github.com/sindresorhus/cli-spinners/ *)
-
-include struct
-  let dots1     = Line.spinner ~frames:[ "⠋"; "⠙"; "⠹"; "⠸"; "⠼"; "⠴"; "⠦"; "⠧"; "⠇"; "⠏" ] ()
-  let dots2     = Line.spinner ~frames:[ "⣾"; "⣽"; "⣻"; "⢿"; "⡿"; "⣟"; "⣯"; "⣷" ] ()
-  let dots3     = Line.spinner ~frames:[ "⠋"; "⠙"; "⠚"; "⠞"; "⠖"; "⠦"; "⠴"; "⠲"; "⠳"; "⠓" ] ()
-  let dots4     = Line.spinner ~frames:[ "⠄"; "⠆"; "⠇"; "⠋"; "⠙"; "⠸"; "⠰"; "⠠"; "⠰"; "⠸"; "⠙"; "⠋"; "⠇"; "⠆" ] ()
-  let dots5     = Line.spinner ~frames:[ "⠋"; "⠙"; "⠚"; "⠒"; "⠂"; "⠂"; "⠒"; "⠲"; "⠴"; "⠦"; "⠖"; "⠒"; "⠐"; "⠐"; "⠒"; "⠓"; "⠋" ] ()
-  let dots6     = Line.spinner ~frames:[ "⠁"; "⠉"; "⠙"; "⠚"; "⠒"; "⠂"; "⠂"; "⠒"; "⠲"; "⠴"; "⠤"; "⠄"; "⠄"; "⠤"; "⠴"; "⠲"; "⠒"; "⠂"; "⠂"; "⠒"; "⠚"; "⠙"; "⠉"; "⠁" ] ()
-  let dots7     = Line.spinner ~frames:[ "⠈"; "⠉"; "⠋"; "⠓"; "⠒"; "⠐"; "⠐"; "⠒"; "⠖"; "⠦"; "⠤"; "⠠"; "⠠"; "⠤"; "⠦"; "⠖"; "⠒"; "⠐"; "⠐"; "⠒"; "⠓"; "⠋"; "⠉"; "⠈" ] ()
-  let dots8     = Line.spinner ~frames:[ "⢹"; "⢺"; "⢼"; "⣸"; "⣇"; "⡧"; "⡗"; "⡏" ] ()
-  let dots9     = Line.spinner ~frames:[ "⠁"; "⠂"; "⠄"; "⡀"; "⢀"; "⠠"; "⠐"; "⠈" ] ()
-  let pointer   = Line.spinner ~frames:[ "←"; "↖"; "↑"; "↗"; "→"; "↘"; "↓"; "↙" ] ()
-  let chevron   = Line.spinner ~frames:[ "▹▹▹▹▹"; "▸▹▹▹▹"; "▹▸▹▹▹"; "▹▹▸▹▹"; "▹▹▹▸▹"; "▹▹▹▹▸" ] ()
-  let hamburger = Line.spinner ~frames:[ "☱"; "☲"; "☴" ] ()
-  let grow_vert = Line.spinner ~frames:[ " "; "▁"; "▂"; "▃"; "▄"; "▅"; "▆"; "▇"; "█"; "▇"; "▆"; "▅"; "▄"; "▃"; "▂"; "▁" ] ()
-  let grow_hori = Line.spinner ~frames:[ "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉"; "▊"; "▋"; "▌"; "▍"; "▎" ] ()
-  let moon      = Line.spinner ~frames:[ "🌑"; "🌒"; "🌓"; "🌔"; "🌕"; "🌖"; "🌗"; "🌘"; "🌑"; "🌒"; "🌓"; "🌔"; "🌕"; "🌖"; "🌗"; "🌘" ] ()
-  let earth     = Line.spinner ~frames:[ "🌍 "; "🌎 "; "🌏 " ] ()
-  let clock     = Line.spinner ~frames:[ "🕛"; "🕚"; "🕙"; "🕘"; "🕗"; "🕖"; "🕕"; "🕔"; "🕓"; "🕒"; "🕑"; "🕐"] ()
-  let toggle    = Line.spinner ~frames:[ "⊶"; "⊷" ] ()
-  let triangle  = Line.spinner ~frames:[ "◢"; "◣"; "◤"; "◥" ] ()
-
-  let bouncing_bar =
-    Line.spinner
-      ~frames:
-        [ "[    ]"
-        ; "[=   ]"
-        ; "[==  ]"
-        ; "[=== ]"
-        ; "[ ===]"
-        ; "[  ==]"
-        ; "[   =]"
-        ; "[    ]"
-        ; "[   =]"
-        ; "[  ==]"
-        ; "[ ===]"
-        ; "[====]"
-        ; "[=== ]"
-        ; "[==  ]"
-        ; "[=   ]"
-        ]
-      ()
-end
-[@@ocamlformat "disable"]
 
 let run () =
   print_endline "";
@@ -89,10 +89,11 @@ let run () =
     |> List.map (fun (name, elt, interval) ->
            let open Line in
            lpad 25 (constf "%s  :  " name)
-           ++ debounce (Duration.of_int_ms interval) elt)
+           ++ elt (Some (Duration.of_int_ms interval)))
   in
 
   with_reporters
+    (* ~config:(Config.create ~min_interval:None ()) *)
     (Multi.v_list (spinners @ [ Line.noop () ]))
     (fun reporters ->
       let timer = Mtime_clock.counter () in
