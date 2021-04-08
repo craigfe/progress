@@ -27,14 +27,14 @@ end = struct
 
   let create : type a. Config.t -> a Segment_list.elt -> a t =
    fun cfg segment ->
-    let s = Segment.compile (segment cfg) in
+    let s = Line_primitives.compile (segment cfg) in
     let line_buffer = Line_buffer.create ~size:80 in
     let report =
-      let report = Staged.prj (Segment.report s) in
+      let report = Staged.prj (Line_primitives.report s) in
       fun (a : a) -> report line_buffer a
     in
     let update =
-      let update = Staged.prj (Segment.update s) in
+      let update = Staged.prj (Line_primitives.update s) in
       fun ~unconditional -> update line_buffer ~unconditional
     in
     { line_buffer; report; update }

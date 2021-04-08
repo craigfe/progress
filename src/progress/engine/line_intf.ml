@@ -137,12 +137,12 @@ module type S = sig
   (** A line segment that does nothing. *)
 
   (** {1 Primitive line segment DSL} *)
-  module Expert : sig
+  module Primitives : sig
     type 'a line
 
     module Line_buffer = Line_buffer
 
-    include Segment.S with type 'a t = 'a Segment.t
+    include Line_primitives.S with type 'a t = 'a Line_primitives.t
     (** @inline *)
 
     val box_winsize : ?max:int -> ?fallback:int -> 'a t -> 'a t
@@ -169,7 +169,7 @@ module type Line = sig
          and type color := Ansi.Color.t
          and type 'a printer := 'a Printer.t
 
-    val compile : 'a t -> Config.t -> 'a Expert.t
+    val compile : 'a t -> Config.t -> 'a Primitives.t
   end
 end
 

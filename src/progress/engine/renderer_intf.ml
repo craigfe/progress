@@ -29,7 +29,7 @@ module Reporters = struct
 end
 
 module Segment_list = struct
-  type 'a elt = Config.t -> 'a Segment.t
+  type 'a elt = Config.t -> 'a Line_primitives.t
 
   type (_, _) t =
     | One : 'a elt -> ('a reporter -> 'b, 'b) t

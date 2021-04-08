@@ -1,4 +1,9 @@
-include Segment_intf
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+   Distributed under the MIT license. See terms at the end of this file.
+  ————————————————————————————————————————————————————————————————————————————*)
+
+include Line_primitives_intf
 open! Import
 open Staged.Syntax
 

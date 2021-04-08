@@ -4,7 +4,7 @@
   ————————————————————————————————————————————————————————————————————————————*)
 
 include Line_intf
-module Expert = Segment
+module Primitives = Line_primitives
 open! Import
 
 (** [Line] is a higher-level wrapper around [Segment] that makes some
@@ -29,10 +29,10 @@ module Acc = struct
          elt:(module Integer.S with type t = a)
       -> clock:(unit -> Mtime.t)
       -> should_update:(unit -> bool)
-      -> a t Expert.t
-      -> a Expert.t =
+      -> a t Primitives.t
+      -> a Primitives.t =
    fun ~elt:(module Integer) ~clock ~should_update inner ->
-    Expert.stateful (fun () ->
+    Primitives.stateful (fun () ->
         let ring_buffer =
           Ring_buffer.create ~clock ~size:32 ~elt:(module Integer)
         in
@@ -46,11 +46,11 @@ module Acc = struct
           }
         in
 
-        Expert.contramap ~f:(fun a ->
+        Primitives.contramap ~f:(fun a ->
             Ring_buffer.record state.ring_buffer a;
             state.pending <- Integer.add a state.pending)
-        @@ Expert.conditional (fun _ -> should_update ())
-        @@ Expert.contramap ~f:(fun () ->
+        @@ Primitives.conditional (fun _ -> should_update ())
+        @@ Primitives.contramap ~f:(fun () ->
                let to_record = state.pending in
                state.accumulator <- Integer.add to_record state.accumulator;
                state.latest <- to_record;
@@ -82,21 +82,23 @@ end
 
 type 'a t =
   | Noop
-  | Primitive of 'a Expert.t
-  | Basic of 'a Expert.t
-  | Map of ('a Expert.t -> 'a Expert.t) * 'a t
+  | Primitive of 'a Primitives.t
+  | Basic of 'a Primitives.t
+  | Map of ('a Primitives.t -> 'a Primitives.t) * 'a t
   | List of 'a t list
   | Contramap : ('b t * ('a -> 'b)) -> 'a t
   | Pair : 'a t * unit t * 'b t -> ('a * 'b) t
   | Acc of
-      { segment : 'a Acc.t Expert.t; elt : (module Integer.S with type t = 'a) }
+      { segment : 'a Acc.t Primitives.t
+      ; elt : (module Integer.S with type t = 'a)
+      }
 
 module Platform_dependent (Platform : Platform.S) = struct
   module Clock = Platform.Clock
 
-  module Expert = struct
+  module Primitives = struct
     module Line_buffer = Line_buffer
-    include Expert
+    include Primitives
 
     let box_winsize ?max ?(fallback = 80) s =
       let get_width () =
@@ -110,29 +112,29 @@ module Platform_dependent (Platform : Platform.S) = struct
     let to_line t = Primitive t
   end
 
-  let compile : type a. a t -> Config.t -> a Expert.t =
-    let rec inner : type a. a t -> (unit -> bool) -> a Expert.t = function
-      | Noop -> fun _ -> Expert.noop ()
+  let compile : type a. a t -> Config.t -> a Primitives.t =
+    let rec inner : type a. a t -> (unit -> bool) -> a Primitives.t = function
+      | Noop -> fun _ -> Primitives.noop ()
       | Primitive x -> fun _ -> x
       | Pair (a, sep, b) ->
           let a = inner a in
           let sep = inner sep in
           let b = inner b in
           fun should_update ->
-            Expert.pair ~sep:(sep should_update) (a should_update)
+            Primitives.pair ~sep:(sep should_update) (a should_update)
               (b should_update)
       | Contramap (x, f) ->
           let x = inner x in
-          fun y -> Expert.contramap ~f (x y)
+          fun y -> Primitives.contramap ~f (x y)
       | Map (f, x) -> fun a -> f (inner x a)
       | List xs ->
           let xs = List.map inner xs in
           fun should_update ->
-            Expert.array
+            Primitives.array
               (List.map (fun f -> f should_update) xs |> Array.of_list)
       | Basic segment ->
           fun should_update ->
-            Expert.conditional (fun _ -> should_update ()) @@ segment
+            Primitives.conditional (fun _ -> should_update ()) @@ segment
       | Acc { segment; elt = (module Integer) } ->
           fun should_update ->
             Acc.wrap ~elt:(module Integer) ~clock:Clock.now ~should_update
@@ -144,7 +146,7 @@ module Platform_dependent (Platform : Platform.S) = struct
       | t ->
           let inner = inner t in
           let segment =
-            Expert.stateful (fun () ->
+            Primitives.stateful (fun () ->
                 let should_update =
                   let state = { Timer.render_latest = Clock.now () } in
                   Staged.prj
@@ -152,10 +154,10 @@ module Platform_dependent (Platform : Platform.S) = struct
                        ~interval:config.min_interval state)
                 in
                 let x = ref true in
-                Expert.contramap ~f:(fun a ->
+                Primitives.contramap ~f:(fun a ->
                     x := should_update ();
                     a)
-                @@ Expert.box_winsize ?max:config.max_width
+                @@ Primitives.box_winsize ?max:config.max_width
                 @@ inner (fun () -> !x))
           in
           segment
@@ -167,7 +169,7 @@ module Platform_dependent (Platform : Platform.S) = struct
   let const s =
     let len = String.length s and len_utf8 = String.Utf8.length s in
     let segment =
-      Expert.theta ~width:len_utf8 (fun buf ->
+      Primitives.theta ~width:len_utf8 (fun buf ->
           Line_buffer.add_substring buf s ~off:0 ~len)
     in
     Basic segment
@@ -186,7 +188,7 @@ module Platform_dependent (Platform : Platform.S) = struct
 
   let string =
     let segment =
-      Segment.alpha_unsized ~initial:(`Val "") (fun ~width buf s ->
+      Primitives.alpha_unsized ~initial:(`Val "") (fun ~width buf s ->
           let input_len = String.length s in
           let output_len = width () - 1 (* XXX: why is -1 necessary? *) in
           let () =
@@ -204,8 +206,8 @@ module Platform_dependent (Platform : Platform.S) = struct
     in
     Basic segment
 
-  let lpad sz t = Map (Expert.box_fixed ~pad:`left sz, t)
-  let rpad sz t = Map (Expert.box_fixed ~pad:`right sz, t)
+  let lpad sz t = Map (Primitives.box_fixed ~pad:`left sz, t)
+  let rpad sz t = Map (Primitives.box_fixed ~pad:`right sz, t)
 
   (* Spinners *)
 
@@ -226,7 +228,7 @@ module Platform_dependent (Platform : Platform.S) = struct
         !idx)
 
   let debounce interval s =
-    Expert.stateful (fun () ->
+    Primitives.stateful (fun () ->
         let latest = ref (Clock.now ()) in
         let should_update () =
           let now = Clock.now () in
@@ -236,7 +238,7 @@ module Platform_dependent (Platform : Platform.S) = struct
               latest := now;
               true
         in
-        Expert.conditional (fun _ -> should_update ()) s)
+        Primitives.conditional (fun _ -> should_update ()) s)
 
   let spinner ?color ?frames ?(min_interval = Some (Duration.of_int_ms 80)) () =
     let frames, width =
@@ -271,10 +273,10 @@ module Platform_dependent (Platform : Platform.S) = struct
       Option.fold min_interval ~none:(fun x -> x) ~some:debounce
     in
     Basic
-      (Segment.stateful (fun () ->
+      (Primitives.stateful (fun () ->
            let tick = Staged.prj (modulo_counter stage_count) in
            apply_debounce
-           @@ Segment.theta ~width (fun buf ->
+           @@ Primitives.theta ~width (fun buf ->
                   with_color_opt color buf (fun () ->
                       Line_buffer.add_string buf frames.(tick ())))))
 
@@ -284,13 +286,13 @@ module Platform_dependent (Platform : Platform.S) = struct
     let basic ~init printer =
       let pp = Staged.prj (Printer.to_line_printer printer) in
       Basic
-        (Expert.alpha ~width:(Printer.width printer) ~initial:(`Val init) pp)
+        (Primitives.alpha ~width:(Printer.width printer) ~initial:(`Val init) pp)
 
     let of_printer printer =
       let pp = Staged.prj (Printer.to_line_printer printer) in
       acc
-      @@ Expert.contramap ~f:Acc.accumulator
-      @@ Expert.alpha ~width:(Printer.width printer)
+      @@ Primitives.contramap ~f:Acc.accumulator
+      @@ Primitives.alpha ~width:(Printer.width printer)
            ~initial:(`Val Integer.zero) pp
 
     let bytes = of_printer (Units.Bytes.generic (module Integer))
@@ -308,8 +310,8 @@ module Platform_dependent (Platform : Platform.S) = struct
       let total = Integer.to_string total in
       let width = String.length total in
       acc
-      @@ Expert.contramap ~f:Acc.accumulator
-      @@ Expert.alpha ~initial:(`Val Integer.zero) ~width (fun lb x ->
+      @@ Primitives.contramap ~f:Acc.accumulator
+      @@ Primitives.alpha ~initial:(`Val Integer.zero) ~width (fun lb x ->
              let x = Integer.to_string x in
              for _ = String.length x to width - 1 do
                Line_buffer.add_char lb ' '
@@ -383,31 +385,31 @@ module Platform_dependent (Platform : Platform.S) = struct
         ?(width = `Expand) ~total () =
       let proportion x = Integer.to_float x /. Integer.to_float total in
       Basic
-        (Segment.contramap ~f:proportion
+        (Primitives.contramap ~f:proportion
         @@
         match width with
         | `Fixed width ->
             if width < 3 then failwith "Not enough space for a progress bar";
-            Segment.alpha ~width ~initial:(`Val 0.) (fun buf x ->
+            Primitives.alpha ~width ~initial:(`Val 0.) (fun buf x ->
                 ignore
                   (bar ~style ~color ~color_empty (fun _ -> width) x buf : int))
         | `Expand ->
-            Segment.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf x ->
+            Primitives.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf x ->
                 bar ~style ~color ~color_empty width x ppf))
 
     let bar ?(style = `UTF8) ?color ?color_empty ?(width = `Expand) ~total () =
       let proportion x = Integer.to_float x /. Integer.to_float total in
       acc
-      @@ Segment.contramap ~f:(Acc.accumulator >> proportion)
+      @@ Primitives.contramap ~f:(Acc.accumulator >> proportion)
       @@
       match width with
       | `Fixed width ->
           if width < 3 then failwith "Not enough space for a progress bar";
-          Segment.alpha ~width ~initial:(`Val 0.) (fun buf x ->
+          Primitives.alpha ~width ~initial:(`Val 0.) (fun buf x ->
               ignore
                 (bar ~style ~color ~color_empty (fun _ -> width) x buf : int))
       | `Expand ->
-          Segment.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf x ->
+          Primitives.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf x ->
               bar ~style ~color ~color_empty width x ppf)
 
     let rate pp_val =
@@ -419,17 +421,17 @@ module Platform_dependent (Platform : Platform.S) = struct
       in
       let width = Printer.width pp_val + 2 in
       acc
-      @@ Expert.contramap
+      @@ Primitives.contramap
            ~f:
              (Acc.ring_buffer >> Ring_buffer.rate_per_second >> Integer.to_float)
-      @@ Expert.alpha ~width ~initial:(`Val 0.) pp_rate
+      @@ Primitives.alpha ~width ~initial:(`Val 0.) pp_rate
 
     let eta ~total =
       let printer = Staged.prj (Printer.to_line_printer Units.Duration.mm_ss) in
       let width = Printer.width Units.Duration.mm_ss + 4 in
       let initial = `Val Mtime.Span.max_span in
       acc
-      @@ Expert.contramap ~f:(fun acc ->
+      @@ Primitives.contramap ~f:(fun acc ->
              let per_second =
                Acc.ring_buffer acc |> Ring_buffer.rate_per_second
              in
@@ -442,7 +444,7 @@ module Platform_dependent (Platform : Platform.S) = struct
                  Mtime.Span.of_uint64_ns
                    (Int64.of_float
                       (todo /. Integer.to_float per_second *. 1_000_000_000.)))
-      @@ Expert.alpha ~width ~initial printer
+      @@ Primitives.alpha ~width ~initial printer
   end
 
   include Integer_dependent (Integer.Int)
@@ -465,9 +467,9 @@ module Platform_dependent (Platform : Platform.S) = struct
    *     Staged.prj (Printer.to_line_buffer Units.Duration.mm_ss_print)
    *   in
    *   let segment =
-   *     Expert.contramap ~f: (fun acc ->
+   *     Primitives.contramap ~f: (fun acc ->
    *         let time = Mtime.span (Acc.render_start acc) (Clock.now ()) in
-   *         Expert.theta ~width:5 (fun buf -> print_time buf time))
+   *         Primitives.theta ~width:5 (fun buf -> print_time buf time))
    *   in
    *   { segment; } *)
 
@@ -476,10 +478,10 @@ module Platform_dependent (Platform : Platform.S) = struct
       Staged.prj (Printer.to_line_printer Units.Duration.mm_ss)
     in
     let segment =
-      Expert.stateful (fun () ->
+      Primitives.stateful (fun () ->
           let start_time = Clock.counter () in
           let pp buf = print_time buf (Clock.count start_time) in
-          Expert.theta ~width:5 pp)
+          Primitives.theta ~width:5 pp)
     in
     Basic segment
 end

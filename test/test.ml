@@ -147,7 +147,7 @@ let test_progress_bar_width () =
 
 module Boxes = struct
   let unsized =
-    Progress.Line.Expert.alpha_unsized ~initial:(`Val ()) (fun ~width:_ _ _ ->
+    Progress.Line.Primitives.alpha_unsized ~initial:(`Val ()) (fun ~width:_ _ _ ->
         0)
 
   let test_unsized_not_in_box () =
@@ -155,7 +155,7 @@ module Boxes = struct
       (Invalid_argument
          "Encountered an expanding element that is not contained in a box")
     @@ fun () ->
-    Progress.(with_reporter Line.Expert.(to_line unsized) Fun.id ())
+    Progress.(with_reporter Line.Primitives.(to_line unsized) Fun.id ())
 
   let test_two_unsized_in_box () =
     Alcotest.check_raises "Two unsized elements in a box"
@@ -165,7 +165,7 @@ module Boxes = struct
     @@ fun () ->
     Progress.(
       with_reporter
-        Line.Expert.(to_line @@ box_fixed 10 (array [| unsized; unsized |]))
+        Line.Primitives.(to_line @@ box_fixed 10 (array [| unsized; unsized |]))
         Fun.id ())
 end
 
