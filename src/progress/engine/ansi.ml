@@ -1,3 +1,10 @@
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+   Distributed under the MIT license. See terms at the end of this file.
+  ————————————————————————————————————————————————————————————————————————————*)
+
+include Ansi_intf
+
 let show_cursor = "\x1b[?25h"
 let hide_cursor = "\x1b[?25l"
 let erase_display_suffix = "\x1b[J"
@@ -7,9 +14,9 @@ let move_down ppf = function 0 -> () | n -> Format.fprintf ppf "\x1b[%dB" n
 
 module Color = struct
   type plain =
-    [ `Black | `Blue | `Cyan | `Green | `Magenta | `Red | `White | `Yellow ]
+    [ `black | `blue | `cyan | `green | `magenta | `red | `white | `yellow ]
 
-  type t = Ansi of [ plain | `Bright of plain ] | Rgb of int * int * int
+  type t = Ansi of [ plain | `bright of plain ] | Rgb of int * int * int
 
   let of_ansi x = Ansi x
   let of_rgb r g b = Rgb (r, g, b)
@@ -59,38 +66,38 @@ module Style = struct
     | Italic -> "\x1b[3m"
     | Underline -> "\x1b[4m"
     | Reverse -> "\x1b[7m"
-    | Fg (Ansi `Black) -> "\x1b[30m"
-    | Fg (Ansi `Red) -> "\x1b[31m"
-    | Fg (Ansi `Green) -> "\x1b[32m"
-    | Fg (Ansi `Yellow) -> "\x1b[33m"
-    | Fg (Ansi `Blue) -> "\x1b[34m"
-    | Fg (Ansi `Magenta) -> "\x1b[35m"
-    | Fg (Ansi `Cyan) -> "\x1b[36m"
-    | Fg (Ansi `White) -> "\x1b[37m"
-    | Bg (Ansi `Black) -> "\x1b[40m"
-    | Bg (Ansi `Red) -> "\x1b[41m"
-    | Bg (Ansi `Green) -> "\x1b[42m"
-    | Bg (Ansi `Yellow) -> "\x1b[43m"
-    | Bg (Ansi `Blue) -> "\x1b[44m"
-    | Bg (Ansi `Magenta) -> "\x1b[45m"
-    | Bg (Ansi `Cyan) -> "\x1b[46m"
-    | Bg (Ansi `White) -> "\x1b[47m"
-    | Fg (Ansi (`Bright `Black)) -> "\x1b[90m"
-    | Fg (Ansi (`Bright `Red)) -> "\x1b[91m"
-    | Fg (Ansi (`Bright `Green)) -> "\x1b[92m"
-    | Fg (Ansi (`Bright `Yellow)) -> "\x1b[93m"
-    | Fg (Ansi (`Bright `Blue)) -> "\x1b[94m"
-    | Fg (Ansi (`Bright `Magenta)) -> "\x1b[95m"
-    | Fg (Ansi (`Bright `Cyan)) -> "\x1b[96m"
-    | Fg (Ansi (`Bright `White)) -> "\x1b[97m"
-    | Bg (Ansi (`Bright `Black)) -> "\x1b[100m"
-    | Bg (Ansi (`Bright `Red)) -> "\x1b[101m"
-    | Bg (Ansi (`Bright `Green)) -> "\x1b[102m"
-    | Bg (Ansi (`Bright `Yellow)) -> "\x1b[103m"
-    | Bg (Ansi (`Bright `Blue)) -> "\x1b[104m"
-    | Bg (Ansi (`Bright `Magenta)) -> "\x1b[105m"
-    | Bg (Ansi (`Bright `Cyan)) -> "\x1b[106m"
-    | Bg (Ansi (`Bright `White)) -> "\x1b[107m"
+    | Fg (Ansi `black) -> "\x1b[30m"
+    | Fg (Ansi `red) -> "\x1b[31m"
+    | Fg (Ansi `green) -> "\x1b[32m"
+    | Fg (Ansi `yellow) -> "\x1b[33m"
+    | Fg (Ansi `blue) -> "\x1b[34m"
+    | Fg (Ansi `magenta) -> "\x1b[35m"
+    | Fg (Ansi `cyan) -> "\x1b[36m"
+    | Fg (Ansi `white) -> "\x1b[37m"
+    | Bg (Ansi `black) -> "\x1b[40m"
+    | Bg (Ansi `red) -> "\x1b[41m"
+    | Bg (Ansi `green) -> "\x1b[42m"
+    | Bg (Ansi `yellow) -> "\x1b[43m"
+    | Bg (Ansi `blue) -> "\x1b[44m"
+    | Bg (Ansi `magenta) -> "\x1b[45m"
+    | Bg (Ansi `cyan) -> "\x1b[46m"
+    | Bg (Ansi `white) -> "\x1b[47m"
+    | Fg (Ansi (`bright `black)) -> "\x1b[90m"
+    | Fg (Ansi (`bright `red)) -> "\x1b[91m"
+    | Fg (Ansi (`bright `green)) -> "\x1b[92m"
+    | Fg (Ansi (`bright `yellow)) -> "\x1b[93m"
+    | Fg (Ansi (`bright `blue)) -> "\x1b[94m"
+    | Fg (Ansi (`bright `magenta)) -> "\x1b[95m"
+    | Fg (Ansi (`bright `cyan)) -> "\x1b[96m"
+    | Fg (Ansi (`bright `white)) -> "\x1b[97m"
+    | Bg (Ansi (`bright `black)) -> "\x1b[100m"
+    | Bg (Ansi (`bright `red)) -> "\x1b[101m"
+    | Bg (Ansi (`bright `green)) -> "\x1b[102m"
+    | Bg (Ansi (`bright `yellow)) -> "\x1b[103m"
+    | Bg (Ansi (`bright `blue)) -> "\x1b[104m"
+    | Bg (Ansi (`bright `magenta)) -> "\x1b[105m"
+    | Bg (Ansi (`bright `cyan)) -> "\x1b[106m"
+    | Bg (Ansi (`bright `white)) -> "\x1b[107m"
     | Fg (Rgb (r, g, b)) -> Printf.sprintf "\x1b[38;2;%d;%d;%dm" r g b
     | Bg (Rgb (r, g, b)) -> Printf.sprintf "\x1b[48;2;%d;%d;%dm" r g b
 end

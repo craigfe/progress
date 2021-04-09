@@ -7,7 +7,7 @@ val reporter :
   -> ?dst:Format.formatter
   -> unit
   -> Logs.reporter
-(** [reporter] is like {!Logs_fmt.reporter} but produces a reporter that
+(** [reporter] is like [Logs_fmt.reporter] but produces a reporter that
     {{!Progress.interject_with} suspends} any ongoing progress bar rendering
     while displaying log entries, ensuring that log entries in the terminal are
     never overwritten by the renderer. *)

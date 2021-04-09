@@ -6,18 +6,22 @@
 open! Import
 
 type -'a t
+(** The type of fixed-width pretty-printers for values of type ['a]. These
+    printers provide efficient (and correct) printers for
+
+    See {!Units} for commonly *)
 
 val create : to_string:('a -> string) -> string_len:int -> pp:'a pp -> 'a t
 
-(** Pre-provided printers *)
+(** {2 Constructing printers} *)
 
 val int : width:int -> int t
 val string : width:int -> string t
+val of_to_string : len:int -> ('a -> string) -> 'a t
 
-(** Constructing printers *)
+(** {2 Composing printers} *)
 
 val using : f:('b -> 'a) -> 'a t -> 'b t
-val of_to_string : len:int -> ('a -> string) -> 'a t
 
 (** Consuming printers *)
 

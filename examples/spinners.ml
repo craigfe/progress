@@ -54,7 +54,7 @@ let unlimited_bar min_interval =
     List.init width (fun i ->
         String.concat ""
           (List.init width (fun x ->
-               if x = i then apply_color (Ansi.fg @@ Color.of_ansi `Cyan) ">"
+               if x = i then apply_color (Ansi.fg @@ Color.of_ansi `cyan) ">"
                else apply_color Ansi.faint "-")))
   in
   let spin = Line.spinner ~min_interval ~frames () in

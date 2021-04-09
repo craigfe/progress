@@ -103,6 +103,8 @@ module type S = sig
 
       @raise Failure if there is already an active progress bar display. *)
 
+  val add_line : display -> 'a line -> 'a reporter
+
   val finalize : display -> unit
   (** Terminate the given progress bar display.
 

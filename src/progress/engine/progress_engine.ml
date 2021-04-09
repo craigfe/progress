@@ -49,8 +49,26 @@ module Make (Platform : Platform.S) = struct
   let interject_with = Renderer.interject_with
   let with_reporters = Renderer.with_reporters
   let with_reporter ?config b f = with_reporters ?config (Multi.v b) f
+  let add_line = Renderer.add_line
 
   module Reporters = Renderer.Reporters
 end
 
 module Integer = Integer
+
+(*————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+
+   Permission to use, copy, modify, and/or distribute this software for
+   any purpose with or without fee is hereby granted, provided that the
+   above copyright notice and this permission notice appear in all
+   copies.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+   THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE SOFTWARE.
+  ————————————————————————————————————————————————————————————————————————————*)

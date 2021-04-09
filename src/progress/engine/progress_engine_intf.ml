@@ -4,32 +4,30 @@
   ————————————————————————————————————————————————————————————————————————————*)
 
 module type S = sig
-  (** {2 Preliminary types and utilities} *)
+  (* We go to some effort here to avoid having types directly refer to those in
+     [Progress_engine] rather than going via the aliases. *)
 
-  module Color : sig
-    include module type of Ansi.Color
-    (** @inline *)
-  end
+  (** For example:
+
+      {[
+
+
+
+      ]}
+     See the [examples] directory for more complicated examples.
+
+
+      First, we need some basic types: *)
+
+  module Color = Ansi.Color
 
   module Ansi : sig
-    include module type of Ansi.Style
+    include Ansi.Style with type color := Color.t
   end
 
-  module Duration : sig
-    include module type of Duration with type t = Duration.t
-    (** @inline *)
-  end
-
-  module Printer : sig
-    include module type of Printer with type -'a t = 'a Printer.t
-    (** @inline *)
-  end
-
-  (** Helpers for printing values of various units. *)
-  module Units : sig
-    include module type of Units
-    (** @inline *)
-  end
+  module Duration = Duration
+  module Printer = Printer
+  module Units = Units
 
   (** {1 Description} *)
 

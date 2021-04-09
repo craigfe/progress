@@ -1,7 +1,6 @@
 (** A library for displaying progress bars, including support for rendering
     multiple bars at once. Start by {{!description} describing} of a sequence of
-    progress bars, then begin {{!rendering} rendering} them to get access to
-    their respective reporting functions.
+    progress bars, then begin {{!rendering} rendering} them.
 
     - See {!Progress_logs} for related extensions to the
       {{:https://erratique.ch/software/logs} Logs} library.

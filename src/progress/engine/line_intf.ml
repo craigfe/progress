@@ -64,21 +64,13 @@ module type S = sig
   (** {1 Basic line segments} *)
 
   val const : string -> _ t
-  (** [const s] is the segment that always displays [s]. [s] must not contain
-      any newline characters. *)
+  (** [const s] is the segment that always displays [s]. *)
 
   val constf : ('a, Format.formatter, unit, _ t) format4 -> 'a
-  (** Like {!const}, but takes a format string and placeholder values rather
-      than a string. i.e. [constf fmt a b c ...] is equivalent to
+  (** [constf fmt a b c ...] is equivalent to
       [const (Format.asprintf fmt a b c ...)]. *)
 
   val string : string t
-
-  val elapsed : unit -> _ t
-  (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
-
-  val lpad : int -> 'a t -> 'a t
-  val rpad : int -> 'a t -> 'a t
 
   val spinner :
        ?color:color
@@ -90,6 +82,9 @@ module type S = sig
   val basic : init:'a -> 'a printer -> 'a t
   (** TODO: Rename to [of_printer] and keep a distinction between accumulated
       printers. *)
+
+  val elapsed : unit -> _ t
+  (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
 
   (** {1 Integer line segments} *)
 
@@ -129,15 +124,26 @@ module type S = sig
   (** Horizontally join a pair of segments consuming different reported values
       into a single segment that consumes a pair. *)
 
+  val lpad : int -> 'a t -> 'a t
+  (** [lpad n t] left-pads the segment [t] to size [n] by adding blank space at
+      the start. *)
+
+  val rpad : int -> 'a t -> 'a t
+  (** [rpad n t] right-pads the segment [t] to size [n] by adding blank space at
+      the end. *)
+
   val using : ('a -> 'b) -> 'b t -> 'a t
   (** [using f s] is a segment that first applies [f] to the reported value and
       then behaves as segment [s]. *)
 
   val noop : unit -> _ t
-  (** A line segment that does nothing. *)
+  (** A zero-width line segment that does nothing. *)
 
   (** {1 Primitive line segment DSL} *)
+
   module Primitives : sig
+    (** Provides the primitive ... *)
+
     type 'a line
 
     module Line_buffer = Line_buffer

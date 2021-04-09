@@ -3,8 +3,6 @@ module Duration : sig
   (** Renders a time span in fixed-width [MM:SS] form. *)
 end
 
-(** {2 Assorted pretty-printing utilities} *)
-
 (** Prints a proportion as a percentage. e.g.
 
     {[

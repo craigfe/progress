@@ -3,6 +3,6 @@
  (public_name progress.engine)
  (libraries
   (re_export mtime)
-   alcotest
+  alcotest
   fmt
   uutf))
