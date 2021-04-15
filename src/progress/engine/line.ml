@@ -93,7 +93,7 @@ type 'a t =
       ; elt : (module Integer.S with type t = 'a)
       }
 
-module Platform_dependent (Platform : Platform.S) = struct
+module Make (Platform : Platform.S) = struct
   module Clock = Platform.Clock
 
   module Primitives = struct
@@ -112,7 +112,7 @@ module Platform_dependent (Platform : Platform.S) = struct
     let to_line t = Primitive t
   end
 
-  let compile : type a. a t -> Config.t -> a Primitives.t =
+  let to_primitive : type a. Config.t -> a t -> a Primitives.t =
     let rec inner : type a. a t -> (unit -> bool) -> a Primitives.t = function
       | Noop -> fun _ -> Primitives.noop ()
       | Primitive x -> fun _ -> x
@@ -128,10 +128,10 @@ module Platform_dependent (Platform : Platform.S) = struct
           fun y -> Primitives.contramap ~f (x y)
       | Map (f, x) -> fun a -> f (inner x a)
       | List xs ->
-          let xs = List.map inner xs in
+          let xs = List.map xs ~f:inner in
           fun should_update ->
             Primitives.array
-              (List.map (fun f -> f should_update) xs |> Array.of_list)
+              (List.map xs ~f:(fun f -> f should_update) |> Array.of_list)
       | Basic segment ->
           fun should_update ->
             Primitives.conditional (fun _ -> should_update ()) @@ segment
@@ -140,8 +140,7 @@ module Platform_dependent (Platform : Platform.S) = struct
             Acc.wrap ~elt:(module Integer) ~clock:Clock.now ~should_update
             @@ segment
     in
-    fun t (config : Config.t) ->
-      match t with
+    fun (config : Config.t) -> function
       | Primitive x -> x
       | t ->
           let inner = inner t in
@@ -208,6 +207,26 @@ module Platform_dependent (Platform : Platform.S) = struct
 
   let lpad sz t = Map (Primitives.box_fixed ~pad:`left sz, t)
   let rpad sz t = Map (Primitives.box_fixed ~pad:`right sz, t)
+
+  let counter () =
+    let segment =
+      Primitives.stateful (fun () ->
+          let count = ref (-1) (* TODO: use Int63 *) in
+          let pp ~width buf () =
+            incr count;
+            let width = width () in
+            let str = string_of_int !count in
+            let len = String.length str in
+            for _ = len + 1 to width do
+              (* TODO: deal with overflow *)
+              Line_buffer.add_char buf ' '
+            done;
+            Line_buffer.add_string buf str;
+            width
+          in
+          Primitives.alpha_unsized ~initial:(`Val ()) pp)
+    in
+    Basic segment
 
   (* Spinners *)
 
@@ -439,7 +458,7 @@ module Platform_dependent (Platform : Platform.S) = struct
              if Integer.(equal zero) per_second then Mtime.Span.max_span
              else
                let todo = Integer.(to_float (sub total acc)) in
-               if todo <= 0. then Mtime.Span.zero
+               if Float.(todo <= 0.) then Mtime.Span.zero
                else
                  Mtime.Span.of_uint64_ns
                    (Int64.of_float

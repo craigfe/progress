@@ -34,7 +34,7 @@ let resize t more =
     !res
   in
   let new_buffer = Bytes.create new_len in
-  Bytes.blit t.buffer 0 new_buffer 0 t.position;
+  Bytes.blit ~src:t.buffer ~src_pos:0 ~dst:new_buffer ~dst_pos:0 ~len:t.position;
   t.buffer <- new_buffer;
   t.length <- new_len
 
@@ -74,7 +74,8 @@ let add_line_buffer ~dst ~src =
   let position = dst.position in
   let len = src.position in
   advance dst len;
-  Bytes.unsafe_blit src.buffer 0 dst.buffer position len
+  Bytes.unsafe_blit ~src:src.buffer ~src_pos:0 ~dst:dst.buffer ~dst_pos:position
+    ~len
 
 let create ~size =
   let buffer = Bytes.create size in
@@ -106,7 +107,7 @@ let contents t =
   let current_len = t.position in
   (* NOTE: Without an efficient substring equality function, we have no choice
            but to copy here even if the buffer is clean... *)
-  let current = Bytes.sub_string t.buffer 0 current_len in
+  let current = Bytes.sub_string t.buffer ~pos:0 ~len:current_len in
   reset t;
 
   match Int.equal last_len current_len && String.equal last current with

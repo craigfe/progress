@@ -409,7 +409,7 @@ let report compiled =
             Line_buffer.skip buf t.latest_span;
             Sta_dyn.get t.width)
     | Group g ->
-        let reporters = Array.map (aux >> Staged.prj) g in
+        let reporters = Array.map g ~f:(aux >> Staged.prj) in
         Staged.inj (fun buf v ->
             ArrayLabels.fold_left reporters ~f:(fun a f -> a + f buf v) ~init:0)
     | Pair { left; sep; right } ->
@@ -467,9 +467,9 @@ let update top =
               Sta_dyn.get t.width)
     | Contramap (inner, _) -> aux inner
     | Group g ->
-        let updaters = Array.map (aux >> Staged.prj) g in
+        let updaters = Array.map g ~f:(aux >> Staged.prj) in
         Staged.inj (fun uncond ppf ->
-            Array.fold_left (fun a f -> a + f uncond ppf) 0 updaters)
+            Array.fold_left updaters ~init:0 ~f:(fun a f -> a + f uncond ppf))
     | Pair { left; sep; right } ->
         let$ left = aux left and$ sep = aux sep and$ right = aux right in
         fun uncond ppf ->

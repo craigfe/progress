@@ -1,42 +1,71 @@
 open Progress
 
+let colors =
+  (* import matplotlib.cm
+     for i in matplotlib.cm.rainbow(numpy.linspace(0.2, 1, 20)):
+       print(matplotlib.colors.rgb2hex(i))
+  *)
+  Array.map Color.of_hex
+    [| "#1996f3"; "#06aeed"; "#10c6e6"; "#27dade"; "#3dead5"
+     ; "#52f5cb"; "#66fcc2"; "#7dffb6"; "#92fda9"; "#a8f79c"
+     ; "#bced8f"; "#d2de81"; "#e8cb72"; "#feb562"; "#ff9b52"
+     ; "#ff8143"; "#ff6232"; "#ff4121"; "#ff1f10"; "#ff0000"
+    |]
+  [@@ocamlformat "disable"]
+
+let x = ref 0
+
 let bar ~total =
   let open Line in
-  let rate = rate Units.Bytes.of_float in
   let eta = eta ~total in
+  incr x;
   list ~sep:(const " ")
     [ spinner ~color:(Color.of_ansi `green) ()
     ; const "[" ++ elapsed () ++ const "]"
-    ; bar ~color:(Color.of_ansi `cyan) ~style:`ASCII ~total ()
+    ; bar ~color:colors.(!x - 1) ~style:`ASCII ~total ()
     ; bytes ++ constf " / %s" (Printer.to_to_string Units.Bytes.of_int total)
-    ; const "(" ++ rate ++ const ", eta: " ++ eta ++ const ")"
+    ; const "(" ++ const "eta: " ++ eta ++ const ")"
     ]
 
-type worker = { mutable todo : int; mutable reporter : int -> unit }
+type worker = { mutable todo : int; mutable reporter : int Reporter.t }
 type t = { mutable active_workers : worker list; mutable files : int list }
 
 let run () =
-  let _, display = start (Multi.v (Line.noop ())) in
+  let total_files = 20 in
+  let files = List.init total_files (fun _ -> Random.int 10_000_000) in
+
+  let bottom_line =
+    Line.(
+      lpad 8 (counter ())
+      ++ constf " / %d files downloaded, elapsed: " total_files
+      ++ elapsed ())
+  in
+  let display = Display.start Multi.(blank ++ blank ++ v bottom_line) in
+  let Reporters.[ completed ] =
+    (Display.reporters display : (_, unit) Reporters.t)
+  in
   let nb_workers = 5 in
   let active_workers =
-    List.init nb_workers (fun _ -> { todo = 0; reporter = ignore })
+    List.init nb_workers (fun _ -> { todo = 0; reporter = Reporter.noop })
   in
-  let files = List.init 50 (fun _ -> Random.int 10_000_000) in
 
   let t = { active_workers; files } in
 
   while List.length t.active_workers > 0 do
     t.active_workers <-
       ListLabels.filter t.active_workers ~f:(fun worker ->
-          let progress = Random.int 10_000 in
-          (* Printf.printf "%d - %d\n%!" worker.todo progress; *)
-          worker.todo <- max 0 (worker.todo - progress);
-          worker.reporter progress;
+          let progress = min worker.todo (2_000 + Random.int 8_000) in
+          worker.todo <- worker.todo - progress;
+          Reporter.push worker.reporter progress;
           match (worker.todo = 0, t.files) with
           | false, _ -> true (* Not done yet; keep going. *)
           | true, x :: xs ->
               (* Done. Take a new work item. *)
-              let new_reporter = add_line display (bar ~total:x) in
+              Display.finalize_line display worker.reporter;
+              completed ();
+              let new_reporter =
+                Display.add_line ~above:2 display (bar ~total:x)
+              in
               worker.reporter <- new_reporter;
               worker.todo <- x;
               t.files <- xs;

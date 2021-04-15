@@ -21,6 +21,7 @@ let usage () =
     (Filename.chop_extension __FILE__)
 
 let () =
+  Random.self_init ();
   Fmt.set_style_renderer Fmt.stderr `Ansi_tty;
   match Sys.argv with
   | [| _ |] | [| _; "-h" | "-help" | "--help" |] -> usage ()

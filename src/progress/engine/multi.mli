@@ -3,44 +3,8 @@
    Distributed under the MIT license. See terms at the end of this file.
   ————————————————————————————————————————————————————————————————————————————*)
 
-include Progress_engine_intf
-
-module Make (Platform : Platform.S) = struct
-  module Color = Ansi.Color
-  module Ansi = Ansi.Style
-  module Duration = Duration
-  module Multi = Multi
-  module Printer = Printer
-  module Units = Units
-
-  module Config = struct
-    include Config
-
-    type t = user_supplied
-  end
-
-  module Renderer = struct
-    include Renderer.Make (Platform)
-    include Renderer
-  end
-
-  module Line = struct
-    include Line.Make (Platform)
-    include Line
-  end
-
-  type 'a reporter = 'a -> unit
-
-  module Display = Renderer.Display
-  module Reporter = Renderer.Reporter
-  module Reporters = Renderer.Reporters
-
-  let interject_with = Renderer.interject_with
-  let with_reporters = Renderer.with_reporters
-  let with_reporter ?config b f = with_reporters ?config (Multi.v b) f
-end
-
-module Integer = Integer
+include Multi_intf.Multi
+(** @inline *)
 
 (*————————————————————————————————————————————————————————————————————————————
    Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>

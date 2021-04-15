@@ -67,7 +67,8 @@ let run () =
 
         (* Advance the spinners while we wait *)
         for _ = 1 to 10 do
-          Progress.tick ();
+          (* Progress.tick (); *)
+          (* TODO: reinstate w/ better with_bars that gives display *)
           Unix.sleepf 0.05
         done
       done);

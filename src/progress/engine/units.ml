@@ -29,21 +29,21 @@ module Bytes = struct
     let process_components x k =
       let mantissa, unit, rpad =
         match[@ocamlformat "disable"] Integer.to_float x with
-        | n when n < 1024.       -> (n                 , "B"  , "  ")
-        | n when n < 1024. ** 2. -> (n /. 1024.        , "KiB", "")
-        | n when n < 1024. ** 3. -> (n /. (1024. ** 2.), "MiB", "")
-        | n when n < 1024. ** 4. -> (n /. (1024. ** 3.), "GiB", "")
-        | n when n < 1024. ** 5. -> (n /. (1024. ** 4.), "TiB", "")
-        | n when n < 1024. ** 6. -> (n /. (1024. ** 5.), "PiB", "")
-        | n                      -> (n /. (1024. ** 6.), "EiB", "")
+        | n when Float.(n < 1024.      ) -> (n                 , "B", "  ")
+        | n when Float.(n < 1024. ** 2.) -> (n /. 1024.        , "KiB", "")
+        | n when Float.(n < 1024. ** 3.) -> (n /. (1024. ** 2.), "MiB", "")
+        | n when Float.(n < 1024. ** 4.) -> (n /. (1024. ** 3.), "GiB", "")
+        | n when Float.(n < 1024. ** 5.) -> (n /. (1024. ** 4.), "TiB", "")
+        | n when Float.(n < 1024. ** 6.) -> (n /. (1024. ** 5.), "PiB", "")
+        | n                              -> (n /. (1024. ** 6.), "EiB", "")
       in
       (* Round down to the nearest 0.1 *)
       let mantissa = Float.trunc (mantissa *. 10.) /. 10. in
       let lpad =
         match mantissa with
-        | n when n < 10. -> "   "
-        | n when n < 100. -> "  "
-        | n when n < 1000. -> " "
+        | n when Float.(n < 10.) -> "   "
+        | n when Float.(n < 100.) -> "  "
+        | n when Float.(n < 1000.) -> " "
         | _ -> ""
       in
       k ~mantissa ~unit ~rpad ~lpad

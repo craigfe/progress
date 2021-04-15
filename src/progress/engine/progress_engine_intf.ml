@@ -47,38 +47,8 @@ module type S = sig
 
   (** [Multi] extends [Line] to multi-line layouts. *)
   module Multi : sig
-    type ('a, 'b) t
-    (** The type of sequences of progress bars. The parameter ['a] stores a list
-        of the reporting functions associated with each bar, terminating with
-        ['b]. For example:
-
-        {[
-          (* Single progress bar, taking a [float] value. *)
-          (float reporter -> 'b, 'b) t
-
-          (* A two-bar layout, where the top bar takes [int64]s and the bottom one
-             takes [string * float] pairs. *)
-          (int64 reporter -> (string * float) reporter -> 'b, 'b) t
-        ]}
-
-        These reporting functions are supplied when beginning the {{!rendering}
-        rendering} process. *)
-
-    val v : 'a Line.t -> ('a reporter -> 'b, 'b) t
-    (** Define a new progress bar from a specification, with the given initial
-        value. *)
-
-    val v_list : 'a Line.t list -> ('a reporter list -> 'b, 'b) t
-
-    val ( / ) : ('a, 'b) t -> ('b, 'c) t -> ('a, 'c) t
-    (** Stack progress bars vertically. [a / b] is a set with [a] stacked on top
-        of [b]. The two bars have separate reporting functions, passed
-        consecutively to the {!with_reporters} continuation when rendering. *)
-  end
-
-  (** A list of reporters of differing types. *)
-  module Reporters : sig
-    type 'a t = [] : unit t | ( :: ) : 'a * 'b t -> ('a -> 'b) t
+    include Multi.S with type 'a reporter := 'a reporter
+    (** @inline *)
   end
 
   (** {1 Rendering} *)

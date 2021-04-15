@@ -7,39 +7,6 @@ open! Import
 
 type 'a reporter = 'a -> unit
 
-module Hlist = struct
-  (* ['a] and ['b] correspond to parameters of [Bar_list.t]. *)
-  type (_, _) t =
-    | [] : ('a, 'a) t
-    | ( :: ) : 'a * ('b, 'c) t -> ('a -> 'b, 'c) t
-
-  let rec apply_all : type a b. a -> (a, b) t -> b =
-   fun f -> function [] -> f | x :: xs -> apply_all (f x) xs
-
-  let rec append : type a b c. (a, b) t -> (b, c) t -> (a, c) t =
-   fun xs ys -> match xs with [] -> ys | x :: xs -> x :: append xs ys
-end
-
-module Reporters = struct
-  type _ t = [] : unit t | ( :: ) : 'a * 'b t -> ('a -> 'b) t
-
-  let rec of_hlist : type a. (a, unit) Hlist.t -> a t = function
-    | [] -> []
-    | x :: xs -> x :: of_hlist xs
-end
-
-module Segment_list = struct
-  type 'a elt = Config.t -> 'a Line_primitives.t
-
-  type (_, _) t =
-    | One : 'a elt -> ('a reporter -> 'b, 'b) t
-    | Many : 'a elt list -> ('a reporter list -> 'b, 'b) t
-    | Plus : ('a, 'b) t * ('b, 'c) t -> ('a, 'c) t
-
-  let append : type a b c. (a, b) t -> (b, c) t -> (a, c) t =
-   fun x y -> Plus (x, y)
-end
-
 module type S = sig
   type 'a reporter
   type 'a line
@@ -89,56 +56,67 @@ module type S = sig
       appropriate position to resume rendering. In practice, this means that any
       printing to the terminal should be terminated with a newline character. *)
 
-  val tick : unit -> unit
+  module Reporter : sig
+    type 'a t
 
-  type display
+    val push : 'a t -> 'a -> unit
+    val noop : 'a t
+  end
+
+  module Reporters : sig
+    type (_, _) t =
+      | [] : ('a, 'a) t
+      | ( :: ) : 'a * ('b, 'c) t -> ('a -> 'b, 'c) t
+  end
+
   (** Functions for explicitly starting and stopping the process of rendering a
       bar; useful when the code doing the progress reporting cannot be
       conveniently delimited inside {!with_display}. All {!display}s must be
       properly {!finalize}d, and it is not possible to interleave rendering of
       displays. *)
+  module Display : sig
+    type ('a, 'b) t
 
-  val start : ?config:config -> ('a, unit) multi -> 'a Reporters.t * display
-  (** Initiate rendering of a progress bar display.
+    val start : ?config:config -> ('a, 'b) multi -> ('a, 'b) t
+    (** Initiate rendering of a progress bar display.
 
-      @raise Failure if there is already an active progress bar display. *)
+        @raise Failure if there is already an active progress bar display. *)
 
-  val add_line : display -> 'a line -> 'a reporter
+    val tick : _ t -> unit
+    val reporters : ('a, 'b) t -> ('a, 'b) Reporters.t
+    val add_line : ?above:int -> (_, _) t -> 'a line -> 'a Reporter.t
+    val finalize_line : (_, _) t -> _ Reporter.t -> unit
 
-  val finalize : display -> unit
-  (** Terminate the given progress bar display.
+    val finalize : (_, _) t -> unit
+    (** Terminate the given progress bar display.
 
-      @raise Failure if the display has already been finalized. *)
+        @raise Failure if the display has already been finalized. *)
+  end
 end
 
 module type Renderer = sig
   module type S = S
 
-  module Hlist = Hlist
-  module Reporters = Reporters
-  module Segment_list = Segment_list
-
   module Make (_ : Platform.S) :
     S
       with type 'a reporter := 'a reporter
        and type 'a line := 'a Line.t
-       and type ('a, 'b) multi := ('a, 'b) Segment_list.t
+       and type ('a, 'b) multi := ('a, 'b) Multi.t
        and type config := Config.user_supplied
 end
 
 (*————————————————————————————————————————————————————————————————————————————
    Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
 
-   Permission to use, copy, modify, and/or distribute this software for
-   any purpose with or without fee is hereby granted, provided that the
-   above copyright notice and this permission notice appear in all
-   copies.
+   Permission to use, copy, modify, and/or distribute this software for any
+   purpose with or without fee is hereby granted, provided that the above
+   copyright notice and this permission notice appear in all copies.
 
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-   IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-   CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-   TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-   SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-  ————————————————————————————————————————————————————————————————————————*)
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+   THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE SOFTWARE.
+  ————————————————————————————————————————————————————————————————————————————*)

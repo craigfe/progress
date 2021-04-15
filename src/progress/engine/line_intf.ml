@@ -86,6 +86,8 @@ module type S = sig
   val elapsed : unit -> _ t
   (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
 
+  val counter : unit -> unit t
+
   (** {1 Integer line segments} *)
 
   (** @inline *)
@@ -168,14 +170,14 @@ module type Line = sig
 
   type 'a t
 
-  module Platform_dependent (_ : Platform.S) : sig
+  module Make (_ : Platform.S) : sig
     include
       S
         with type 'a t := 'a t
          and type color := Ansi.Color.t
          and type 'a printer := 'a Printer.t
 
-    val compile : 'a t -> Config.t -> 'a Primitives.t
+    val to_primitive : Config.t -> 'a t -> 'a Primitives.t
   end
 end
 

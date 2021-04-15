@@ -11,6 +11,57 @@ let trace fmt x =
   Fmt.epr fmt x;
   x
 
+module type Eq = sig
+  type t
+
+  val equal : t -> t -> bool
+end
+
+module type Comparable_infix = sig
+  type t
+
+  val ( = ) : t -> t -> bool
+  val ( <= ) : t -> t -> bool
+  val ( >= ) : t -> t -> bool
+  val ( < ) : t -> t -> bool
+  val ( > ) : t -> t -> bool
+end
+
+module Poly = struct
+  let ( = ) = Stdlib.( = )
+  let ( <= ) = Stdlib.( <= )
+  let ( >= ) = Stdlib.( >= )
+  let ( < ) = Stdlib.( < )
+  let ( > ) = Stdlib.( > )
+end
+
+include Stdlib.StdLabels
+include Stdlib.MoreLabels
+
+(** Shadow polymorphic operators in the Stdlib. *)
+include struct
+  let min : int -> int -> int = min
+  let max : int -> int -> int = max
+  let compare : int -> int -> int = compare
+
+  include (Poly : Comparable_infix with type t := int)
+end
+
+module Int = struct
+  include Int
+  include (Poly : Comparable_infix with type t := int)
+end
+
+module Int32 = struct
+  include Int
+  include (Poly : Comparable_infix with type t := int32)
+end
+
+module Float = struct
+  include Float
+  include (Poly : Comparable_infix with type t := float)
+end
+
 module String = struct
   include String
 
@@ -61,6 +112,26 @@ end = struct
     let ( let$ ) x f = f x
     let ( and$ ) a b = (a, b)
   end
+end
+
+module Unique_id () : sig
+  type t
+
+  val create : unit -> t
+  val equal : t -> t -> bool
+  val pp : t pp
+end = struct
+  let allocated = ref 0
+
+  type t = int
+
+  let create () =
+    let v = !allocated in
+    incr allocated;
+    v
+
+  let equal = Int.equal
+  let pp = Fmt.int
 end
 
 module Sta_dyn : sig
