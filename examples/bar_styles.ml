@@ -12,7 +12,7 @@ let bars =
          let open Progress.Line in
          lpad 13 (constf "%s  " name)
          ++ bar ~style ~color:(Progress.Color.of_hex color) ~total:1000 ())
-  |> Progress.Multi.v_list
+  |> Progress.Multi.lines
 
 let pick_random_function l =
   Random.self_init ();

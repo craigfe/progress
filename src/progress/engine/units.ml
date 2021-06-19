@@ -68,9 +68,11 @@ module Duration = struct
   let mm_ss =
     let to_string span =
       let seconds = Mtime.Span.to_s span in
-      Printf.sprintf "%02.0f:%02.0f"
-        (Float.div seconds 60. |> Float.floor)
-        (Float.rem seconds 60. |> Float.floor)
+      if Float.compare seconds 0. < 0 then "--:--"
+      else
+        Printf.sprintf "%02.0f:%02.0f"
+          (Float.div seconds 60. |> Float.floor)
+          (Float.rem seconds 60. |> Float.floor)
     in
     Printer.of_to_string ~len:5 to_string
 end

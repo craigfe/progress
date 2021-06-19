@@ -3,6 +3,7 @@
  (public_name progress.engine)
  (libraries
   (re_export mtime)
-  alcotest
+  (re_export optint)
   fmt
-  uutf))
+  uutf
+  vector))

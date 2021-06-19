@@ -10,6 +10,7 @@ type nonrec t = t
 let equal = Mtime.Span.equal
 let compare = Mtime.Span.compare
 let compare_zero (f : int -> int -> _) a b = f (compare a b) 0 [@@inlined]
+let ( + ) = Mtime.Span.add
 let ( < ) = compare_zero ( < )
 let ( <= ) = compare_zero ( <= )
 let ( = ) = compare_zero ( = )
@@ -36,6 +37,12 @@ let of_int_sec x = of_int64_sec (Int64.of_int x)
 let of_min =
   let f = 60. *. 1e9 in
   fun x -> v (Int64.of_float (x *. f))
+
+let of_int64_min =
+  let f = 60_000_000_000L in
+  fun x -> v Int64.(mul x f)
+
+let of_int_min x = of_int64_min (Int64.of_int x)
 
 let of_hour =
   let f = 60. *. 60. *. 1e9 in

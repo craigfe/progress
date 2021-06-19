@@ -22,17 +22,18 @@ open Staged.Syntax
     colour codes. *)
 
 type 'a pp = Format.formatter -> 'a -> unit
+type 'a event = [ `start | `report of 'a | `rerender of 'a | `finish of 'a ]
 
 type 'a t =
   | Noop
-  | Theta of { pp : Line_buffer.t -> unit; width : int }
+  | Theta of { pp : Line_buffer.t -> unit event -> unit; width : int }
   | Alpha of
-      { pp : Line_buffer.t -> 'a -> unit
+      { pp : Line_buffer.t -> 'a event -> unit
       ; initial : [ `Theta of Line_buffer.t -> unit | `Val of 'a ]
       ; width : int
       }
   | Alpha_unsized of
-      { pp : width:(unit -> int) -> Line_buffer.t -> 'a -> int
+      { pp : width:(unit -> int) -> Line_buffer.t -> 'a event -> int
       ; initial :
           [ `Theta of width:(unit -> int) -> Line_buffer.t -> int | `Val of 'a ]
       }
@@ -119,10 +120,10 @@ module Compiled = struct
   type 'a t =
     | Noop
     | Alpha of
-        { pp : Line_buffer.t -> 'a -> int
+        { pp : Line_buffer.t -> 'a event -> int
         ; mutable latest : Line_buffer.t -> int
         }
-    | Theta of { pp : Line_buffer.t -> int }
+    | Theta of { pp : Line_buffer.t -> unit event -> int }
     | Contramap : 'a t * ('b -> 'a) -> 'b t
     | Pad of
         { contents : 'a t
@@ -259,8 +260,8 @@ let compile top =
     | Noop -> return Compiled.Noop
     | Staged s -> inner (s ())
     | Theta { pp; width } ->
-        let pp ppf =
-          pp ppf;
+        let pp ppf event =
+          pp ppf event;
           width
         in
         let+ () = Compiler_state.consume_space (Static width) in
@@ -269,7 +270,9 @@ let compile top =
         let+ width = Compiler_state.expand in
         let pp ppf x = pp ~width ppf x in
         let latest buf =
-          match initial with `Val v -> pp buf v | `Theta f -> f ~width buf
+          match initial with
+          | `Val v -> pp buf (`rerender v)
+          | `Theta f -> f ~width buf
         in
         Compiled.Alpha { pp; latest }
     | Alpha { pp; width; initial } ->
@@ -280,7 +283,7 @@ let compile top =
         let+ () = Compiler_state.consume_space (Static width) in
         let latest buf =
           match initial with
-          | `Val v -> pp buf v
+          | `Val v -> pp buf (`rerender v)
           | `Theta f ->
               f buf;
               width
@@ -374,11 +377,11 @@ let report compiled =
   let rec aux : type a. a Compiled.t -> (Line_buffer.t -> a -> int) Staged.t =
     function
     | Noop -> Staged.inj (fun _ _ -> 0)
-    | Theta { pp } -> Staged.inj (fun buf (_ : a) -> pp buf)
+    | Theta { pp } -> Staged.inj (fun buf (_ : a) -> pp buf (`report ()))
     | Alpha pp ->
         Staged.inj (fun buf x ->
-            pp.latest <- (fun buf -> pp.pp buf x);
-            pp.pp buf x)
+            pp.latest <- (fun buf -> pp.pp buf (`rerender x));
+            pp.pp buf (`report x))
     | Contramap (t, f) ->
         let$ inner = aux t in
         fun buf a -> inner buf (f a)
@@ -427,19 +430,26 @@ let report compiled =
   aux compiled
 
 let update top =
-  let rec aux : type a. a Compiled.t -> (bool -> Line_buffer.t -> int) Staged.t
-      = function
-    | Noop -> Staged.inj (fun _ _ -> 0)
-    | Theta { pp } -> Staged.inj (fun _ -> pp)
-    | Alpha pp -> Staged.inj (fun _ buf -> pp.latest buf)
+  let rec aux :
+      type a.
+         a Compiled.t
+      -> (bool -> [ `rerender | `finish ] -> Line_buffer.t -> int) Staged.t =
+    function
+    | Noop -> Staged.inj (fun _ _ _ -> 0)
+    | Theta { pp } ->
+        Staged.inj (fun _ event buf ->
+            match event with
+            | `rerender -> pp buf (`rerender ())
+            | `finish -> pp buf (`finish ()))
+    | Alpha pp -> Staged.inj (fun _ _ buf -> pp.latest buf)
     | Pad { contents; dir; width } ->
         let$ contents = aux contents and$ pad = apply_padding dir width in
-        fun y buf -> pad (fun buf -> contents y buf) buf
+        fun y event buf -> pad (fun buf -> contents y event buf) buf
     | Cond t -> (
         let$ then_ = aux t.then_ in
-        let update_with buf unconditional =
+        let update_with buf unconditional event =
           let start = Line_buffer.current_position buf in
-          let _reported_width = then_ unconditional buf in
+          let _reported_width = then_ unconditional event buf in
           let finish = Line_buffer.current_position buf in
           t.latest_span <- Line_buffer.Span.between_marks start finish;
           (* if actual_width <> t.width then
@@ -450,12 +460,12 @@ let update top =
            *     t.width actual_width Compiled.pp_dump elt; *)
           Sta_dyn.get t.width
         in
-        fun unconditional buf ->
+        fun unconditional event buf ->
           match (unconditional, t.latest) with
-          | true, Some _ -> update_with buf unconditional
-          | false, Some v when t.if_ v -> update_with buf unconditional
+          | true, Some _ -> update_with buf unconditional event
+          | false, Some v when t.if_ v -> update_with buf unconditional event
           | true, None ->
-              update_with buf unconditional
+              update_with buf unconditional event
               (* let start = Line_buffer.current_position buf in
                * let width = Sta_dyn.get t.width in
                * Line_buffer.add_string buf (String.make width ' ');
@@ -468,15 +478,23 @@ let update top =
     | Contramap (inner, _) -> aux inner
     | Group g ->
         let updaters = Array.map g ~f:(aux >> Staged.prj) in
-        Staged.inj (fun uncond ppf ->
-            Array.fold_left updaters ~init:0 ~f:(fun a f -> a + f uncond ppf))
+        Staged.inj (fun uncond event ppf ->
+            Array.fold_left updaters ~init:0 ~f:(fun a f ->
+                a + f uncond event ppf))
     | Pair { left; sep; right } ->
         let$ left = aux left and$ sep = aux sep and$ right = aux right in
-        fun uncond ppf ->
-          let x = left uncond ppf in
-          let y = sep uncond ppf in
-          let z = right uncond ppf in
+        fun uncond event ppf ->
+          let x = left uncond event ppf in
+          let y = sep uncond event ppf in
+          let z = right uncond event ppf in
           x + y + z
   in
   let$ f = aux top in
-  fun ~unconditional buf : int -> f unconditional buf
+  fun ~unconditional event buf : int -> f unconditional event buf
+
+let finalise t =
+  Staged.map (update t) ~f:(fun f -> f ~unconditional:true `finish)
+
+let update t =
+  Staged.map (update t) ~f:(fun f ~unconditional buf ->
+      f ~unconditional `rerender buf)

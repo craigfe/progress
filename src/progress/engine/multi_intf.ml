@@ -8,6 +8,7 @@ open! Import
 type 'a reporter = 'a -> unit
 
 module type S = sig
+  type 'a line
   type 'a reporter
 
   type ('a, 'b) t
@@ -29,15 +30,15 @@ module type S = sig
 
   val blank : ('a, 'a) t
 
-  val v : 'a Line.t -> ('a reporter -> 'b, 'b) t
+  val line : 'a line -> ('a reporter -> 'b, 'b) t
   (** Define a new progress bar from a specification, with the given initial
       value. *)
 
-  val v_list : 'a Line.t list -> ('a reporter list -> 'b, 'b) t
+  val lines : 'a line list -> ('a reporter list -> 'b, 'b) t
 
   val ( ++ ) : ('a, 'b) t -> ('b, 'c) t -> ('a, 'c) t
   (** Stack progress bars vertically. [a / b] is a set with [a] stacked on top
-      of [b]. The two bars have separate reporting functions, passed
+      of [b]. The two sections have separate reporting functions, passed
       consecutively to the {!with_reporters} continuation when rendering. *)
 end
 
@@ -85,7 +86,8 @@ module type Multi = sig
 
   include
     S
-      with type 'a reporter := 'a -> unit
+      with type 'a line := 'a Line.t
+       and type 'a reporter := 'a -> unit
        and type ('a, 'b) t = ('a, 'b) Hlist(Line).t
 end
 (*————————————————————————————————————————————————————————————————————————————

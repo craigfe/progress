@@ -111,7 +111,7 @@ let contents t =
   reset t;
 
   match Int.equal last_len current_len && String.equal last current with
-  | true -> `Clean
+  | true -> `Clean t.last
   | false ->
       t.last <- current;
       t.last_len <- current_len;

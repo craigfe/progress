@@ -24,7 +24,7 @@ module type S = sig
         let read_file path buffer =
           let total = file_size path and in_channel = open_in path in
           try
-            with_reporters (counter ~total ()) @@ fun report ->
+            with_reporter (counter ~total ()) @@ fun report ->
             let rec aux offset =
               let bytes_read = really_read buffer offset in
               report bytes_read;
@@ -36,7 +36,7 @@ module type S = sig
         (** Sending data to multiple clients, with one progress bar each. *)
         let multi_bar_rendering () =
           with_reporters
-            (bar_a / bar_b / bar_c)
+            Multi.(line bar_a ++ line bar_b ++ line bar_c)
             (fun report_a report_b report_c ->
               for i = 1 to 1000 do
                 report_a (transfer_bytes client_a);
@@ -76,11 +76,11 @@ module type S = sig
       displays. *)
   module Display : sig
     type ('a, 'b) t
+    (** The type of active progress bar displaye. *)
 
     val start : ?config:config -> ('a, 'b) multi -> ('a, 'b) t
-    (** Initiate rendering of a progress bar display.
-
-        @raise Failure if there is already an active progress bar display. *)
+    (** Initiate rendering of a progress bar display. Raises [Failure] if there
+        is already an active progress bar display. *)
 
     val tick : _ t -> unit
     val reporters : ('a, 'b) t -> ('a, 'b) Reporters.t
@@ -88,9 +88,8 @@ module type S = sig
     val finalize_line : (_, _) t -> _ Reporter.t -> unit
 
     val finalize : (_, _) t -> unit
-    (** Terminate the given progress bar display.
-
-        @raise Failure if the display has already been finalized. *)
+    (** Terminate the given progress bar display. Raises [Failure] if the
+        display has already been finalized. *)
   end
 end
 

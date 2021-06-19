@@ -7,15 +7,11 @@ module type S = sig
   (* We go to some effort here to avoid having types directly refer to those in
      [Progress_engine] rather than going via the aliases. *)
 
+  (** *)
+
   (** For example:
 
-      {[
-
-
-
-      ]}
-     See the [examples] directory for more complicated examples.
-
+      See the [examples] directory for more complicated examples.
 
       First, we need some basic types: *)
 
@@ -47,8 +43,9 @@ module type S = sig
 
   (** [Multi] extends [Line] to multi-line layouts. *)
   module Multi : sig
-    include Multi.S with type 'a reporter := 'a reporter
     (** @inline *)
+    include
+      Multi.S with type 'a line := 'a Line.t and type 'a reporter := 'a reporter
   end
 
   (** {1 Rendering} *)
@@ -72,13 +69,26 @@ module type S = sig
         escape codes) during progress bar rendering. Defaults to [true]. *)
 
     val ( || ) : t -> t -> t
+    (** Merge two config values, with settings from the left taking priority.
+        That is, [a || b] contains the configuration of [a], with unset defaults
+        taken from [b]. *)
 
+    (** Provides the default values of each of the config parameters. *)
     module Default : sig
       val ppf : Format.formatter
+      (** [ppf] is [Format.err_formatter]. *)
+
       val hide_cursor : bool
+      (** [hide_cursor] is [true]. *)
+
       val persistent : bool
+      (** [persistent] is [true]. *)
+
       val max_width : int option
+      (** [max_width] is [None]. *)
+
       val min_interval : Duration.t option
+      (** [min_interval] is 1/60th of a second. *)
     end
   end
 

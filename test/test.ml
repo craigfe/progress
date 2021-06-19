@@ -5,14 +5,16 @@ let almost f = f -. Float.epsilon
 let ( let@ ) f x = f x
 
 let config =
-  Progress.Config.create ~ppf:Format.str_formatter ~hide_cursor:false ()
+  Progress.Config.create ~ppf:Format.str_formatter ~hide_cursor:false
+    ~persistent:true ~min_interval:None ()
 
 let read_bar () =
   Format.flush_str_formatter ()
   |> String.trim ~drop:(function '\r' | '\n' -> true | _ -> false)
 
 let check_bar expected =
-  Alcotest.check Alcotest.string
+  Alcotest.check
+    Alcotest.(testable Fmt.Dump.string String.equal)
     ("Expected state: " ^ expected)
     expected (read_bar ())
 
@@ -23,8 +25,8 @@ let test_pair () =
     Progress.(
       Line.(
         pair ~sep:(const ", ")
-          (basic ~init:0 (Printer.int ~width:1))
-          (basic ~init:"foo" (Printer.string ~width:3))))
+          (of_printer ~init:0 (Printer.int ~width:1))
+          (of_printer ~init:"foo" (Printer.string ~width:3))))
   in
   let () =
     let@ report = Progress.with_reporter ~config bar in
@@ -46,26 +48,26 @@ let test_unicode_bar () =
       check_bar s
     in
     check_bar "│ │";
-    expect "│ │" 0.;
-    expect "│ │" (almost (1. /. 8.));
+    expect "" 0.;
+    expect "" (almost (1. /. 8.));
     expect "│▏│" (1. /. 8.);
-    expect "│▏│" (almost (2. /. 8.));
+    expect "" (almost (2. /. 8.));
     expect "│▎│" (2. /. 8.);
-    expect "│▎│" (almost (3. /. 8.));
+    expect "" (almost (3. /. 8.));
     expect "│▍│" (3. /. 8.);
-    expect "│▍│" (almost (4. /. 8.));
+    expect "" (almost (4. /. 8.));
     expect "│▌│" (4. /. 8.);
-    expect "│▌│" (almost (5. /. 8.));
+    expect "" (almost (5. /. 8.));
     expect "│▋│" (5. /. 8.);
-    expect "│▋│" (almost (6. /. 8.));
+    expect "" (almost (6. /. 8.));
     expect "│▊│" (6. /. 8.);
-    expect "│▊│" (almost (7. /. 8.));
+    expect "" (almost (7. /. 8.));
     expect "│▉│" (7. /. 8.);
-    expect "│▉│" (almost 1.);
+    expect "" (almost 1.);
     expect "│█│" 1.;
-    expect "│█│" (1. +. Float.epsilon);
-    expect "│█│" (1. +. (1. /. 8.));
-    expect "│█│" (almost 2.)
+    expect "" (1. +. Float.epsilon);
+    expect "" (1. +. (1. /. 8.));
+    expect "" (almost 2.)
   in
   clear_test_state ();
   let () =
@@ -79,7 +81,7 @@ let test_unicode_bar () =
       check_bar s
     in
     check_bar "│   │";
-    expect "│   │" 0.;
+    expect "" 0.;
     expect "│█▌ │" 0.5;
     expect "│██▉│" (almost 1.);
     expect "│███│" 1.
@@ -184,5 +186,6 @@ let () =
         ; test_case "Two unsized elements in box" `Quick
             Boxes.test_two_unsized_in_box
         ] )
+    ; ("line", Test_line.tests)
     ; ("units", Test_units.tests)
     ]

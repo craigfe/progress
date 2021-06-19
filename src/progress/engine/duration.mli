@@ -35,9 +35,11 @@ val of_int_ms : int -> t
 val of_int64_ms : int64 -> t
 val of_int_sec : int -> t
 val of_int64_sec : int64 -> t
+val of_int_min : int -> t
 
 (** Infix operators *)
 
+val ( + ) : t -> t -> t
 val ( < ) : t -> t -> bool
 val ( <= ) : t -> t -> bool
 val ( = ) : t -> t -> bool

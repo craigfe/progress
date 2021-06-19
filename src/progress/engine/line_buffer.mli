@@ -26,7 +26,7 @@ val lift_write :
   -> write:('a -> into:bytes -> pos:int -> unit)
   -> (t -> 'a -> unit) Staged.t
 
-val contents : t -> [ `Clean | `Dirty of string ]
+val contents : t -> [ `Clean of string | `Dirty of string ]
 (** Reset the write head to the start of the buffer and return a copy of the
     intervening contents. *)
 

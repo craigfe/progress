@@ -1,19 +1,24 @@
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+   Distributed under the MIT license. See terms at the end of this file.
+  ————————————————————————————————————————————————————————————————————————————*)
+
+open! Import
+
 module type Integer_dependent = sig
   type 'a t
   type integer
   type color
   type 'a printer
 
-  val of_printer : integer printer -> integer t
+  val count : width:int -> integer t
+  (** [count ~width] displays a running total of reported values in the given
+      width. *)
+
+  val count_pp : integer printer -> integer t
   (** [of_pp ~width pp] is a segment that uses the supplied fixed-width
       pretty-printer to render the value. The pretty-printer must never emit
       newline characters. *)
-
-  val count : integer -> integer t
-  (** [counter pp] is a segment that uses the supplied fixed-width
-      pretty-printer to print the {i accumulated} total of all values.
-
-      The pretty-printer must never emit newline characters. *)
 
   val bytes : integer t
   val percentage_of : integer -> integer t
@@ -79,7 +84,7 @@ module type S = sig
     -> unit
     -> _ t
 
-  val basic : init:'a -> 'a printer -> 'a t
+  val of_printer : ?init:'a -> 'a printer -> 'a t
   (** TODO: Rename to [of_printer] and keep a distinction between accumulated
       printers. *)
 
@@ -98,20 +103,22 @@ module type S = sig
        and type 'a printer := 'a printer
        and type integer := int
 
-  module type Integer_dependent = sig
-    include
-      Integer_dependent
-        with type 'a t := 'a t
-         and type color := color
-         and type 'a printer := 'a printer
+  module Integer_dependent : sig
+    module type S = sig
+      include
+        Integer_dependent
+          with type 'a t := 'a t
+           and type color := color
+           and type 'a printer := 'a printer
+    end
+
+    module Make (Integer : Integer.S) : S with type integer := Integer.t
   end
 
-  module Int32 : Integer_dependent with type integer := int32
-  module Int64 : Integer_dependent with type integer := int64
-  module Float : Integer_dependent with type integer := float
-
-  module Integer_dependent (Integer : Integer.S) :
-    Integer_dependent with type integer := Integer.t
+  module Int32 : Integer_dependent.S with type integer := int32
+  module Int63 : Integer_dependent.S with type integer := int63
+  module Int64 : Integer_dependent.S with type integer := int64
+  module Float : Integer_dependent.S with type integer := float
 
   (** {1 Combining segments} *)
 

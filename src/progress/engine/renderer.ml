@@ -12,21 +12,30 @@ module Bar_id = Unique_id ()
 
 module Bar_renderer : sig
   type 'a t
-  type contents = { width : int; data : [ `Clean | `Dirty of string ] }
+
+  type contents =
+    { width : int; data : [ `Clean of string | `Dirty of string ] }
 
   val create : 'a Line_primitives.t -> 'a t
   val update : unconditional:bool -> _ t -> unit -> contents
   val report : 'a t -> 'a -> contents
+  val finalise : _ t -> contents
   val id : _ t -> Bar_id.t
 end = struct
   type 'a t =
     { line_buffer : Line_buffer.t
     ; update : unconditional:bool -> int
     ; report : 'a -> int
+    ; finalise : unit -> int
     ; id : Bar_id.t
+    ; mutable finalised : bool
+    ; mutable finalised_width : int
     }
 
-  type contents = { width : int; data : [ `Clean | `Dirty of string ] }
+  type contents =
+    { width : int; data : [ `Clean of string | `Dirty of string ] }
+
+  (* TODO: get rid of all this boilerplate *)
 
   let create : type a. a Line_primitives.t -> a t =
    fun s ->
@@ -40,18 +49,40 @@ end = struct
       let update = Staged.prj (Line_primitives.update s) in
       fun ~unconditional -> update line_buffer ~unconditional
     in
+    let finalise =
+      let finalise = Staged.prj (Line_primitives.finalise s) in
+      fun () -> finalise line_buffer
+    in
     let id = Bar_id.create () in
-    { line_buffer; report; update; id }
+    { line_buffer
+    ; report
+    ; update
+    ; finalise
+    ; id
+    ; finalised = false
+    ; finalised_width = 0
+    }
+
+  let finalise t =
+    let width = t.finalise () in
+    let data = Line_buffer.contents t.line_buffer in
+    t.finalised <- true;
+    t.finalised_width <- width;
+    { width; data }
 
   let update ~unconditional t () =
-    let width = t.update ~unconditional in
-    let data = Line_buffer.contents t.line_buffer in
-    { width; data }
+    if t.finalised then finalise t
+    else
+      let width = t.update ~unconditional in
+      let data = Line_buffer.contents t.line_buffer in
+      { width; data }
 
   let report t x =
-    let width = t.report x in
-    let data = Line_buffer.contents t.line_buffer in
-    { width; data }
+    if t.finalised then finalise t
+    else
+      let width = t.report x in
+      let data = Line_buffer.contents t.line_buffer in
+      { width; data }
 
   let id t = t.id
 end
@@ -120,22 +151,18 @@ end = struct
   let create ~config bars =
     let uid = Unique_id.create () in
     let rows =
-      Bar_list.mapi bars
-        ~f:
-          { f =
-              (fun i -> function
-                | None -> None
-                | Some renderer ->
-                    Some (E { renderer; latest_width = 0; position = i }))
-          }
-      |> Vector.of_list
+      let f i = function
+        | None -> None
+        | Some renderer -> Some (E { renderer; latest_width = 0; position = i })
+      in
+      Bar_list.mapi bars ~f:{ f } |> Vector.of_list ~dummy:None
     in
     let bar_count = Bar_list.length bars in
     let bars = Hashtbl.create bar_count in
-    Vector.iter rows ~f:(function
-      | None -> ()
-      | Some (E { renderer; _ } as t) ->
-          Hashtbl.add bars ~key:(Bar_renderer.id renderer) ~data:t);
+    Vector.iter rows
+      ~f:
+        (Option.iter (fun (E { renderer; _ } as t) ->
+             Hashtbl.add bars ~key:(Bar_renderer.id renderer) ~data:t));
 
     { config; uid; bars; rows }
 
@@ -148,53 +175,43 @@ end = struct
     Format.pp_print_string ppf data;
     if new_width < old_width then Format.pp_print_string ppf Ansi.erase_line
 
-  let rerender_all_from_top ~starting_at ~unconditional
+  let rerender_all_from_top ~stage ~starting_at ~unconditional
       ({ config = { ppf; _ }; rows; _ } as t) =
     let total_rows = Vector.length rows in
-    Vector.iteri_from starting_at rows ~f:(fun idx -> function
-      | None -> Fmt.pf ppf "%s@\n" Ansi.erase_line
-      | Some (E bar) -> (
-          let ({ width; data } : Bar_renderer.contents) =
-            Bar_renderer.update ~unconditional bar.renderer ()
-          in
-          (match data with
-          | `Clean -> ()
-          | `Dirty contents ->
-              rerender_line_and_advance t (E bar) width contents);
+    Vector.iteri_from starting_at rows ~f:(fun idx slot ->
+        let is_last = idx = total_rows - 1 in
+        let () =
+          match slot with
+          | None -> Format.fprintf ppf "%s" Ansi.erase_line
+          | Some (E bar) -> (
+              let ({ width; data } : Bar_renderer.contents) =
+                match stage with
+                | `update -> Bar_renderer.update ~unconditional bar.renderer ()
+                | `finalise -> Bar_renderer.finalise bar.renderer
+              in
+              match data with
+              | `Clean _ when not unconditional -> ()
+              | `Clean contents | `Dirty contents ->
+                  rerender_line_and_advance t (E bar) width contents)
+        in
+        match is_last with
+        | false -> Format.pp_force_newline ppf ()
+        | true -> Format.fprintf ppf "\r%!")
 
-          let is_last = idx = total_rows - 1 in
-          match is_last with
-          | false -> Format.pp_force_newline ppf ()
-          | true -> Format.fprintf ppf "\r%!"))
+  let initial_render =
+    rerender_all_from_top ~stage:`update ~starting_at:0 ~unconditional:true
 
-  let initial_render = rerender_all_from_top ~starting_at:0 ~unconditional:true
+  let get_bar_exn ~msg bars uid =
+    let exception Finalised of string in
+    match Hashtbl.find bars uid with
+    | x -> x
+    | exception Not_found -> raise (Finalised msg)
 
   let rerender_line ({ config = { ppf; _ }; bars; rows; _ } as t) uid
       ({ width; data } : Bar_renderer.contents) =
-    let (E bar) = Hashtbl.find bars uid in
+    let (E bar) = get_bar_exn ~msg:"Can't render to finalised bar" bars uid in
     match data with
-    | `Clean -> ()
-    | `Dirty data ->
-        let distance_from_base = Vector.length rows - bar.position - 1 in
-
-        (* Format.printf "uid = %a; positions: %a@." Bar_id.pp
-         *   (Bar_renderer.id bar.renderer)
-         *   pp_map t.bar_by_position; *)
-
-        (* NOTE: we add an initial carriage return to avoid overflowing the line if
-           the user has typed into the terminal between renders. *)
-        Format.fprintf ppf "\r%a" Ansi.move_up distance_from_base;
-        rerender_line_and_advance t (E bar) width data;
-        Format.fprintf ppf "%a\r%!" Ansi.move_down distance_from_base
-
-  let finalize_line ({ config = { ppf; _ }; bars; rows; _ } as t) uid =
-    (* Format.printf "finalising bar with id: %a@." Bar_id.pp uid; *)
-    let (E bar) = Hashtbl.find bars uid in
-    let ({ width; data } : Bar_renderer.contents) =
-      Bar_renderer.update bar.renderer ~unconditional:true ()
-    in
-    match data with
-    | `Clean -> ()
+    | `Clean _ -> ()
     | `Dirty data ->
         let distance_from_base = Vector.length rows - bar.position - 1 in
 
@@ -203,6 +220,12 @@ end = struct
         Format.fprintf ppf "\r%a" Ansi.move_up distance_from_base;
         rerender_line_and_advance t (E bar) width data;
         Format.fprintf ppf "%a\r%!" Ansi.move_down distance_from_base
+
+  let finalize_line t uid =
+    let (E bar) = get_bar_exn ~msg:"Bar already finalised" t.bars uid in
+    let contents = Bar_renderer.finalise bar.renderer in
+    rerender_line t uid contents;
+    Hashtbl.remove t.bars uid
 
   let add_line ?(above = 0) t renderer =
     let position = Vector.length t.rows - above in
@@ -211,15 +234,20 @@ end = struct
     Hashtbl.add t.bars ~key ~data:bar;
 
     Vector.insert t.rows position (Some bar);
+    Vector.iteri_from (position + 1) t.rows ~f:(fun i -> function
+      | None -> () | Some (E bar) -> bar.position <- i);
 
     (* The cursor is now one line above the bottom. Move to the correct starting
        position for a re-render of the affected suffix of the display. *)
     Format.pp_force_newline t.config.ppf ();
     Ansi.move_up t.config.ppf above;
-    rerender_all_from_top ~starting_at:position ~unconditional:true t
+    rerender_all_from_top ~stage:`update ~starting_at:position
+      ~unconditional:true t
 
   let ceil_div x y = (x + y - 1) / y
-  let overflow_rows ~old_width ~new_width = ceil_div old_width new_width - 1
+
+  let overflow_rows ~old_width ~new_width =
+    max 0 (ceil_div old_width new_width - 1)
 
   let handle_width_change ({ config = { ppf; _ }; rows; _ } as display)
       new_width =
@@ -238,28 +266,21 @@ end = struct
     in
     let move_up = overflows + row_count - 1 - bottom_overflow in
     Ansi.move_up ppf move_up;
-
-    (* let out =
-     *   Fmt.str
-     *     "{ new_width = %d; rows = %d; latest_widths = %a; overflows = %d; \
-     *      bottom_overflow = %d; move_up = %d }"
-     *     new_width row_count (Fmt.Dump.array Fmt.int) latest_widths overflows
-     *     bottom_overflow move_up
-     * in
-     * Printf.fprintf oc "%s\n%!" out; *)
     if overflows > 0 then Format.pp_print_string ppf Ansi.erase_display_suffix;
-    rerender_all_from_top ~starting_at:0 ~unconditional:true display
+    rerender_all_from_top ~stage:`update ~starting_at:0 ~unconditional:true
+      display
 
   let rerender_all ({ config = { ppf; _ }; rows; _ } as t) =
     Ansi.move_up ppf (Vector.length rows - 1);
-    rerender_all_from_top ~starting_at:0 ~unconditional:false t
+    rerender_all_from_top ~stage:`update ~starting_at:0 ~unconditional:false t
 
   let interject_with ({ config = { ppf; _ }; rows; _ } as t) f =
     Format.fprintf ppf "%a%s%!" Ansi.move_up
       (Vector.length rows - 1)
       Ansi.erase_line;
     Fun.protect f ~finally:(fun () ->
-        rerender_all_from_top ~starting_at:0 ~unconditional:true t)
+        rerender_all_from_top ~stage:`update ~starting_at:0 ~unconditional:true
+          t)
 
   let cleanup { config; _ } =
     if config.hide_cursor then
@@ -269,7 +290,8 @@ end = struct
       ({ config = { ppf; hide_cursor; persistent; _ }; rows; _ } as display) =
     Ansi.move_up ppf (Vector.length rows - 1);
     if persistent then (
-      rerender_all_from_top ~starting_at:0 ~unconditional:true display;
+      rerender_all_from_top ~stage:`finalise ~starting_at:0 ~unconditional:true
+        display;
       Format.fprintf ppf "@,@]")
     else Format.pp_print_string ppf Ansi.erase_line;
     Format.fprintf ppf "%s%!" (if hide_cursor then Ansi.show_cursor else "")
@@ -470,7 +492,7 @@ module Make (Platform : Platform.S) = struct
       (fun () -> Reporters.apply_all f (Display.reporters display))
       ~finally:(fun () -> Display.finalize display)
 
-  let with_reporter ?config b f = with_reporters ?config (Multi.v b) f
+  let with_reporter ?config b f = with_reporters ?config (Multi.line b) f
 end
 
 (*————————————————————————————————————————————————————————————————————————————

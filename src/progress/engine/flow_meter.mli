@@ -3,44 +3,20 @@
    Distributed under the MIT license. See terms at the end of this file.
   ————————————————————————————————————————————————————————————————————————————*)
 
-include Progress_engine_intf
+type 'a t
+(** The type of ring buffers. *)
 
-module Make (Platform : Platform.S) = struct
-  module Color = Ansi.Color
-  module Ansi = Ansi.Style
-  module Duration = Duration
-  module Multi = Multi
-  module Printer = Printer
-  module Units = Units
+val create :
+     clock:(unit -> Mtime.t)
+  -> size:int
+  -> elt:(module Integer.S with type t = 'a)
+  -> 'a t
 
-  module Config = struct
-    include Config
+val record : 'a t -> 'a -> unit
+(** Add a value to the ring buffer. *)
 
-    type t = user_supplied
-  end
-
-  module Renderer = struct
-    include Renderer.Make (Platform)
-    include Renderer
-  end
-
-  module Line = struct
-    include Line.Make (Platform)
-    include Line
-  end
-
-  type 'a reporter = 'a -> unit
-
-  module Display = Renderer.Display
-  module Reporter = Renderer.Reporter
-  module Reporters = Renderer.Reporters
-
-  let interject_with = Renderer.interject_with
-  let with_reporters = Renderer.with_reporters
-  let with_reporter ?config b f = with_reporters ?config (Multi.line b) f
-end
-
-module Integer = Integer
+val rate_per_second : 'a t -> 'a
+(** Estimate the rate of change of recorded values per second. *)
 
 (*————————————————————————————————————————————————————————————————————————————
    Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>

@@ -7,6 +7,10 @@ type 'a pp = Format.formatter -> 'a -> unit
 
 let ( >> ) f g x = g (f x)
 
+let tap f x =
+  f x;
+  x
+
 let trace fmt x =
   Fmt.epr fmt x;
   x
@@ -49,17 +53,41 @@ end
 
 module Int = struct
   include Int
-  include (Poly : Comparable_infix with type t := int)
+  include (Poly : Comparable_infix with type t := t)
+
+  let float_div a b = to_float a /. to_float b
 end
 
 module Int32 = struct
-  include Int
-  include (Poly : Comparable_infix with type t := int32)
+  include Int32
+  include (Poly : Comparable_infix with type t := t)
+
+  let float_div a b = to_float a /. to_float b
+end
+
+module Int63 = struct
+  include Optint.Int63
+  include (Poly : Comparable_infix with type t := t)
+
+  let float_div a b = to_float a /. to_float b
+end
+
+type int63 = Int63.t
+
+module Int64 = struct
+  include Int64
+  include (Poly : Comparable_infix with type t := t)
+
+  let float_div a b = to_float a /. to_float b
 end
 
 module Float = struct
   include Float
-  include (Poly : Comparable_infix with type t := float)
+  include (Poly : Comparable_infix with type t := t)
+
+  let float_div = ( /. )
+  let to_float x = x
+  let of_float x = x
 end
 
 module String = struct
@@ -94,7 +122,9 @@ end
 
 module Staged : sig
   type 'a t
+  type ('a, 'b) endo := 'a t -> 'b t
 
+  external map : f:('a -> 'b) -> ('a, 'b) endo = "%identity"
   external inj : 'a -> 'a t = "%identity"
   external prj : 'a t -> 'a = "%identity"
 
@@ -104,7 +134,9 @@ module Staged : sig
   end
 end = struct
   type 'a t = 'a
+  type ('a, 'b) endo = 'a t -> 'b t
 
+  external map : f:('a -> 'b) -> ('a, 'b) endo = "%identity"
   external inj : 'a -> 'a t = "%identity"
   external prj : 'a t -> 'a = "%identity"
 

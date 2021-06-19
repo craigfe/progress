@@ -10,7 +10,7 @@ let bar color message =
     ; Int64.bar ~color ~style:`UTF8 ~total ()
     ; Int64.percentage_of total ++ const " "
     ]
-  |> Multi.v
+  |> Multi.line
 
 let main () =
   let layout =

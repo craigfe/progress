@@ -21,7 +21,7 @@ module Acc = struct
     ; mutable accumulator : 'a
     ; mutable pending : 'a
     ; render_start : Mtime.t
-    ; ring_buffer : 'a Ring_buffer.t
+    ; flow_meter : 'a Flow_meter.t
     }
 
   let wrap :
@@ -33,8 +33,8 @@ module Acc = struct
       -> a Primitives.t =
    fun ~elt:(module Integer) ~clock ~should_update inner ->
     Primitives.stateful (fun () ->
-        let ring_buffer =
-          Ring_buffer.create ~clock ~size:32 ~elt:(module Integer)
+        let flow_meter =
+          Flow_meter.create ~clock ~size:32 ~elt:(module Integer)
         in
         let render_start = clock () in
         let state =
@@ -42,12 +42,12 @@ module Acc = struct
           ; accumulator = Integer.zero
           ; pending = Integer.zero
           ; render_start
-          ; ring_buffer
+          ; flow_meter
           }
         in
 
         Primitives.contramap ~f:(fun a ->
-            Ring_buffer.record state.ring_buffer a;
+            Flow_meter.record state.flow_meter a;
             state.pending <- Integer.add a state.pending)
         @@ Primitives.conditional (fun _ -> should_update ())
         @@ Primitives.contramap ~f:(fun () ->
@@ -59,8 +59,12 @@ module Acc = struct
         @@ inner)
 
   let accumulator t = t.accumulator
-  let ring_buffer t = t.ring_buffer
+  let flow_meter t = t.flow_meter
 end
+
+let update_only pp ppf = function
+  | `start -> ()
+  | `finish x | `report x | `rerender x -> pp ppf x
 
 module Timer = struct
   type 'a t = { mutable render_latest : Mtime.t }
@@ -168,7 +172,7 @@ module Make (Platform : Platform.S) = struct
   let const s =
     let len = String.length s and len_utf8 = String.Utf8.length s in
     let segment =
-      Primitives.theta ~width:len_utf8 (fun buf ->
+      Primitives.theta ~width:len_utf8 (fun buf _ ->
           Line_buffer.add_substring buf s ~off:0 ~len)
     in
     Basic segment
@@ -187,21 +191,23 @@ module Make (Platform : Platform.S) = struct
 
   let string =
     let segment =
-      Primitives.alpha_unsized ~initial:(`Val "") (fun ~width buf s ->
-          let input_len = String.length s in
-          let output_len = width () - 1 (* XXX: why is -1 necessary? *) in
-          let () =
-            match input_len <= output_len with
-            | true ->
-                Line_buffer.add_string buf s;
-                for _ = input_len to output_len do
-                  Line_buffer.add_char buf ' '
-                done
-            | false ->
-                Line_buffer.add_substring buf s ~off:0 ~len:(output_len - 4);
-                Line_buffer.add_string buf " ..."
-          in
-          output_len)
+      Primitives.alpha_unsized ~initial:(`Val "") (fun ~width buf -> function
+        | `start -> 0 (* TODO: chosen randomly *)
+        | `finish s | `report s | `rerender s ->
+            let input_len = String.length s in
+            let output_len = width () - 1 (* XXX: why is -1 necessary? *) in
+            let () =
+              match input_len <= output_len with
+              | true ->
+                  Line_buffer.add_string buf s;
+                  for _ = input_len to output_len do
+                    Line_buffer.add_char buf ' '
+                  done
+              | false ->
+                  Line_buffer.add_substring buf s ~off:0 ~len:(output_len - 4);
+                  Line_buffer.add_string buf " ..."
+            in
+            output_len)
     in
     Basic segment
 
@@ -211,11 +217,11 @@ module Make (Platform : Platform.S) = struct
   let counter () =
     let segment =
       Primitives.stateful (fun () ->
-          let count = ref (-1) (* TODO: use Int63 *) in
-          let pp ~width buf () =
-            incr count;
+          let count = ref Int63.zero in
+          let pp ~width buf e =
+            if Poly.(e = `report ()) then count := Int63.succ !count;
             let width = width () in
-            let str = string_of_int !count in
+            let str = Int63.to_string !count in
             let len = String.length str in
             for _ = len + 1 to width do
               (* TODO: deal with overflow *)
@@ -239,12 +245,22 @@ module Make (Platform : Platform.S) = struct
         Line_buffer.add_string buf Ansi.Style.(code none);
         a
 
-  let modulo_counter : int -> (unit -> int) Staged.t =
-   fun bound ->
-    let idx = ref (-1) in
-    Staged.inj (fun () ->
-        idx := succ !idx mod bound;
-        !idx)
+  module Modulo_counter : sig
+    type t
+
+    val create : int -> t
+    val latest : t -> int
+    val tick : t -> int
+  end = struct
+    type t = { modulus : int; mutable latest : int }
+
+    let create modulus = { modulus; latest = 0 }
+    let latest t = t.latest
+
+    let tick t =
+      t.latest <- succ t.latest mod t.modulus;
+      t.latest
+  end
 
   let debounce interval s =
     Primitives.stateful (fun () ->
@@ -293,204 +309,235 @@ module Make (Platform : Platform.S) = struct
     in
     Basic
       (Primitives.stateful (fun () ->
-           let tick = Staged.prj (modulo_counter stage_count) in
+           let counter = Modulo_counter.create stage_count in
            apply_debounce
-           @@ Primitives.theta ~width (fun buf ->
-                  with_color_opt color buf (fun () ->
-                      Line_buffer.add_string buf frames.(tick ())))))
+           @@ Primitives.theta ~width (fun buf -> function
+                | `start -> ()
+                | `finish () ->
+                    with_color_opt color buf (fun () ->
+                        Line_buffer.add_string buf "✔️")
+                | (`report () | `rerender ()) as e ->
+                    let tick =
+                      match e with
+                      | `report () -> Modulo_counter.tick counter
+                      | `rerender () -> Modulo_counter.latest counter
+                    in
+                    let frame = frames.(tick) in
+                    with_color_opt color buf (fun () ->
+                        Line_buffer.add_string buf frame))))
 
-  module Integer_dependent (Integer : Integer.S) = struct
-    let acc segment = Acc { segment; elt = (module Integer) }
+  module Integer_dependent = struct
+    module type S = sig
+      include
+        Integer_dependent
+          with type 'a t := 'a t
+           and type color := Ansi.Color.t
+           and type 'a printer := 'a Printer.t
+    end
 
-    let basic ~init printer =
-      let pp = Staged.prj (Printer.to_line_printer printer) in
-      Basic
-        (Primitives.alpha ~width:(Printer.width printer) ~initial:(`Val init) pp)
+    module Make (Integer : Integer.S) = struct
+      let acc segment = Acc { segment; elt = (module Integer) }
 
-    let of_printer printer =
-      let pp = Staged.prj (Printer.to_line_printer printer) in
-      acc
-      @@ Primitives.contramap ~f:Acc.accumulator
-      @@ Primitives.alpha ~width:(Printer.width printer)
-           ~initial:(`Val Integer.zero) pp
+      let of_printer ?init printer =
+        let pp = update_only @@ Staged.prj (Printer.to_line_printer printer) in
+        let width = Printer.width printer in
+        let initial =
+          match init with
+          | Some v -> `Val v
+          | None ->
+              `Theta
+                (fun buf ->
+                  for _ = 1 to width do
+                    Line_buffer.add_char buf ' '
+                  done)
+        in
+        Basic (Primitives.alpha ~width ~initial pp)
 
-    let bytes = of_printer (Units.Bytes.generic (module Integer))
+      let count_pp printer =
+        let pp = Staged.prj (Printer.to_line_printer printer) in
+        acc
+        @@ Primitives.contramap ~f:Acc.accumulator
+        @@ Primitives.alpha ~width:(Printer.width printer)
+             ~initial:(`Val Integer.zero) (update_only pp)
 
-    let percentage_of accumulator =
-      let printer =
-        Printer.using Units.Percentage.of_float ~f:(fun x ->
-            Integer.to_float x /. Integer.to_float accumulator)
-      in
-      of_printer printer
+      let bytes = count_pp (Units.Bytes.generic (module Integer))
 
-    let max total = const (Integer.to_string total)
+      let percentage_of accumulator =
+        let printer =
+          Printer.using Units.Percentage.of_float ~f:(fun x ->
+              Integer.to_float x /. Integer.to_float accumulator)
+        in
+        count_pp printer
 
-    let count total =
-      let total = Integer.to_string total in
-      let width = String.length total in
-      acc
-      @@ Primitives.contramap ~f:Acc.accumulator
-      @@ Primitives.alpha ~initial:(`Val Integer.zero) ~width (fun lb x ->
-             let x = Integer.to_string x in
-             for _ = String.length x to width - 1 do
-               Line_buffer.add_char lb ' '
-             done;
-             Line_buffer.add_string lb x)
+      let max total = const (Integer.to_string total)
 
-    (* Progress bars *)
+      let count ~width =
+        acc
+        @@ Primitives.contramap ~f:Acc.accumulator
+        @@ Primitives.alpha ~initial:(`Val Integer.zero) ~width
+             ( update_only @@ fun lb x ->
+               let x = Integer.to_string x in
+               for _ = String.length x to width - 1 do
+                 Line_buffer.add_char lb ' '
+               done;
+               Line_buffer.add_string lb x )
 
-    let bar_custom ~stages ~color ~color_empty width proportion buf =
-      let color_empty = Option.(color_empty || color) in
-      let stages = Array.of_list stages in
-      let final_stage = Array.length stages - 1 in
-      let width = width () in
-      let bar_width = width - 2 in
-      let squaresf = Float.of_int bar_width *. proportion in
-      let squares = Float.to_int squaresf in
-      let filled = min squares bar_width in
-      let not_filled = bar_width - filled - 1 in
-      Line_buffer.add_string buf "│";
-      with_color_opt color buf (fun () ->
-          for _ = 1 to filled do
-            Line_buffer.add_string buf stages.(final_stage)
-          done);
-      let () =
-        if filled <> bar_width then (
-          let chunks = Float.to_int (squaresf *. Float.of_int final_stage) in
-          let index = chunks - (filled * final_stage) in
-          if index >= 0 && index < final_stage then
-            with_color_opt color buf (fun () ->
-                Line_buffer.add_string buf stages.(index));
+      (* Progress bars *)
 
-          with_color_opt color_empty buf (fun () ->
-              for _ = 1 to not_filled do
-                Line_buffer.add_string buf stages.(0)
-              done))
-      in
-      Line_buffer.add_string buf "│";
-      width
+      let bar_custom ~stages ~color ~color_empty width proportion buf =
+        let color_empty = Option.(color_empty || color) in
+        let stages = Array.of_list stages in
+        let final_stage = Array.length stages - 1 in
+        let width = width () in
+        let bar_width = width - 2 in
+        let squaresf = Float.of_int bar_width *. proportion in
+        let squares = Float.to_int squaresf in
+        let filled = min squares bar_width in
+        let not_filled = bar_width - filled - 1 in
+        Line_buffer.add_string buf "│";
+        with_color_opt color buf (fun () ->
+            for _ = 1 to filled do
+              Line_buffer.add_string buf stages.(final_stage)
+            done);
+        let () =
+          if filled <> bar_width then (
+            let chunks = Float.to_int (squaresf *. Float.of_int final_stage) in
+            let index = chunks - (filled * final_stage) in
+            if index >= 0 && index < final_stage then
+              with_color_opt color buf (fun () ->
+                  Line_buffer.add_string buf stages.(index));
 
-    let bar_ascii ~color ~color_empty width proportion buf =
-      let color_empty = Option.(color_empty || color) in
-      let width = width () in
-      let bar_width = width - 2 in
-      let filled =
-        min (Float.to_int (Float.of_int bar_width *. proportion)) bar_width
-      in
-      let not_filled = bar_width - filled in
-      Line_buffer.add_char buf '[';
-      with_color_opt color buf (fun () ->
-          for _ = 1 to filled do
-            Line_buffer.add_char buf '#'
-          done);
-      with_color_opt color_empty buf (fun () ->
-          for _ = 1 to not_filled do
-            Line_buffer.add_char buf '-'
-          done);
-      Line_buffer.add_char buf ']';
-      width
+            with_color_opt color_empty buf (fun () ->
+                for _ = 1 to not_filled do
+                  Line_buffer.add_string buf stages.(0)
+                done))
+        in
+        Line_buffer.add_string buf "│";
+        width
 
-    let bar ~style =
-      match style with
-      | `ASCII -> bar_ascii
-      | `Custom stages -> bar_custom ~stages
-      | `UTF8 ->
-          let stages =
-            [ " "; "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉"; "█" ]
-          in
-          bar_custom ~stages
+      let bar_ascii ~color ~color_empty width proportion buf =
+        let color_empty = Option.(color_empty || color) in
+        let width = width () in
+        let bar_width = width - 2 in
+        let filled =
+          min (Float.to_int (Float.of_int bar_width *. proportion)) bar_width
+        in
+        let not_filled = bar_width - filled in
+        Line_buffer.add_char buf '[';
+        with_color_opt color buf (fun () ->
+            for _ = 1 to filled do
+              Line_buffer.add_char buf '#'
+            done);
+        with_color_opt color_empty buf (fun () ->
+            for _ = 1 to not_filled do
+              Line_buffer.add_char buf '-'
+            done);
+        Line_buffer.add_char buf ']';
+        width
 
-    let bar_unaccumulated ?(style = `UTF8) ?color ?color_empty
-        ?(width = `Expand) ~total () =
-      let proportion x = Integer.to_float x /. Integer.to_float total in
-      Basic
-        (Primitives.contramap ~f:proportion
-        @@
-        match width with
-        | `Fixed width ->
-            if width < 3 then failwith "Not enough space for a progress bar";
-            Primitives.alpha ~width ~initial:(`Val 0.) (fun buf x ->
-                ignore
-                  (bar ~style ~color ~color_empty (fun _ -> width) x buf : int))
-        | `Expand ->
-            Primitives.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf x ->
-                bar ~style ~color ~color_empty width x ppf))
+      let bar ~style =
+        match style with
+        | `ASCII -> bar_ascii
+        | `Custom stages -> bar_custom ~stages
+        | `UTF8 ->
+            let stages =
+              [ " "; "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉"; "█" ]
+            in
+            bar_custom ~stages
 
-    let bar ?(style = `UTF8) ?color ?color_empty ?(width = `Expand) ~total () =
-      let proportion x = Integer.to_float x /. Integer.to_float total in
-      acc
-      @@ Primitives.contramap ~f:(Acc.accumulator >> proportion)
-      @@
-      match width with
-      | `Fixed width ->
-          if width < 3 then failwith "Not enough space for a progress bar";
-          Primitives.alpha ~width ~initial:(`Val 0.) (fun buf x ->
-              ignore
-                (bar ~style ~color ~color_empty (fun _ -> width) x buf : int))
-      | `Expand ->
-          Primitives.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf x ->
-              bar ~style ~color ~color_empty width x ppf)
+      let bar_unaccumulated ?(style = `UTF8) ?color ?color_empty
+          ?(width = `Expand) ~total () =
+        let proportion x = Integer.to_float x /. Integer.to_float total in
+        Basic
+          (Primitives.contramap ~f:proportion
+          @@
+          match width with
+          | `Fixed width ->
+              if width < 3 then failwith "Not enough space for a progress bar";
+              Primitives.alpha ~width ~initial:(`Val 0.) (fun buf -> function
+                | `start -> ()
+                | `finish x | `report x | `rerender x ->
+                    ignore
+                      (bar ~style ~color ~color_empty (fun _ -> width) x buf
+                        : int))
+          | `Expand ->
+              Primitives.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf ->
+                function
+                | `start -> 0
+                | `finish x | `report x | `rerender x ->
+                    bar ~style ~color ~color_empty width x ppf))
 
-    let rate pp_val =
-      let pp_rate =
-        let pp_val = Staged.prj (Printer.to_line_printer pp_val) in
-        fun buf x ->
-          pp_val buf x;
-          Line_buffer.add_string buf "/s"
-      in
-      let width = Printer.width pp_val + 2 in
-      acc
-      @@ Primitives.contramap
-           ~f:
-             (Acc.ring_buffer >> Ring_buffer.rate_per_second >> Integer.to_float)
-      @@ Primitives.alpha ~width ~initial:(`Val 0.) pp_rate
+      let bar ?(style = `UTF8) ?color ?color_empty ?(width = `Expand) ~total ()
+          =
+        let proportion x = Integer.to_float x /. Integer.to_float total in
+        let proportion_segment =
+          match width with
+          | `Fixed width ->
+              if width < 3 then failwith "Not enough space for a progress bar";
+              Primitives.alpha ~width ~initial:(`Val 0.) (fun buf -> function
+                | `start -> ()
+                | `finish x | `report x | `rerender x ->
+                    ignore
+                      (bar ~style ~color ~color_empty (fun _ -> width) x buf
+                        : int))
+          | `Expand ->
+              Primitives.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf ->
+                function
+                | `start -> 0
+                | `finish x | `report x | `rerender x ->
+                    bar ~style ~color ~color_empty width x ppf)
+        in
+        acc
+          (Primitives.contramap proportion_segment
+             ~f:(Acc.accumulator >> proportion))
 
-    let eta ~total =
-      let printer = Staged.prj (Printer.to_line_printer Units.Duration.mm_ss) in
-      let width = Printer.width Units.Duration.mm_ss + 4 in
-      let initial = `Val Mtime.Span.max_span in
-      acc
-      @@ Primitives.contramap ~f:(fun acc ->
-             let per_second =
-               Acc.ring_buffer acc |> Ring_buffer.rate_per_second
-             in
-             let acc = Acc.accumulator acc in
-             if Integer.(equal zero) per_second then Mtime.Span.max_span
-             else
-               let todo = Integer.(to_float (sub total acc)) in
-               if Float.(todo <= 0.) then Mtime.Span.zero
+      let rate pp_val =
+        let pp_rate =
+          let pp_val = Staged.prj (Printer.to_line_printer pp_val) in
+          fun buf x ->
+            pp_val buf x;
+            Line_buffer.add_string buf "/s"
+        in
+        let width = Printer.width pp_val + 2 in
+        acc
+        @@ Primitives.contramap
+             ~f:
+               (Acc.flow_meter >> Flow_meter.rate_per_second >> Integer.to_float)
+        @@ Primitives.alpha ~width ~initial:(`Val 0.) (update_only pp_rate)
+
+      let eta ~total =
+        let printer =
+          let pp = Staged.prj (Printer.to_line_printer Units.Duration.mm_ss) in
+          fun ppf -> function
+            | `start -> ()
+            | `finish _ -> pp ppf Mtime.Span.max_span
+            | `report x | `rerender x -> pp ppf x
+        in
+        let width = Printer.width Units.Duration.mm_ss in
+        let initial = `Val Mtime.Span.max_span in
+        acc
+          (Primitives.contramap (Primitives.alpha ~width ~initial printer)
+             ~f:(fun acc ->
+               let per_second =
+                 Acc.flow_meter acc |> Flow_meter.rate_per_second
+               in
+               let acc = Acc.accumulator acc in
+               if Integer.(equal zero) per_second then Mtime.Span.max_span
                else
-                 Mtime.Span.of_uint64_ns
-                   (Int64.of_float
-                      (todo /. Integer.to_float per_second *. 1_000_000_000.)))
-      @@ Primitives.alpha ~width ~initial printer
+                 let todo = Integer.(to_float (sub total acc)) in
+                 if Float.(todo <= 0.) then Mtime.Span.zero
+                 else
+                   Mtime.Span.of_uint64_ns
+                     (Int64.of_float
+                        (todo /. Integer.to_float per_second *. 1_000_000_000.))))
+    end
   end
 
-  include Integer_dependent (Integer.Int)
-
-  module type Integer_dependent = sig
-    include
-      Integer_dependent
-        with type 'a t := 'a t
-         and type color := Ansi.Color.t
-         and type 'a printer := 'a Printer.t
-  end
-
-  module Int32 = Integer_dependent (Integer.Int32)
-  module Int64 = Integer_dependent (Integer.Int64)
-  module Float = Integer_dependent (Integer.Float)
-
-  (* TODO: common start time by using something like Acc *)
-  (* let elapsed () =
-   *   let print_time =
-   *     Staged.prj (Printer.to_line_buffer Units.Duration.mm_ss_print)
-   *   in
-   *   let segment =
-   *     Primitives.contramap ~f: (fun acc ->
-   *         let time = Mtime.span (Acc.render_start acc) (Clock.now ()) in
-   *         Primitives.theta ~width:5 (fun buf -> print_time buf time))
-   *   in
-   *   { segment; } *)
+  include Integer_dependent.Make (Integer.Int)
+  module Int32 = Integer_dependent.Make (Integer.Int32)
+  module Int63 = Integer_dependent.Make (Integer.Int63)
+  module Int64 = Integer_dependent.Make (Integer.Int64)
+  module Float = Integer_dependent.Make (Integer.Float)
 
   let elapsed () =
     let print_time =
@@ -498,8 +545,18 @@ module Make (Platform : Platform.S) = struct
     in
     let segment =
       Primitives.stateful (fun () ->
-          let start_time = Clock.counter () in
-          let pp buf = print_time buf (Clock.count start_time) in
+          let elapsed = Clock.counter () in
+          let latest = ref Mtime.Span.zero in
+          let finished = ref false in
+          let pp buf e =
+            (match e with
+            | `start | `report _ -> latest := Clock.count elapsed
+            | `finish _ when not !finished ->
+                latest := Clock.count elapsed;
+                finished := true
+            | `rerender _ | `finish _ -> ());
+            print_time buf !latest
+          in
           Primitives.theta ~width:5 pp)
     in
     Basic segment

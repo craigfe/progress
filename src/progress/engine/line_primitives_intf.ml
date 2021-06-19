@@ -18,19 +18,23 @@ module type S = sig
   (** The type of segments of progress bars that display reported values of type
       ['a]. *)
 
-  type theta := Line_buffer.t -> unit
-  type 'a alpha := Line_buffer.t -> 'a -> unit
+  type 'a event := [ `start | `report of 'a | `rerender of 'a | `finish of 'a ]
+  type theta := Line_buffer.t -> unit event -> unit
+  type 'a alpha := Line_buffer.t -> 'a event -> unit
 
   val noop : unit -> _ t
   val theta : width:int -> theta -> _ t
 
   val alpha :
-    width:int -> initial:[ `Theta of theta | `Val of 'a ] -> 'a alpha -> 'a t
+       width:int
+    -> initial:[ `Theta of Line_buffer.t -> unit | `Val of 'a ]
+    -> 'a alpha
+    -> 'a t
 
   val alpha_unsized :
        initial:
          [ `Theta of width:(unit -> int) -> Line_buffer.t -> int | `Val of 'a ]
-    -> (width:(unit -> int) -> Line_buffer.t -> 'a -> int)
+    -> (width:(unit -> int) -> Line_buffer.t -> 'a event -> int)
     -> 'a t
 
   val array : 'a t array -> 'a t
@@ -38,7 +42,7 @@ module type S = sig
   val contramap : f:('a -> 'b) -> 'b t -> 'a t
 
   val of_pp :
-    width:int -> initial:'a -> (Format.formatter -> 'a -> unit) -> 'a t
+    width:int -> initial:'a -> (Format.formatter -> 'a event -> unit) -> 'a t
   (** [of_pp ~width pp] is a segment that uses the supplied fixed-width
       pretty-printer to render the value. The pretty-printer must never emit
       newline characters. *)
@@ -94,6 +98,7 @@ module type Line_primitives = sig
     'a Compiled.t -> (unconditional:bool -> Line_buffer.t -> int) Staged.t
 
   val report : 'a Compiled.t -> (Line_buffer.t -> 'a -> int) Staged.t
+  val finalise : 'a Compiled.t -> (Line_buffer.t -> int) Staged.t
 end
 
 (*————————————————————————————————————————————————————————————————————————————

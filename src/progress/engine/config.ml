@@ -12,6 +12,8 @@ type user_supplied =
   }
 
 module Default = struct
+  (* NOTE: changes here should be reflected in the doc-strings. *)
+
   let ppf =
     (* We avoid using [Format.err_formatter] directly since [Fmt] uses
        physical equality to share configuration options. *)

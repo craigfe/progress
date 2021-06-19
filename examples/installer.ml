@@ -22,7 +22,7 @@ let with_bars f =
         spinner ~color:(Progress.Color.of_ansi `green) ()
         ++ constf " %s: " name
         ++ string)
-    |> Progress.Multi.v_list
+    |> Progress.Multi.lines
   in
   Progress.(with_reporters ~config @@ bars) f
 

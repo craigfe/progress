@@ -61,8 +61,6 @@ let unlimited_bar min_interval =
   Line.(const "[" ++ spin ++ spin ++ spin ++ spin ++ spin ++ const "]")
 
 let run () =
-  print_endline "";
-
   let spinners =
     [ ("dots1", dots1, 80)
     ; ("dots2", dots2, 80)
@@ -91,13 +89,11 @@ let run () =
            lpad 25 (constf "%s  :  " name)
            ++ elt (Some (Duration.of_int_ms interval)))
   in
-
   with_reporters
-    (* ~config:(Config.create ~min_interval:None ()) *)
-    (Multi.v_list (spinners @ [ Line.noop () ]))
-    (fun reporters ->
+    Multi.(blank ++ lines spinners ++ line (Line.noop ()))
+    (fun reporters _ ->
       let timer = Mtime_clock.counter () in
-      let render_time = Duration.of_sec 10. in
+      let render_time = Duration.of_sec 20. in
       while Duration.(Mtime_clock.count timer < render_time) do
         List.iter (fun f -> f ()) reporters
       done)

@@ -3,44 +3,69 @@
    Distributed under the MIT license. See terms at the end of this file.
   ————————————————————————————————————————————————————————————————————————————*)
 
-include Progress_engine_intf
+type 'a t =
+  { data : 'a array
+  ; timestamps : Mtime.t array
+  ; max_length : int
+  ; mutable most_recently_added : int
+  ; mutable length : int
+  ; get_time : unit -> Mtime.t
+  ; elt : (module Integer.S with type t = 'a)
+  }
 
-module Make (Platform : Platform.S) = struct
-  module Color = Ansi.Color
-  module Ansi = Ansi.Style
-  module Duration = Duration
-  module Multi = Multi
-  module Printer = Printer
-  module Units = Units
+let create (type a) ~clock:get_time ~size:max_length ~elt : a t =
+  let start_time = get_time () in
+  { get_time
+  ; data = Array.make max_length (Obj.magic None)
+  ; timestamps = Array.make max_length start_time
+  ; max_length
+  ; most_recently_added = -1
+  ; length = 0
+  ; elt
+  }
 
-  module Config = struct
-    include Config
+let is_empty t = t.most_recently_added = -1
 
-    type t = user_supplied
-  end
+let push t ~key ~data =
+  t.data.(key) <- data;
+  t.timestamps.(key) <- t.get_time ()
 
-  module Renderer = struct
-    include Renderer.Make (Platform)
-    include Renderer
-  end
+let record t data =
+  if t.length = t.max_length then (
+    (* Buffer is full. Overwrite the oldest value. *)
+    let next = (t.most_recently_added + 1) mod t.length in
+    push t ~key:next ~data;
+    t.most_recently_added <- next)
+  else (
+    (* Increase the buffer size *)
+    push t ~key:t.length ~data;
+    t.length <- succ t.length)
 
-  module Line = struct
-    include Line.Make (Platform)
-    include Line
-  end
+let oldest_index t =
+  if t.length = t.max_length then (t.most_recently_added + 1) mod t.length
+  else 0
 
-  type 'a reporter = 'a -> unit
+let fold =
+  let rec aux data f acc = function
+    | -1 -> acc
+    | n -> aux data f (f acc data.(n)) (n - 1)
+  in
+  fun t ~f ~init -> aux t.data f init (t.length - 1)
 
-  module Display = Renderer.Display
-  module Reporter = Renderer.Reporter
-  module Reporters = Renderer.Reporters
-
-  let interject_with = Renderer.interject_with
-  let with_reporters = Renderer.with_reporters
-  let with_reporter ?config b f = with_reporters ?config (Multi.line b) f
-end
-
-module Integer = Integer
+let rate_per_second : type a. a t -> a =
+ fun t ->
+  let (module Integer) = t.elt in
+  if is_empty t then Integer.zero
+  else
+    (* The computation here is very sloppy. TODO: test accuracy and precision *)
+    let interval =
+      let start_time = t.timestamps.(oldest_index t) in
+      let end_time = t.timestamps.(t.most_recently_added) in
+      Mtime.Span.to_s (Mtime.span start_time end_time)
+    in
+    let sum = fold t ~f:Integer.add ~init:Integer.zero in
+    let est = Integer.to_float sum /. interval in
+    Integer.of_float est
 
 (*————————————————————————————————————————————————————————————————————————————
    Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
