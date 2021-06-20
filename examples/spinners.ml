@@ -1,4 +1,5 @@
 open Progress
+module Ansi = Internals.Ansi
 
 let apply_color color s = Ansi.(code color) ^ s ^ Ansi.(code none)
 

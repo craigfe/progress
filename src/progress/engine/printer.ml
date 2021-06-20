@@ -30,7 +30,24 @@ let of_to_string ~len to_string =
 
 (** TODO: handle overflows *)
 
-let int ~width = of_to_string ~len:width Int.to_string
+let integer (type a) ~width (module Integer : Integer.S with type t = a) : a t =
+  let to_string x =
+    let x = Integer.to_string x in
+    let x_len = String.length x in
+    let padding = width - x_len in
+    if padding < 0 then
+      Fmt.failwith
+        "Progress.Printer.int: can't print integer %s within a width of %d" x
+        width;
+    if padding = 0 then x
+    else
+      let buf = Bytes.make width ' ' in
+      unsafe_blit_string x 0 buf padding x_len;
+      Bytes.unsafe_to_string buf
+  in
+  of_to_string ~len:width to_string
+
+let int ~width = integer ~width (module Integer.Int)
 let string ~width = of_to_string ~len:width Fun.id
 let to_pp { pp; _ } = pp
 

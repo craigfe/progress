@@ -9,29 +9,20 @@ module type S = sig
 
   (** *)
 
-  (** For example:
+  (** {1 Preliminaries}
 
-      See the [examples] directory for more complicated examples.
-
-      First, we need some basic types: *)
+      Some basic types used throughout the rest of the library: *)
 
   module Color = Ansi.Color
-
-  module Ansi : sig
-    include Ansi.Style with type color := Color.t
-  end
-
   module Duration = Duration
   module Printer = Printer
   module Units = Units
 
-  (** {1 Description} *)
+  (** {1 Description}
 
-  type 'a reporter := 'a -> unit
-  (** A {i reporter} for values of type ['a]. In this library, each progress bar
-      has its own reporting function. *)
+      Describing a progress line is done via the {!Line} DSL. Individual lines
+      can be stacked vertically via {!Multi}. *)
 
-  (** [Line] contains a DSL for defining custom progress bars. *)
   module Line : sig
     (** @inline *)
     include
@@ -41,12 +32,15 @@ module type S = sig
          and type 'a printer := 'a Printer.t
   end
 
-  (** [Multi] extends [Line] to multi-line layouts. *)
   module Multi : sig
+    type 'a reporter := 'a -> unit
+
     (** @inline *)
     include
       Multi.S with type 'a line := 'a Line.t and type 'a reporter := 'a reporter
   end
+
+  (** {2 Pre-provided layouts} *)
 
   val counter :
        total:int64
@@ -72,7 +66,15 @@ module type S = sig
         example, {!Units.bytes} can be used for totals measured in bytes. The
         default is to not display this segment. *)
 
-  (** {1 Rendering} *)
+  (** {1 Rendering}
+
+      Once you have a {{!description} description} of the progress bar to be
+      rendered (either a [Line.t] or a [Multi.t]), begin rendering it by using
+      {!with_reporter} or {!with_reporters} respectively. *)
+
+  type 'a reporter := 'a -> unit
+  (** A {i reporter} for values of type ['a]. In this library, each progress
+      line has its own reporting function. *)
 
   (** Configuration for progress bar rendering. *)
   module Config : sig
@@ -86,11 +88,21 @@ module type S = sig
       -> ?min_interval:Duration.t option
       -> unit
       -> t
-    (** @param ppf The formatter to use for rendering. Defaults to
-        [Format.err_formatter].
-        @param hide_cursor Whether or not to hide the terminal cursor (using the
-        {{:https://en.wikipedia.org/wiki/ANSI_escape_code} [DECTCEM]} ANSI
-        escape codes) during progress bar rendering. Defaults to [true]. *)
+    (** - [ppf]: the formatter to use for rendering. Defaults to
+          [Format.err_formatter].
+
+        - [hide_cursor]: whether or not to hide the terminal cursor (using the
+          {{:https://en.wikipedia.org/wiki/ANSI_escape_code} [DECTCEM]} ANSI
+          escape codes) during progress bar rendering. Defaults to [true].
+
+        - [persistent]: whether or not to retain the final progress bar display
+          in the terminal after rendering has finished. Defaults to [true].
+
+        - [max_width]: an optional fixed upper bound on the size of a progress
+          bar (in addition to the one by the terminal width). Defaults to
+          [None].
+
+        - [min_interval]: the minimal *)
 
     val ( || ) : t -> t -> t
     (** Merge two config values, with settings from the left taking priority.
@@ -123,12 +135,21 @@ module type S = sig
        and type 'a line := 'a Line.t
        and type ('a, 'b) multi := ('a, 'b) Multi.t
        and type config := Config.t
+
+  (** {1 Internals} *)
+
+  module Internals : sig
+    module Ansi : sig
+      include Ansi.Style with type color := Color.t
+    end
+  end
 end
 
 module type Progress_engine = sig
   module type S = S
+  module type Platform = Platform.S
 
-  module Make (_ : Platform.S) : S
+  module Make (_ : Platform) : S
   module Integer = Integer
 end
 

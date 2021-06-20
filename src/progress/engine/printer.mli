@@ -16,6 +16,7 @@ val create : to_string:('a -> string) -> string_len:int -> pp:'a pp -> 'a t
 (** {2 Constructing printers} *)
 
 val int : width:int -> int t
+val integer : width:int -> (module Integer.S with type t = 'a) -> 'a t
 val string : width:int -> string t
 val of_to_string : len:int -> ('a -> string) -> 'a t
 

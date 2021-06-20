@@ -12,9 +12,9 @@ module type S = sig
   type 'a reporter
 
   type ('a, 'b) t
-  (** The type of sequences of progress bars. The parameter ['a] stores a list
-      of the reporting functions associated with each bar, terminating with
-      ['b]. For example:
+  (** The type of vertical {i sequences} of progress bars. The parameter ['a]
+      stores a list of the reporting functions associated with each bar,
+      terminating with ['b]. For example:
 
       {[
         (* Single progress bar, taking a [float] value. *)
@@ -28,18 +28,20 @@ module type S = sig
       These reporting functions are supplied when beginning the {{!rendering}
       rendering} process. *)
 
-  val blank : ('a, 'a) t
-
   val line : 'a line -> ('a reporter -> 'b, 'b) t
-  (** Define a new progress bar from a specification, with the given initial
-      value. *)
+  (** Construct a multiple-line layout from a single progress bar line. *)
 
   val lines : 'a line list -> ('a reporter list -> 'b, 'b) t
+  (** Construct a multiple-line layout from a sequence of lines that all have
+      the same type of reported values. *)
 
   val ( ++ ) : ('a, 'b) t -> ('b, 'c) t -> ('a, 'c) t
   (** Stack progress bars vertically. [a / b] is a set with [a] stacked on top
       of [b]. The two sections have separate reporting functions, passed
       consecutively to the {!with_reporters} continuation when rendering. *)
+
+  val blank : ('a, 'a) t
+  (** A blank line, for adding spacing between progress lines. *)
 end
 
 module Hlist (Elt : sig

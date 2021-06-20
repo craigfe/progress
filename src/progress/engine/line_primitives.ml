@@ -38,7 +38,7 @@ type 'a t =
           [ `Theta of width:(unit -> int) -> Line_buffer.t -> int | `Val of 'a ]
       }
   | Staged of (unit -> 'a t)
-  | On_finalise of { final : unit t; inner : 'a t }
+  | On_finalise of { final : 'a; inner : 'a t }
   | Contramap : 'a t * ('b -> 'a) -> 'b t
   | Cond of { if_ : 'a -> bool; then_ : 'a t }
   | Box of
@@ -128,7 +128,7 @@ module Compiled = struct
         }
     | Theta of { pp : Line_buffer.t -> unit event -> int }
     | Contramap : 'a t * ('b -> 'a) -> 'b t
-    | On_finalise of { final : unit t; inner : 'a t }
+    | On_finalise of { final : 'a; inner : 'a t }
     | Pad of
         { contents : 'a t
         ; dir : [ `left of Line_buffer.t | `right ]
@@ -179,7 +179,6 @@ module Compiler_state : sig
   val consume_space : int Sta_dyn.t -> unit t
   val measure_consumed : 'a t -> ('a * int Sta_dyn.t) t
   val expand : (unit -> int) t
-  val both : 'a t -> 'b t -> ('a * 'b) t
 
   val with_expansion_point :
     int Sta_dyn.t -> 'a t -> ('a * [ `used | `not_used ] * int Sta_dyn.t) t
@@ -207,11 +206,6 @@ end = struct
       let a, s = at s in
       (fab a, s)
   end
-
-  let both l r s =
-    let l, _ = l s in
-    let r, s = r s in
-    ((l, r), s)
 
   let consume_space v s =
     let consumed_static =
@@ -304,10 +298,8 @@ let compile top =
         let+ inner = inner t in
         Compiled.Contramap (inner, f)
     | On_finalise t ->
-        let+ inner, final =
-          Compiler_state.both (inner t.inner) (inner t.final)
-        in
-        Compiled.On_finalise { final; inner }
+        let+ inner = inner t.inner in
+        Compiled.On_finalise { final = t.final; inner }
     | Cond { if_; then_ } ->
         let+ then_, width = Compiler_state.measure_consumed (inner then_) in
         Compiled.Cond
@@ -390,20 +382,27 @@ let apply_padding dir width =
           outer_width)
 
 let report compiled =
-  let rec aux : type a. a Compiled.t -> (Line_buffer.t -> a -> int) Staged.t =
-    function
+  let rec aux :
+      type a.
+         [ `report | `finish ]
+      -> a Compiled.t
+      -> (Line_buffer.t -> a -> int) Staged.t =
+   fun typ -> function
     | Noop -> Staged.inj (fun _ _ -> 0)
     | Theta { pp } -> Staged.inj (fun buf (_ : a) -> pp buf (`report ()))
     | Alpha pp ->
         Staged.inj (fun buf x ->
             pp.latest <- (fun buf -> pp.pp buf (`rerender x));
-            pp.pp buf (`report x))
+            let x =
+              match typ with `report -> `report x | `finish -> `finish x
+            in
+            pp.pp buf x)
     | Contramap (t, f) ->
-        let$ inner = aux t in
+        let$ inner = aux typ t in
         fun buf a -> inner buf (f a)
-    | On_finalise { inner; _ } -> aux inner
+    | On_finalise { inner; _ } -> aux typ inner
     | Cond t as _elt ->
-        let$ then_ = aux t.then_ in
+        let$ then_ = aux typ t.then_ in
         fun buf x ->
           t.latest <- Some x;
           if t.if_ x then (
@@ -427,21 +426,22 @@ let report compiled =
             Line_buffer.skip buf t.latest_span;
             Sta_dyn.get t.width)
     | Group g ->
-        let reporters = Array.map g ~f:(aux >> Staged.prj) in
+        let reporters = Array.map g ~f:(aux typ >> Staged.prj) in
         Staged.inj (fun buf v ->
             ArrayLabels.fold_left reporters ~f:(fun a f -> a + f buf v) ~init:0)
     | Pair { left; sep; right } ->
-        let$ left = aux left and$ sep = aux sep and$ right = aux right in
+        let$ left = aux typ left
+        and$ sep = aux typ sep
+        and$ right = aux typ right in
         fun buf (v_left, v_right) ->
           let x = left buf v_left in
           let y = sep buf () in
           let z = right buf v_right in
           x + y + z
     | Pad { contents; dir; width } ->
-        let$ contents = aux contents and$ pad = apply_padding dir width in
+        let$ contents = aux typ contents and$ pad = apply_padding dir width in
         fun buf x -> pad (fun buf -> contents buf x) buf
   in
-
   aux compiled
 
 let update top =
@@ -492,9 +492,9 @@ let update top =
               Sta_dyn.get t.width)
     | Contramap (inner, _) -> aux inner
     | On_finalise { final; inner } ->
-        let$ final_report = report final and$ inner = aux inner in
+        let$ inner_report = report `finish inner and$ inner = aux inner in
         fun uncond event ppf ->
-          if Poly.(event = `finish) then final_report ppf ()
+          if Poly.(event = `finish) then inner_report ppf final
           else inner uncond event ppf
     | Group g ->
         let updaters = Array.map g ~f:(aux >> Staged.prj) in
@@ -518,3 +518,21 @@ let finalise t =
 let update t =
   Staged.map (update t) ~f:(fun f ~unconditional buf ->
       f ~unconditional `rerender buf)
+
+let report t = report `report t
+
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+
+   Permission to use, copy, modify, and/or distribute this software for any
+   purpose with or without fee is hereby granted, provided that the above
+   copyright notice and this permission notice appear in all copies.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+   THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE SOFTWARE.
+  ————————————————————————————————————————————————————————————————————————————*)

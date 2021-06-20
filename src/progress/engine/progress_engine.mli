@@ -1,4 +1,11 @@
-(** [Progres_engine] provides a platform-independent progress bar renderer. *)
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+   Distributed under the MIT license. See terms at the end of this file.
+  ————————————————————————————————————————————————————————————————————————————*)
+
+(** [Progress_engine] provides a platform-independent progress bar renderer.
+    Most users should use the {!Progress} module, which instantiates this core
+    with a Unix platform implementation. *)
 
 include Progress_engine_intf.Progress_engine
 (** @inline *)

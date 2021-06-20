@@ -4,7 +4,8 @@
 
     - See {!Progress_logs} for related extensions to the
       {{:https://erratique.ch/software/logs} Logs} library.
-    - See {!Progress_engine} for non-Unix-dependent utilities. *)
+    - See {!Progress_engine} for an equivalent API that is portable to non-Unix
+      platforms. *)
 
 include Progress_engine.S
 (** @inline *)

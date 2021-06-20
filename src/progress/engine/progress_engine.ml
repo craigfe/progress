@@ -5,13 +5,18 @@
 
 include Progress_engine_intf
 
-module Make (Platform : Platform.S) = struct
+module type Platform = Platform.S
+
+module Make (Platform : Platform) = struct
   module Color = Ansi.Color
-  module Ansi = Ansi.Style
   module Duration = Duration
   module Multi = Multi
   module Printer = Printer
   module Units = Units
+
+  module Internals = struct
+    module Ansi = Ansi.Style
+  end
 
   module Config = struct
     include Config

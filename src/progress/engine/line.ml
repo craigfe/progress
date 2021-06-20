@@ -49,22 +49,19 @@ module Acc = struct
           ; flow_meter
           }
         in
-        let inner =
-          Primitives.contramap ~f:(fun () ->
-              let to_record = state.pending in
-              state.accumulator <- Integer.add to_record state.accumulator;
-              state.latest <- to_record;
-              state.pending <- Integer.zero;
-              state)
-          @@ inner
-        in
+        Primitives.contramap ~f:(fun a ->
+            Flow_meter.record state.flow_meter a;
+            state.pending <- Integer.add a state.pending)
+        @@ Primitives.conditional (fun _ -> should_update ())
         (* On finalisation, we must flush the [pending] accumulator to get the
            true final value. *)
-        Primitives.on_finalise inner
-        @@ Primitives.contramap ~f:(fun a ->
-               Flow_meter.record state.flow_meter a;
-               state.pending <- Integer.add a state.pending)
-        @@ Primitives.conditional (fun _ -> should_update ())
+        @@ Primitives.on_finalise ()
+        @@ Primitives.contramap ~f:(fun () ->
+               let to_record = state.pending in
+               state.accumulator <- Integer.add to_record state.accumulator;
+               state.latest <- to_record;
+               state.pending <- Integer.zero;
+               state)
         @@ inner)
 
   let accumulator t = t.accumulator
@@ -416,24 +413,25 @@ module Make (Platform : Platform.S) = struct
         in
         count_pp printer
 
-      let count ~width =
+      let count ?pp ~width () =
+        let pp =
+          match pp with
+          | None -> Printer.integer ~width (module Integer)
+          | Some x -> x
+        in
+        let pp = Staged.prj (Printer.to_line_printer pp) in
         acc
         @@ Primitives.contramap ~f:Acc.accumulator
-        @@ Primitives.alpha ~initial:(`Val Integer.zero) ~width
-             ( update_only @@ fun lb x ->
-               let x = Integer.to_string x in
-               for _ = String.length x to width - 1 do
-                 Line_buffer.add_char lb ' '
-               done;
-               Line_buffer.add_string lb x )
+        @@ Primitives.alpha ~initial:(`Val Integer.zero) ~width (update_only pp)
 
-      let count_to ?(sep = const "/") total =
+      let count_up_to ?pp ?(sep = const "/") total =
         let total = Integer.to_string total in
-        List
-          [ count ~width:(String.length total)
-          ; using (fun _ -> ()) sep
-          ; const total
-          ]
+        let width =
+          match pp with
+          | Some pp -> Printer.width pp
+          | None -> String.length total
+        in
+        List [ count ~width (); using (fun _ -> ()) sep; const total ]
 
       (* Progress bars *)
 
@@ -568,7 +566,7 @@ module Make (Platform : Platform.S) = struct
             in
             fun ppf -> function
               | `start -> ()
-              | `finish _ -> pp ppf Mtime.Span.zero
+              | `finish _ -> pp ppf Mtime.Span.max_span (* renders as [--:--] *)
               | `report x | `rerender x -> pp ppf x
           in
           let width = Printer.width Units.Duration.mm_ss in
@@ -576,7 +574,7 @@ module Make (Platform : Platform.S) = struct
           Primitives.alpha ~width ~initial printer
         in
         acc
-          (Primitives.contramap span_segment ~f:(fun acc ->
+        @@ Primitives.contramap ~f:(fun acc ->
                let per_second = Flow_meter.per_second (Acc.flow_meter acc) in
                let acc = Acc.accumulator acc in
                if Integer.(equal zero) per_second then Mtime.Span.max_span
@@ -586,7 +584,8 @@ module Make (Platform : Platform.S) = struct
                  else
                    Mtime.Span.of_uint64_ns
                      (Int64.of_float
-                        (todo /. Integer.to_float per_second *. 1_000_000_000.))))
+                        (todo /. Integer.to_float per_second *. 1_000_000_000.)))
+        @@ span_segment
 
       let elapsed () =
         let print_time =

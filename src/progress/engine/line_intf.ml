@@ -14,9 +14,8 @@ module type Integer_dependent = sig
   (**)
   type 'a t
 
-  val count : width:int -> integer t
-  val count_to : ?sep:unit t -> integer -> integer t
-  val count_pp : integer printer -> integer t
+  val count : ?pp:integer printer -> width:int -> unit -> integer t
+  val count_up_to : ?pp:integer printer -> ?sep:unit t -> integer -> integer t
   val bytes : integer t
   val bytes_per_sec : integer t
   val percentage_of : integer -> integer t
@@ -59,6 +58,10 @@ module type DSL = sig
   val const : string -> _ t
   (** [const s] is the segment that always displays [s]. *)
 
+  val constf : ('a, Format.formatter, unit, _ t) format4 -> 'a
+  (** [constf fmt a b c ...] is equivalent to
+      [const (Format.asprintf fmt a b c ...)]. *)
+
   val string : string t
   (** A line segment that displays a dynamically-sized string message. Use
       {!lpad} and {!rpad} to pad the message up to a given length. *)
@@ -70,20 +73,24 @@ module type DSL = sig
       are specialised to [int] values; see "{!integers}" for variants supporting
       [int32], [int64] etc. *)
 
-  val count : width:int -> integer t
-  (** [count ~width] displays a running total of reported values in the given
-      width. *)
+  val count : ?pp:integer printer -> width:int -> unit -> integer t
+  (** [count ~width ()] displays a running total of reported values using
+      [width]-many terminal columns. If passed, [pp] overrides the printer used
+      for rendering the count. *)
 
-  val count_to : ?sep:unit t -> integer -> integer t
-  (** TODO: document *)
-
-  val count_pp : integer printer -> integer t
-  (** [of_pp ~width pp] is a segment that uses the supplied fixed-width
-      pretty-printer to render the value. The pretty-printer must never emit
-      newline characters. *)
+  val count_up_to : ?pp:integer printer -> ?sep:unit t -> integer -> integer t
+  (** [count_up_to target] is like {!count}, but also renders the target total
+      after a given separator, i.e. [42/100]. [sep] defaults to [const "/"]. The
+      width of the segment is inferred by printing [total]. *)
 
   val bytes : integer t
+  (** Prints the running total as a number of bytes, using ISO/IEC binary
+      prefixes (e.g. [10.4 MiB]). See also {!bytes_per_sec}. *)
+
   val percentage_of : integer -> integer t
+  (** [percentage_of target] renders the running total as a percentage of
+      [target], i.e. [42%]. Values outside the range [\[0, 100\]] will be
+      clamped to either [0] or [100]. *)
 
   val bar :
        ?style:[ `ASCII | `UTF8 | `Custom of string list ]
@@ -115,6 +122,9 @@ module type DSL = sig
     -> unit
     -> _ t
 
+  val ticker : unit -> _ t
+  (** TODO: document. *)
+
   val of_printer : ?init:'a -> 'a printer -> 'a t
   (** TODO: Rename to [of_printer] and keep a distinction between accumulated
       printers. *)
@@ -130,9 +140,6 @@ module type DSL = sig
   val eta : total:integer -> integer t
   (** Displays an estimate of the remaining time until [total] is accumulated by
       the reporters, in [MM:SS] form. *)
-
-  val ticker : unit -> _ t
-  (** TODO: document. *)
 
   val bar_unaccumulated :
        ?style:[ `ASCII | `UTF8 | `Custom of string list ]
@@ -176,10 +183,6 @@ module type DSL = sig
 
       The following line segments are definable in terms of the others, but
       provided for convenience: *)
-
-  val constf : ('a, Format.formatter, unit, _ t) format4 -> 'a
-  (** [constf fmt a b c ...] is equivalent to
-      [const (Format.asprintf fmt a b c ...)]. *)
 
   val parens : 'a t -> 'a t
   (** [parens t] is [const "(" ++ t ++ const ")"]. *)
