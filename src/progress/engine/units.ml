@@ -12,7 +12,7 @@ module Percentage = struct
     let percentage x = clamp (0, 100) (Float.to_int (x *. 100.)) in
     let pp ppf x = Format.fprintf ppf "%3.0d%%" (percentage x) in
     let to_string x = Format.asprintf "%3.0d%%" (percentage x) in
-    Printer.create ~string_len:4 ~to_string ~pp
+    Printer.create ~string_len:4 ~to_string ~pp ()
 end
 
 module Bytes = struct
@@ -57,7 +57,7 @@ module Bytes = struct
           Printf.sprintf "%s%.1f %s%s" lpad mantissa unit rpad)
     in
     let string_len = 10 in
-    Printer.create ~to_string ~string_len ~pp
+    Printer.create ~to_string ~string_len ~pp ()
 
   let of_int = generic (module Integer.Int)
   let of_int63 = generic (module Integer.Int63)
@@ -76,7 +76,7 @@ module Duration = struct
           (Float.div seconds 60. |> Float.floor)
           (Float.rem seconds 60. |> Float.floor)
     in
-    Printer.of_to_string ~len:5 to_string
+    Printer.create ~string_len:5 ~to_string ()
 end
 
 (*————————————————————————————————————————————————————————————————————————————

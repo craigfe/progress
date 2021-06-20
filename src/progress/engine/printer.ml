@@ -19,14 +19,12 @@ type 'a t =
   ; pp : 'a pp
   }
 
-let create ~to_string ~string_len ~pp =
+let create ?pp ~to_string ~string_len () =
   let write x ~into ~pos =
     unsafe_blit_string (to_string x) 0 into pos string_len
   in
+  let pp = match pp with None -> Fmt.of_to_string to_string | Some pp -> pp in
   { write; write_len = string_len; to_string; pp }
-
-let of_to_string ~len to_string =
-  create ~to_string ~string_len:len ~pp:(Fmt.of_to_string to_string)
 
 (** TODO: handle overflows *)
 
@@ -45,7 +43,7 @@ let integer (type a) ~width (module Integer : Integer.S with type t = a) : a t =
       unsafe_blit_string x 0 buf padding x_len;
       Bytes.unsafe_to_string buf
   in
-  of_to_string ~len:width to_string
+  create ~string_len:width ~to_string ()
 
 let int ~width = integer ~width (module Integer.Int)
 
@@ -150,7 +148,7 @@ let string ~width =
       Buffer.add_string buf ellipsis;
       Buffer.contents buf
   in
-  of_to_string ~len:width to_string
+  create ~string_len:width ~to_string ()
 
 let to_pp { pp; _ } = pp
 
@@ -160,11 +158,10 @@ let using ~f { write; write_len; to_string; pp } =
   let to_string x = to_string (f x) in
   { write; write_len; to_string; pp }
 
-let to_to_string { to_string; _ } = to_string
-
 let to_line_printer { write; write_len; _ } =
   Line_buffer.lift_write ~len:write_len ~write
 
+let to_to_string { to_string; _ } = to_string
 let print_width { write_len; _ } = write_len
 
 module Internals = struct

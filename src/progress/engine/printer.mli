@@ -11,8 +11,10 @@ type -'a t
     {i rendered} length in terminals (i.e. after accounting for UTF-8 encoding
     and ANSI escapes).
 
-    See {!Units} for a number of pre-provided printers for working with progress
-    bars. *)
+    Most users don't need this module, and can use the pre-provided {!Line}
+    segments and {!Units} printers. *)
+
+(** {1 Constructing printers} *)
 
 val int : width:int -> int t
 (** [int ~width] pretty-prints integers using [width] characters, adding left
@@ -37,6 +39,12 @@ val string : width:int -> string t
        to be correct on all UTF08 codepoints, and so certain "unusual" string
        inputs can cause progress bar rendering to go awry.} *)
 
+val using : f:('b -> 'a) -> 'a t -> 'b t
+(** [using ~f t] prints values [v] by passing [f v] to the printer [t]. *)
+
+val create :
+  ?pp:'a pp -> to_string:('a -> string) -> string_len:int -> unit -> 'a t
+
 (** {1 Consuming printers} *)
 
 val to_pp : 'a t -> Format.formatter -> 'a -> unit
@@ -48,12 +56,6 @@ val to_to_string : 'a t -> 'a -> string
 val print_width : _ t -> int
 (** [print_width t] is the number of terminal columns occupied by the output of
     [t]. *)
-
-(** {1 Constructing printers} *)
-
-val of_to_string : len:int -> ('a -> string) -> 'a t
-val using : f:('b -> 'a) -> 'a t -> 'b t
-val create : to_string:('a -> string) -> string_len:int -> pp:'a pp -> 'a t
 
 (** {1 Internals} *)
 
