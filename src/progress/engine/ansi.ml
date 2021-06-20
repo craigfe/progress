@@ -16,27 +16,61 @@ module Color = struct
   type plain =
     [ `black | `blue | `cyan | `green | `magenta | `red | `white | `yellow ]
 
+  let pp_plain : plain Fmt.t =
+    Fmt.of_to_string (function
+      | `black -> "black"
+      | `blue -> "blue"
+      | `cyan -> "cyan"
+      | `green -> "green"
+      | `magenta -> "magenta"
+      | `red -> "red"
+      | `white -> "white"
+      | `yellow -> "yellow")
+
   type t = Ansi of [ plain | `bright of plain ] | Rgb of int * int * int
 
-  let of_ansi x = Ansi x
-  let of_rgb r g b = Rgb (r, g, b)
+  let pp_dump ppf = function
+    | Rgb (r, g, b) -> Fmt.pf ppf "RGB (%d, %d, %d)" r g b
+    | Ansi (#plain as x) -> Fmt.pf ppf "ANSI (%a)" pp_plain x
+    | Ansi (`bright x) -> Fmt.pf ppf "ANSI (bright %a)" pp_plain x
 
-  let of_hex s =
-    let len = String.length s in
-    if len = 4 || len = 7 then
-      let short = len = 4 in
-      let r' = if short then String.sub s 1 1 else String.sub s 1 2 in
-      let g' = if short then String.sub s 2 1 else String.sub s 3 2 in
-      let b' = if short then String.sub s 3 1 else String.sub s 5 2 in
-      let r = int_of_string_opt ("0x" ^ r') in
-      let g = int_of_string_opt ("0x" ^ g') in
-      let b = int_of_string_opt ("0x" ^ b') in
-      match (r, g, b) with
-      | Some r, Some g, Some b ->
-          if short then of_rgb ((16 * r) + r) ((16 * g) + g) ((16 * b) + b)
-          else of_rgb r g b
-      | _ -> failwith "Invalid"
-    else failwith "Incorrect length: %d"
+  let of_ansi x = Ansi x
+
+  let of_rgb =
+    let invalid_component typ n =
+      Fmt.invalid_arg "Color.of_rgb: invalid %s component %d" typ n
+    in
+    fun r g b ->
+      if r < 0 || r > 255 then invalid_component "red" r;
+      if g < 0 || g > 255 then invalid_component "green" g;
+      if b < 0 || b > 255 then invalid_component "blue" b;
+      Rgb (r, g, b)
+
+  let of_hex =
+    let invalid_length =
+      Fmt.invalid_arg "Color.of_hex: invalid hexstring length %d"
+    in
+    let hex c =
+      if c >= '0' && c <= '9' then Char.code c - Char.code '0'
+      else if c >= 'a' && c <= 'f' then Char.code c - Char.code 'a' + 10
+      else if c >= 'A' && c <= 'F' then Char.code c - Char.code 'A' + 10
+      else Fmt.invalid_arg "Color.of_hex: invalid hexstring character %c" c
+    in
+    fun s ->
+      let len = String.length s in
+      if len = 0 then invalid_length len;
+      if s.[0] <> '#' then
+        invalid_arg "Color.of_hex: hexstrings must start with '#'";
+      let r1, r0, g1, g0, b1, b0 =
+        match len with
+        | 7 -> (hex s.[1], hex s.[2], hex s.[3], hex s.[4], hex s.[5], hex s.[6])
+        | 4 ->
+            (* Short hexstrings of the form #ABC alias longer ones of the form #AABBCC *)
+            let r, g, b = (hex s.[1], hex s.[2], hex s.[3]) in
+            (r, r, g, g, b, b)
+        | _ -> invalid_length len
+      in
+      of_rgb ((16 * r1) + r0) ((16 * g1) + g0) ((16 * b1) + b0)
 end
 
 module Style = struct
