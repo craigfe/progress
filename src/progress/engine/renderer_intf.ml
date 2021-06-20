@@ -80,8 +80,7 @@ module type S = sig
   module Reporter : sig
     type 'a t
 
-    val push : 'a t -> 'a -> unit
-    val noop : 'a t
+    val report : 'a t -> 'a -> unit
 
     type (_, _) list =
       | [] : ('a, 'a) list

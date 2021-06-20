@@ -36,16 +36,16 @@ module Worker = struct
   type t =
     { mutable todo : int
     ; mutable download_rate : int
-    ; mutable reporter : int Reporter.t
+    ; mutable reporter : int Reporter.t option
     }
 
-  let empty () = { todo = 0; reporter = Reporter.noop; download_rate = 100_000 }
+  let empty () = { todo = 0; reporter = None; download_rate = 100_000 }
 
   let make_progress t =
     let progress = min t.todo t.download_rate in
     t.download_rate <- max 0 (t.download_rate + (Random.int 50_001 - 25_000));
     t.todo <- t.todo - progress;
-    Reporter.push t.reporter progress
+    Reporter.report (Option.get t.reporter) progress
 end
 
 type t = { mutable active_workers : Worker.t list; mutable files : int list }
@@ -65,8 +65,8 @@ let run () =
   in
   let [ completed ] = Display.reporters display in
   let nb_workers = 5 in
-  let finish_item reporter =
-    Display.finalise_line display reporter;
+  let finish_item (worker : Worker.t) =
+    Display.finalise_line display (Option.get worker.reporter);
     completed ()
   in
   let pick_item t (worker : Worker.t) =
@@ -74,7 +74,7 @@ let run () =
     | [] -> false
     | x :: xs ->
         let new_reporter = Display.add_line ~above:3 display (bar ~total:x) in
-        worker.reporter <- new_reporter;
+        worker.reporter <- Some new_reporter;
         worker.todo <- x;
         t.files <- xs;
         true
@@ -95,7 +95,7 @@ let run () =
           Worker.make_progress worker;
           if worker.todo > 0 then true (* Not done yet; keep going. *)
           else (
-            finish_item worker.reporter;
+            finish_item worker;
             pick_item t worker))
     in
 

@@ -86,15 +86,9 @@ end
 
 module Reporter = struct
   type 'a t =
-    | Noop
-    | Active of
-        { uid : Bar_id.t
-        ; update : unconditional:bool -> unit
-        ; report : 'a -> unit
-        }
+    { uid : Bar_id.t; update : unconditional:bool -> unit; report : 'a -> unit }
 
-  let noop = Noop
-  let push = function Noop -> Fun.const () | Active { report; _ } -> report
+  let report t = t.report
 
   type (_, _) list =
     | [] : ('a, 'a) list
@@ -455,15 +449,12 @@ module Make (Platform : Platform.S) = struct
           let uid = Bar_renderer.id bar in
           let report = reporter_of_bar d bar in
           let update = updater_of_bar d bar in
-          Active { uid; report; update }
+          { uid; report; update }
 
     let finalise_line t r =
       match Global.find_display t.uid with
       | Error `finalised -> failwith "Display already finalised"
-      | Ok display -> (
-          match r with
-          | Reporter.Noop -> ()
-          | Active { uid; _ } -> Display.finalise_line display uid)
+      | Ok display -> Display.finalise_line display r.Reporter.uid
     (* TODO: use [bar] / [line] consistently *)
 
     let finalise t =
