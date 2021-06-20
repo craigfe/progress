@@ -13,18 +13,22 @@ let colors =
     |]
   [@@ocamlformat "disable"]
 
-let x = ref 0
+let pick_color =
+  let count = ref (-1) in
+  fun () ->
+    count := succ !count mod Array.length colors;
+    colors.(!count)
 
 let bar ~total =
   let open Line in
-  let eta = eta ~total in
-  incr x;
-  list ~sep:(const " ")
-    [ spinner ~color:(Color.of_ansi `green) ()
-    ; const "[" ++ elapsed () ++ const "]"
-    ; bar ~color:colors.(!x - 1) ~style:`ASCII ~total ()
+  let spinner = spinner ~color:(Color.of_ansi `green) () in
+  let bar = bar ~color:(pick_color ()) ~style:`ASCII ~total () in
+  list
+    [ spinner
+    ; brackets (elapsed ())
+    ; bar
     ; bytes
-    ; const "(" ++ const "eta: " ++ eta ++ const ")"
+    ; parens (const "eta: " ++ eta ~total)
     ]
 
 type worker = { mutable todo : int; mutable reporter : int Reporter.t }
@@ -36,22 +40,20 @@ let run () =
 
   let bottom_line =
     Line.(
-      lpad 8 (counter ())
+      lpad 8 (ticker ())
       ++ constf " / %d files downloaded, elapsed: " total_files
       ++ elapsed ())
   in
   let display =
     Display.start Multi.(blank ++ blank ++ line bottom_line ++ blank)
   in
-  let Reporters.[ completed ] =
-    (Display.reporters display : (_, unit) Reporters.t)
-  in
+  let [ completed ] = Display.reporters display in
   let nb_workers = 5 in
   let active_workers =
     List.init nb_workers (fun _ -> { todo = 0; reporter = Reporter.noop })
   in
   let finish_item reporter =
-    Display.finalize_line display reporter;
+    Display.finalise_line display reporter;
     completed ()
   in
   let t = { active_workers; files } in
@@ -82,4 +84,4 @@ let run () =
     t.active_workers <- active_workers;
     Unix.sleepf 0.01
   done;
-  Display.finalize display
+  Display.finalise display

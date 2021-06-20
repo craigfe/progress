@@ -30,7 +30,7 @@ end
 
 (* Boilerplate from here onwards. Someday I'll write a PPX for this... *)
 
-let create ?ppf ?hide_cursor ?persistent ?max_width ?min_interval () =
+let v ?ppf ?hide_cursor ?persistent ?max_width ?min_interval () =
   { ppf; hide_cursor; persistent; max_width; min_interval }
 
 (* Merge two ['a option]s with a left [Some] taking priority *)

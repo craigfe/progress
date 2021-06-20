@@ -40,6 +40,7 @@ module type S = sig
   val array : 'a t array -> 'a t
   val pair : ?sep:unit t -> 'a t -> 'b t -> ('a * 'b) t
   val contramap : f:('a -> 'b) -> 'b t -> 'a t
+  val on_finalise : unit t -> 'a t -> 'a t
 
   val of_pp :
     width:int -> initial:'a -> (Format.formatter -> 'a event -> unit) -> 'a t

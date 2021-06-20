@@ -13,7 +13,11 @@ open! Import
     - the reported value has a monoid instance, used for initialisation and
       accumulation.
 
-    - the line is wrapped inside a single box. *)
+    - the line is wrapped inside a single box.
+
+    It contains its own notion of "accumulated" line segments, and ensures that
+    this works with conditional rendering of segments (e.g. when rendering with
+    a minimum interval). *)
 
 module Acc = struct
   type 'a t =
@@ -45,17 +49,22 @@ module Acc = struct
           ; flow_meter
           }
         in
-
-        Primitives.contramap ~f:(fun a ->
-            Flow_meter.record state.flow_meter a;
-            state.pending <- Integer.add a state.pending)
+        let inner =
+          Primitives.contramap ~f:(fun () ->
+              let to_record = state.pending in
+              state.accumulator <- Integer.add to_record state.accumulator;
+              state.latest <- to_record;
+              state.pending <- Integer.zero;
+              state)
+          @@ inner
+        in
+        (* On finalisation, we must flush the [pending] accumulator to get the
+           true final value. *)
+        Primitives.on_finalise inner
+        @@ Primitives.contramap ~f:(fun a ->
+               Flow_meter.record state.flow_meter a;
+               state.pending <- Integer.add a state.pending)
         @@ Primitives.conditional (fun _ -> should_update ())
-        @@ Primitives.contramap ~f:(fun () ->
-               let to_record = state.pending in
-               state.accumulator <- Integer.add to_record state.accumulator;
-               state.latest <- to_record;
-               state.pending <- Integer.zero;
-               state)
         @@ inner)
 
   let accumulator t = t.accumulator
@@ -97,10 +106,203 @@ type 'a t =
       ; elt : (module Integer.S with type t = 'a)
       }
 
-module Make (Platform : Platform.S) = struct
-  module Clock = Platform.Clock
+module Integer_independent (Platform : Platform.S) = struct
+  open struct
+    module Clock = Platform.Clock
+  end
 
-  module Primitives = struct
+  let noop () = Noop
+
+  let const s =
+    let len = String.length s and len_utf8 = String.Utf8.length s in
+    let segment =
+      Primitives.theta ~width:len_utf8 (fun buf _ ->
+          Line_buffer.add_substring buf s ~off:0 ~len)
+    in
+    Basic segment
+
+  let constf fmt = Format.kasprintf const fmt
+  let pair ?(sep = noop ()) a b = Pair (a, sep, b)
+
+  let list ?(sep = const " ") xs =
+    let xs =
+      ListLabels.filter_map xs ~f:(function Noop -> None | x -> Some x)
+    in
+    List (List.intersperse ~sep xs)
+
+  let ( ++ ) a b = List [ a; b ]
+  let parens t = const "(" ++ t ++ const ")"
+  let brackets t = const "[" ++ t ++ const "]"
+  let braces t = const "{" ++ t ++ const "}"
+  let using f x = Contramap (x, f)
+
+  let string =
+    let segment =
+      Primitives.alpha_unsized ~initial:(`Val "") (fun ~width buf -> function
+        | `start -> 0 (* TODO: chosen randomly *)
+        | `finish s | `report s | `rerender s ->
+            let input_len = String.length s in
+            let output_len = width () - 1 (* XXX: why is -1 necessary? *) in
+            let () =
+              match input_len <= output_len with
+              | true ->
+                  Line_buffer.add_string buf s;
+                  for _ = input_len to output_len do
+                    Line_buffer.add_char buf ' '
+                  done
+              | false ->
+                  Line_buffer.add_substring buf s ~off:0 ~len:(output_len - 4);
+                  Line_buffer.add_string buf " ..."
+            in
+            output_len)
+    in
+    Basic segment
+
+  let lpad sz t = Map (Primitives.box_fixed ~pad:`left sz, t)
+  let rpad sz t = Map (Primitives.box_fixed ~pad:`right sz, t)
+
+  let ticker () =
+    let segment =
+      let pp ~width buf count =
+        let count =
+          match count with
+          | `finish x | `report x | `rerender x -> x
+          | `start -> Int63.zero
+        in
+        let width = width () in
+        let str = Int63.to_string count in
+        let len = String.length str in
+        for _ = len + 1 to width do
+          (* TODO: deal with overflow *)
+          Line_buffer.add_char buf ' '
+        done;
+        Line_buffer.add_string buf str;
+        width
+      in
+      Primitives.alpha_unsized ~initial:(`Val Int63.zero) pp
+    in
+    Contramap
+      ( Acc
+          { segment = Primitives.contramap ~f:Acc.accumulator segment
+          ; elt = (module Integer.Int63)
+          }
+      , fun _ -> Int63.one )
+
+  (* Spinners *)
+
+  let with_color_opt color buf f =
+    match color with
+    | None -> f ()
+    | Some s ->
+        Line_buffer.add_string buf Ansi.Style.(code (fg s));
+        let a = f () in
+        Line_buffer.add_string buf Ansi.Style.(code none);
+        a
+
+  module Modulo_counter : sig
+    type t
+
+    val create : int -> t
+    val latest : t -> int
+    val tick : t -> int
+  end = struct
+    type t = { modulus : int; mutable latest : int }
+
+    let create modulus = { modulus; latest = 0 }
+    let latest t = t.latest
+
+    let tick t =
+      t.latest <- succ t.latest mod t.modulus;
+      t.latest
+  end
+
+  let debounce interval s =
+    Primitives.stateful (fun () ->
+        let latest = ref (Clock.now ()) in
+        let should_update () =
+          let now = Clock.now () in
+          match Mtime.Span.compare (Mtime.span !latest now) interval >= 0 with
+          | false -> false
+          | true ->
+              latest := now;
+              true
+        in
+        Primitives.conditional (fun _ -> should_update ()) s)
+
+  module Spinner = struct
+    type t = { frames : string array; final_frame : string option; width : int }
+
+    let v ~frames ~final_frame ~width = { frames; final_frame; width }
+
+    let default =
+      v ~final_frame:(Some "✔️") ~width:1
+        ~frames:
+          [| "⠋"
+           ; "⠙"
+           ; "⠹"
+           ; "⠸"
+           ; "⠼"
+           ; "⠴"
+           ; "⠦"
+           ; "⠧"
+           ; "⠇"
+           ; "⠏"
+          |]
+
+    let stage_count t = Array.length t.frames
+  end
+
+  let spinner ?color ?frames ?(min_interval = Some (Duration.of_int_ms 80)) () =
+    let spinner =
+      match frames with
+      | None -> Spinner.default
+      | Some [] -> Fmt.invalid_arg "spinner must have at least one stage"
+      | Some (x :: xs as frames) ->
+          let width = String.Utf8.length x in
+          ListLabels.iteri xs ~f:(fun i x ->
+              let width' = String.Utf8.length x in
+              if width <> width' then
+                Fmt.invalid_arg
+                  "Spinner frames must have the same UTF-8 length. found %d \
+                   (at index 0) and %d (at index %d)"
+                  (i + 1) width width');
+          Spinner.v ~frames:(Array.of_list frames) ~final_frame:None ~width
+    in
+    let apply_debounce = Option.fold min_interval ~none:Fun.id ~some:debounce in
+    Basic
+      (Primitives.stateful (fun () ->
+           let counter = Modulo_counter.create (Spinner.stage_count spinner) in
+           apply_debounce
+           @@ Primitives.theta ~width:spinner.Spinner.width (fun buf -> function
+                | `start -> ()
+                | `finish () ->
+                    let final_frame =
+                      match spinner.final_frame with
+                      | None -> spinner.frames.(Modulo_counter.tick counter)
+                      | Some x -> x
+                    in
+                    with_color_opt color buf (fun () ->
+                        Line_buffer.add_string buf final_frame)
+                | (`report () | `rerender ()) as e ->
+                    let tick =
+                      match e with
+                      | `report () -> Modulo_counter.tick counter
+                      | `rerender () -> Modulo_counter.latest counter
+                    in
+                    let frame = spinner.Spinner.frames.(tick) in
+                    with_color_opt color buf (fun () ->
+                        Line_buffer.add_string buf frame))))
+end
+
+module Make (Platform : Platform.S) = struct
+  open struct
+    module Clock = Platform.Clock
+  end
+
+  module Integer_independent = Integer_independent (Platform)
+  include Integer_independent
+
+  module Internals = struct
     module Line_buffer = Line_buffer
     include Primitives
 
@@ -160,182 +362,27 @@ module Make (Platform : Platform.S) = struct
                 Primitives.contramap ~f:(fun a ->
                     x := should_update ();
                     a)
-                @@ Primitives.box_winsize ?max:config.max_width
+                @@ Internals.box_winsize ?max:config.max_width
                 @@ inner (fun () -> !x))
           in
           segment
 
   (* Basic utilities for combining segments *)
 
-  let noop () = Noop
-
-  let const s =
-    let len = String.length s and len_utf8 = String.Utf8.length s in
-    let segment =
-      Primitives.theta ~width:len_utf8 (fun buf _ ->
-          Line_buffer.add_substring buf s ~off:0 ~len)
-    in
-    Basic segment
-
-  let constf fmt = Format.kasprintf const fmt
-  let pair ?(sep = noop ()) a b = Pair (a, sep, b)
-
-  let list ?(sep = const "  ") xs =
-    let xs =
-      ListLabels.filter_map xs ~f:(function Noop -> None | x -> Some x)
-    in
-    List (List.intersperse ~sep xs)
-
-  let ( ++ ) a b = List [ a; b ]
-  let using f x = Contramap (x, f)
-
-  let string =
-    let segment =
-      Primitives.alpha_unsized ~initial:(`Val "") (fun ~width buf -> function
-        | `start -> 0 (* TODO: chosen randomly *)
-        | `finish s | `report s | `rerender s ->
-            let input_len = String.length s in
-            let output_len = width () - 1 (* XXX: why is -1 necessary? *) in
-            let () =
-              match input_len <= output_len with
-              | true ->
-                  Line_buffer.add_string buf s;
-                  for _ = input_len to output_len do
-                    Line_buffer.add_char buf ' '
-                  done
-              | false ->
-                  Line_buffer.add_substring buf s ~off:0 ~len:(output_len - 4);
-                  Line_buffer.add_string buf " ..."
-            in
-            output_len)
-    in
-    Basic segment
-
-  let lpad sz t = Map (Primitives.box_fixed ~pad:`left sz, t)
-  let rpad sz t = Map (Primitives.box_fixed ~pad:`right sz, t)
-
-  let counter () =
-    let segment =
-      Primitives.stateful (fun () ->
-          let count = ref Int63.zero in
-          let pp ~width buf e =
-            if Poly.(e = `report ()) then count := Int63.succ !count;
-            let width = width () in
-            let str = Int63.to_string !count in
-            let len = String.length str in
-            for _ = len + 1 to width do
-              (* TODO: deal with overflow *)
-              Line_buffer.add_char buf ' '
-            done;
-            Line_buffer.add_string buf str;
-            width
-          in
-          Primitives.alpha_unsized ~initial:(`Val ()) pp)
-    in
-    Basic segment
-
-  (* Spinners *)
-
-  let with_color_opt color buf f =
-    match color with
-    | None -> f ()
-    | Some s ->
-        Line_buffer.add_string buf Ansi.Style.(code (fg s));
-        let a = f () in
-        Line_buffer.add_string buf Ansi.Style.(code none);
-        a
-
-  module Modulo_counter : sig
-    type t
-
-    val create : int -> t
-    val latest : t -> int
-    val tick : t -> int
-  end = struct
-    type t = { modulus : int; mutable latest : int }
-
-    let create modulus = { modulus; latest = 0 }
-    let latest t = t.latest
-
-    let tick t =
-      t.latest <- succ t.latest mod t.modulus;
-      t.latest
-  end
-
-  let debounce interval s =
-    Primitives.stateful (fun () ->
-        let latest = ref (Clock.now ()) in
-        let should_update () =
-          let now = Clock.now () in
-          match Mtime.Span.compare (Mtime.span !latest now) interval >= 0 with
-          | false -> false
-          | true ->
-              latest := now;
-              true
-        in
-        Primitives.conditional (fun _ -> should_update ()) s)
-
-  let spinner ?color ?frames ?(min_interval = Some (Duration.of_int_ms 80)) () =
-    let frames, width =
-      match frames with
-      | None ->
-          ( [| "⠋"
-             ; "⠙"
-             ; "⠹"
-             ; "⠸"
-             ; "⠼"
-             ; "⠴"
-             ; "⠦"
-             ; "⠧"
-             ; "⠇"
-             ; "⠏"
-            |]
-          , 1 )
-      | Some [] -> Fmt.invalid_arg "spinner must have at least one stage"
-      | Some (x :: xs as frames) ->
-          let width = String.Utf8.length x in
-          ListLabels.iteri xs ~f:(fun i x ->
-              let width' = String.Utf8.length x in
-              if width <> width' then
-                Fmt.invalid_arg
-                  "Spinner frames must have the same UTF-8 length. found %d \
-                   (at index 0) and %d (at index %d)"
-                  (i + 1) width width');
-          (Array.of_list frames, width)
-    in
-    let stage_count = Array.length frames in
-    let apply_debounce =
-      Option.fold min_interval ~none:(fun x -> x) ~some:debounce
-    in
-    Basic
-      (Primitives.stateful (fun () ->
-           let counter = Modulo_counter.create stage_count in
-           apply_debounce
-           @@ Primitives.theta ~width (fun buf -> function
-                | `start -> ()
-                | `finish () ->
-                    with_color_opt color buf (fun () ->
-                        Line_buffer.add_string buf "✔️")
-                | (`report () | `rerender ()) as e ->
-                    let tick =
-                      match e with
-                      | `report () -> Modulo_counter.tick counter
-                      | `rerender () -> Modulo_counter.latest counter
-                    in
-                    let frame = frames.(tick) in
-                    with_color_opt color buf (fun () ->
-                        Line_buffer.add_string buf frame))))
-
   module Integer_dependent = struct
-    module type S = sig
-      include
-        Integer_dependent
-          with type 'a t := 'a t
-           and type color := Ansi.Color.t
-           and type 'a printer := 'a Printer.t
-    end
+    module type S =
+      Integer_dependent
+        with type 'a t := 'a t
+         and type color := Ansi.Color.t
+         and type 'a printer := 'a Printer.t
 
-    module Make (Integer : Integer.S) = struct
+    module type Ext =
+      DSL
+        with type 'a t := 'a t
+         and type color := Ansi.Color.t
+         and type 'a printer := 'a Printer.t
+
+    module Make_ext (Integer : Integer.S) = struct
       let acc segment = Acc { segment; elt = (module Integer) }
 
       let of_printer ?init printer =
@@ -369,8 +416,6 @@ module Make (Platform : Platform.S) = struct
         in
         count_pp printer
 
-      let max total = const (Integer.to_string total)
-
       let count ~width =
         acc
         @@ Primitives.contramap ~f:Acc.accumulator
@@ -381,6 +426,14 @@ module Make (Platform : Platform.S) = struct
                  Line_buffer.add_char lb ' '
                done;
                Line_buffer.add_string lb x )
+
+      let count_to ?(sep = const "/") total =
+        let total = Integer.to_string total in
+        List
+          [ count ~width:(String.length total)
+          ; using (fun _ -> ()) sep
+          ; const total
+          ]
 
       (* Progress bars *)
 
@@ -445,6 +498,7 @@ module Make (Platform : Platform.S) = struct
             in
             bar_custom ~stages
 
+      (* TODO: fix duplication with below *)
       let bar_unaccumulated ?(style = `UTF8) ?color ?color_empty
           ?(width = `Expand) ~total () =
         let proportion x = Integer.to_float x /. Integer.to_float total in
@@ -501,26 +555,29 @@ module Make (Platform : Platform.S) = struct
         let width = Printer.width pp_val + 2 in
         acc
         @@ Primitives.contramap
-             ~f:
-               (Acc.flow_meter >> Flow_meter.rate_per_second >> Integer.to_float)
+             ~f:(Acc.flow_meter >> Flow_meter.per_second >> Integer.to_float)
         @@ Primitives.alpha ~width ~initial:(`Val 0.) (update_only pp_rate)
 
+      let bytes_per_sec = rate Units.Bytes.of_float
+
       let eta ~total =
-        let printer =
-          let pp = Staged.prj (Printer.to_line_printer Units.Duration.mm_ss) in
-          fun ppf -> function
-            | `start -> ()
-            | `finish _ -> pp ppf Mtime.Span.max_span
-            | `report x | `rerender x -> pp ppf x
+        let span_segment =
+          let printer =
+            let pp =
+              Staged.prj (Printer.to_line_printer Units.Duration.mm_ss)
+            in
+            fun ppf -> function
+              | `start -> ()
+              | `finish _ -> pp ppf Mtime.Span.zero
+              | `report x | `rerender x -> pp ppf x
+          in
+          let width = Printer.width Units.Duration.mm_ss in
+          let initial = `Val Mtime.Span.max_span in
+          Primitives.alpha ~width ~initial printer
         in
-        let width = Printer.width Units.Duration.mm_ss in
-        let initial = `Val Mtime.Span.max_span in
         acc
-          (Primitives.contramap (Primitives.alpha ~width ~initial printer)
-             ~f:(fun acc ->
-               let per_second =
-                 Acc.flow_meter acc |> Flow_meter.rate_per_second
-               in
+          (Primitives.contramap span_segment ~f:(fun acc ->
+               let per_second = Flow_meter.per_second (Acc.flow_meter acc) in
                let acc = Acc.accumulator acc in
                if Integer.(equal zero) per_second then Mtime.Span.max_span
                else
@@ -530,36 +587,40 @@ module Make (Platform : Platform.S) = struct
                    Mtime.Span.of_uint64_ns
                      (Int64.of_float
                         (todo /. Integer.to_float per_second *. 1_000_000_000.))))
+
+      let elapsed () =
+        let print_time =
+          Staged.prj (Printer.to_line_printer Units.Duration.mm_ss)
+        in
+        let segment =
+          Primitives.stateful (fun () ->
+              let elapsed = Clock.counter () in
+              let latest = ref Mtime.Span.zero in
+              let finished = ref false in
+              let pp buf e =
+                (match e with
+                | `start | `report _ -> latest := Clock.count elapsed
+                | `finish _ when not !finished ->
+                    latest := Clock.count elapsed;
+                    finished := true
+                | `rerender _ | `finish _ -> ());
+                print_time buf !latest
+              in
+              Primitives.theta ~width:5 pp)
+        in
+        Basic segment
+
+      include Integer_independent
     end
+
+    module Make = Make_ext
   end
 
   include Integer_dependent.Make (Integer.Int)
-  module Int32 = Integer_dependent.Make (Integer.Int32)
-  module Int63 = Integer_dependent.Make (Integer.Int63)
-  module Int64 = Integer_dependent.Make (Integer.Int64)
-  module Float = Integer_dependent.Make (Integer.Float)
-
-  let elapsed () =
-    let print_time =
-      Staged.prj (Printer.to_line_printer Units.Duration.mm_ss)
-    in
-    let segment =
-      Primitives.stateful (fun () ->
-          let elapsed = Clock.counter () in
-          let latest = ref Mtime.Span.zero in
-          let finished = ref false in
-          let pp buf e =
-            (match e with
-            | `start | `report _ -> latest := Clock.count elapsed
-            | `finish _ when not !finished ->
-                latest := Clock.count elapsed;
-                finished := true
-            | `rerender _ | `finish _ -> ());
-            print_time buf !latest
-          in
-          Primitives.theta ~width:5 pp)
-    in
-    Basic segment
+  module Using_int32 = Integer_dependent.Make_ext (Integer.Int32)
+  module Using_int63 = Integer_dependent.Make_ext (Integer.Int63)
+  module Using_int64 = Integer_dependent.Make_ext (Integer.Int64)
+  module Using_float = Integer_dependent.Make_ext (Integer.Float)
 end
 
 (*————————————————————————————————————————————————————————————————————————————

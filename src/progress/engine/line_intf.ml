@@ -5,24 +5,21 @@
 
 open! Import
 
+(** These values are documented as part of {!DSL}.*)
 module type Integer_dependent = sig
-  type 'a t
   type integer
   type color
   type 'a printer
 
+  (**)
+  type 'a t
+
   val count : width:int -> integer t
-  (** [count ~width] displays a running total of reported values in the given
-      width. *)
-
+  val count_to : ?sep:unit t -> integer -> integer t
   val count_pp : integer printer -> integer t
-  (** [of_pp ~width pp] is a segment that uses the supplied fixed-width
-      pretty-printer to render the value. The pretty-printer must never emit
-      newline characters. *)
-
   val bytes : integer t
+  val bytes_per_sec : integer t
   val percentage_of : integer -> integer t
-  val max : integer -> integer t
   val rate : float printer -> integer t
   val eta : total:integer -> integer t
 
@@ -34,18 +31,6 @@ module type Integer_dependent = sig
     -> total:integer
     -> unit
     -> integer t
-  (** [bar ~width f] is a progress bar of the form:
-
-      {[ [#######################################................] ]}
-
-      which occupies [width]-many columns and uses [f] to determine the
-      proportion of the bar that is filled. Optional parameters are as follows:
-
-      - [?style] specifies whether to use a UTF-8 or an ASCII encoding for the
-        progress bar. The UTF-8 encoding shows a higher resolution of progress,
-        but may not be supported in all terminals. The default is [`ASCII].
-
-      - [?width] is the width of the bar in columns. Defaults to [`Expand]. *)
 
   val bar_unaccumulated :
        ?style:[ `ASCII | `UTF8 | `Custom of string list ]
@@ -55,27 +40,73 @@ module type Integer_dependent = sig
     -> total:integer
     -> unit
     -> integer t
-  (** TODO: better distinction here *)
 end
 
-module type S = sig
+(** The 'main' set of combinators, specialised to a particular integer type. *)
+module type DSL = sig
+  type integer
   type color
   type 'a printer
 
   type 'a t
-  (** The type of segments of progress bars that display reported values of type
-      ['a]. *)
+  (** The type of progress lines for reported values of type ['a]. This module
+      provides a selection of {{!basic} individual line segments} that can be
+      {{!combinators} combined} to produce more interesting layouts. You may
+      wish to look over the {{!examples} examples} for inspiration. *)
 
-  (** {1 Basic line segments} *)
+  (** {1:basic Basic line segments} *)
 
   val const : string -> _ t
   (** [const s] is the segment that always displays [s]. *)
 
-  val constf : ('a, Format.formatter, unit, _ t) format4 -> 'a
-  (** [constf fmt a b c ...] is equivalent to
-      [const (Format.asprintf fmt a b c ...)]. *)
-
   val string : string t
+  (** A line segment that displays a dynamically-sized string message. Use
+      {!lpad} and {!rpad} to pad the message up to a given length. *)
+
+  (** {2:counting Counting segments}
+
+      These segments all consume integer values and display the accumulated
+      total of all reported values in some way. The top-level [Line] segments
+      are specialised to [int] values; see "{!integers}" for variants supporting
+      [int32], [int64] etc. *)
+
+  val count : width:int -> integer t
+  (** [count ~width] displays a running total of reported values in the given
+      width. *)
+
+  val count_to : ?sep:unit t -> integer -> integer t
+  (** TODO: document *)
+
+  val count_pp : integer printer -> integer t
+  (** [of_pp ~width pp] is a segment that uses the supplied fixed-width
+      pretty-printer to render the value. The pretty-printer must never emit
+      newline characters. *)
+
+  val bytes : integer t
+  val percentage_of : integer -> integer t
+
+  val bar :
+       ?style:[ `ASCII | `UTF8 | `Custom of string list ]
+    -> ?color:color
+    -> ?color_empty:color
+    -> ?width:[ `Fixed of int | `Expand ]
+    -> total:integer
+    -> unit
+    -> integer t
+  (** [bar ~total ()] is a progress bar of the form:
+
+      {[ [#######################################................] ]}
+
+      The proportion of the bar that is filled is given by
+      [<reported_so_far> / total]. Optional parameters are as follows:
+
+      - [?style] specifies whether to use a UTF-8 or an ASCII encoding for the
+        progress bar. The UTF-8 encoding shows a higher resolution of progress,
+        but may not be supported in all terminals. The default is [`ASCII].
+
+      - [?width] is the width of the bar in columns. Defaults to [`Expand],
+        which causes the bar to occupy the remaining rendering space after
+        accounting for other line segments on the same line. *)
 
   val spinner :
        ?color:color
@@ -88,39 +119,32 @@ module type S = sig
   (** TODO: Rename to [of_printer] and keep a distinction between accumulated
       printers. *)
 
+  (** {2:time Time-sensitive segments} *)
+
+  val bytes_per_sec : integer t
+  val rate : float printer -> integer t
+
   val elapsed : unit -> _ t
-  (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
+  (** Displays the time for which the bar has been rendering, in [MM:SS] form. *)
 
-  val counter : unit -> unit t
+  val eta : total:integer -> integer t
+  (** Displays an estimate of the remaining time until [total] is accumulated by
+      the reporters, in [MM:SS] form. *)
 
-  (** {1 Integer line segments} *)
+  val ticker : unit -> _ t
+  (** TODO: document. *)
 
-  (** @inline *)
-  include
-    Integer_dependent
-      with type 'a t := 'a t
-       and type color := color
-       and type 'a printer := 'a printer
-       and type integer := int
+  val bar_unaccumulated :
+       ?style:[ `ASCII | `UTF8 | `Custom of string list ]
+    -> ?color:color
+    -> ?color_empty:color
+    -> ?width:[ `Fixed of int | `Expand ]
+    -> total:integer
+    -> unit
+    -> integer t
+  (** TODO: better distinction here *)
 
-  module Integer_dependent : sig
-    module type S = sig
-      include
-        Integer_dependent
-          with type 'a t := 'a t
-           and type color := color
-           and type 'a printer := 'a printer
-    end
-
-    module Make (Integer : Integer.S) : S with type integer := Integer.t
-  end
-
-  module Int32 : Integer_dependent.S with type integer := int32
-  module Int63 : Integer_dependent.S with type integer := int63
-  module Int64 : Integer_dependent.S with type integer := int64
-  module Float : Integer_dependent.S with type integer := float
-
-  (** {1 Combining segments} *)
+  (** {1:combinators Combining segments} *)
 
   val ( ++ ) : 'a t -> 'a t -> 'a t
   (** Horizontally join two segments of the same reported value type. *)
@@ -148,10 +172,86 @@ module type S = sig
   val noop : unit -> _ t
   (** A zero-width line segment that does nothing. *)
 
-  (** {1 Primitive line segment DSL} *)
+  (** {1 Utilities}
 
-  module Primitives : sig
-    (** Provides the primitive ... *)
+      The following line segments are definable in terms of the others, but
+      provided for convenience: *)
+
+  val constf : ('a, Format.formatter, unit, _ t) format4 -> 'a
+  (** [constf fmt a b c ...] is equivalent to
+      [const (Format.asprintf fmt a b c ...)]. *)
+
+  val parens : 'a t -> 'a t
+  (** [parens t] is [const "(" ++ t ++ const ")"]. *)
+
+  val brackets : 'a t -> 'a t
+  (** [brackets t] is [const "\[" ++ t ++ const "\]"]. *)
+
+  val braces : 'a t -> 'a t
+  (** [braces t] is [const "{" ++ t ++ const "}"]. *)
+end
+
+module _ (X : DSL) : Integer_dependent = X
+
+module type S = sig
+  include DSL with type integer := int
+  (** @inline *)
+
+  (** {1:integers Alternative integer types} *)
+
+  module Integer_dependent : sig
+    (** {!S} contains just the line segments that can be specialised to an
+        underlying integer implementation. *)
+    module type S =
+      Integer_dependent
+        with type 'a t := 'a t
+         and type color := color
+         and type 'a printer := 'a printer
+
+    module Make (Integer : Integer.S) : S with type integer := Integer.t
+
+    (** {!Ext} is {!S} extended with non-integer-dependent segments as well. *)
+    module type Ext =
+      DSL
+        with type 'a t := 'a t
+         and type color := color
+         and type 'a printer := 'a printer
+  end
+
+  module Using_int32 : Integer_dependent.Ext with type integer := int32
+  module Using_int63 : Integer_dependent.Ext with type integer := int63
+  module Using_int64 : Integer_dependent.Ext with type integer := int64
+  module Using_float : Integer_dependent.Ext with type integer := float
+
+  (** {1:examples Examples}
+
+      - A
+
+      {[
+        [##################################################################] 100/100
+      ]}
+      {[ (* Described by: *) const " " ++ count ~up_to:100 ]}
+      - An progress bar for a file download:
+
+      {[
+        ⠏ [01:04] [######---------------------------------------]  293.9 MiB (eta: 07:12)
+      ]}
+      {[
+        (* Described by: *)
+        list
+          [ spinner ()
+          ; brackets (elapsed ())
+          ; bar ~total ()
+          ; bytes
+          ; parens (const "eta: " ++ eta ~total)
+          ]
+      ]} *)
+
+  (** {1 Library internals} *)
+
+  module Internals : sig
+    (** Exposes the underlying implementation of line segments for testing. This
+        API is unstable, unsafe and mostly undocumented; here be dragons etc. *)
 
     type 'a line
 
@@ -184,7 +284,7 @@ module type Line = sig
          and type color := Ansi.Color.t
          and type 'a printer := 'a Printer.t
 
-    val to_primitive : Config.t -> 'a t -> 'a Primitives.t
+    val to_primitive : Config.t -> 'a t -> 'a Internals.t
   end
 end
 

@@ -6,7 +6,7 @@ let line_prefix ~stages =
       ppf
       (Fmt.str "[%d/%d]" !count stages)
 
-let config = Progress.Config.create ~persistent:false ()
+let config = Progress.Config.v ~persistent:false ()
 
 let with_plain_bar ~total f =
   Progress.(

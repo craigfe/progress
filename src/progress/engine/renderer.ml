@@ -29,7 +29,6 @@ end = struct
     ; finalise : unit -> int
     ; id : Bar_id.t
     ; mutable finalised : bool
-    ; mutable finalised_width : int
     }
 
   type contents =
@@ -54,23 +53,17 @@ end = struct
       fun () -> finalise line_buffer
     in
     let id = Bar_id.create () in
-    { line_buffer
-    ; report
-    ; update
-    ; finalise
-    ; id
-    ; finalised = false
-    ; finalised_width = 0
-    }
+    { line_buffer; report; update; finalise; id; finalised = false }
 
   let finalise t =
     let width = t.finalise () in
     let data = Line_buffer.contents t.line_buffer in
     t.finalised <- true;
-    t.finalised_width <- width;
     { width; data }
 
   let update ~unconditional t () =
+    (* We continue to render even once the bar has been finalised in order to
+       account for terminal width changes. *)
     if t.finalised then finalise t
     else
       let width = t.update ~unconditional in
@@ -102,6 +95,10 @@ module Reporter = struct
 
   let noop = Noop
   let push = function Noop -> Fun.const () | Active { report; _ } -> report
+
+  type (_, _) list =
+    | [] : ('a, 'a) list
+    | ( :: ) : 'a * ('b, 'c) list -> ('a -> 'b, 'c) list
 end
 
 module Display : sig
@@ -122,12 +119,12 @@ module Display : sig
   val handle_width_change : t -> int -> unit
   val interject_with : t -> (unit -> 'a) -> 'a
   val cleanup : t -> unit
-  val finalize : t -> unit
+  val finalise : t -> unit
 
   (* Bar-specific functions *)
   val add_line : ?above:int -> t -> _ Bar_renderer.t -> unit
   val rerender_line : t -> Bar_id.t -> Bar_renderer.contents -> unit
-  val finalize_line : t -> Bar_id.t -> unit
+  val finalise_line : t -> Bar_id.t -> unit
 end = struct
   module Unique_id = Unique_id ()
 
@@ -221,7 +218,7 @@ end = struct
         rerender_line_and_advance t (E bar) width data;
         Format.fprintf ppf "%a\r%!" Ansi.move_down distance_from_base
 
-  let finalize_line t uid =
+  let finalise_line t uid =
     let (E bar) = get_bar_exn ~msg:"Bar already finalised" t.bars uid in
     let contents = Bar_renderer.finalise bar.renderer in
     rerender_line t uid contents;
@@ -286,7 +283,7 @@ end = struct
     if config.hide_cursor then
       Format.fprintf config.ppf "\n%s%!" Ansi.show_cursor
 
-  let finalize
+  let finalise
       ({ config = { ppf; hide_cursor; persistent; _ }; rows; _ } as display) =
     Ansi.move_up ppf (Vector.length rows - 1);
     if persistent then (
@@ -304,7 +301,7 @@ module Make (Platform : Platform.S) = struct
 
   module Global : sig
     val active_display : unit -> Display.t option
-    val find_display : Display.Unique_id.t -> (Display.t, [ `finalized ]) result
+    val find_display : Display.Unique_id.t -> (Display.t, [ `finalised ]) result
     val set_active_exn : Display.t -> unit
     val set_inactive : unit -> unit
   end = struct
@@ -324,10 +321,10 @@ module Make (Platform : Platform.S) = struct
 
     let find_display uid =
       match active_display () with
-      | None -> Error `finalized
+      | None -> Error `finalised
       | Some display ->
           if not (Display.Unique_id.equal (Display.uid display) uid) then
-            Error `finalized
+            Error `finalised
           else Ok display
 
     let handle_width_change w =
@@ -409,9 +406,7 @@ module Make (Platform : Platform.S) = struct
     | Some d -> Display.interject_with d f
 
   module Reporters = struct
-    type (_, _) t =
-      | [] : ('a, 'a) t
-      | ( :: ) : 'a * ('b, 'c) t -> ('a -> 'b, 'c) t
+    type nonrec ('a, 'b) t = ('a, 'b) Reporter.list
 
     let rec apply_all : type a b. a -> (a, b) t -> b =
      fun f -> function [] -> f | x :: xs -> apply_all (f x) xs
@@ -427,7 +422,7 @@ module Make (Platform : Platform.S) = struct
 
     let start :
         type a b. ?config:Config.user_supplied -> (a, b) Multi.t -> (a, b) t =
-     fun ?(config = Config.create ()) bars ->
+     fun ?(config = Config.v ()) bars ->
       let config = Config.apply_defaults config in
       let bars = Bar_list.of_multi config bars in
       let ppf = config.ppf in
@@ -451,7 +446,7 @@ module Make (Platform : Platform.S) = struct
 
     let add_line ?above t line : _ Reporter.t =
       match Global.find_display t.uid with
-      | Error `finalized -> failwith "Cannot add a line to a finalised display"
+      | Error `finalised -> failwith "Cannot add a line to a finalised display"
       | Ok d ->
           let bar =
             Bar_renderer.create (Line.to_primitive (Display.config d) line)
@@ -462,25 +457,25 @@ module Make (Platform : Platform.S) = struct
           let update = updater_of_bar d bar in
           Active { uid; report; update }
 
-    let finalize_line t r =
+    let finalise_line t r =
       match Global.find_display t.uid with
-      | Error `finalized -> failwith "Display already finalized"
+      | Error `finalised -> failwith "Display already finalised"
       | Ok display -> (
           match r with
           | Reporter.Noop -> ()
-          | Active { uid; _ } -> Display.finalize_line display uid)
+          | Active { uid; _ } -> Display.finalise_line display uid)
     (* TODO: use [bar] / [line] consistently *)
 
-    let finalize t =
+    let finalise t =
       match Global.find_display t.uid with
-      | Error `finalized -> failwith "Display already finalized"
+      | Error `finalised -> failwith "Display already finalised"
       | Ok display ->
-          Display.finalize display;
+          Display.finalise display;
           Global.set_inactive ()
 
     let tick t =
       match Global.find_display t.uid with
-      | Error `finalized -> ()
+      | Error `finalised -> ()
       | Ok d -> Display.rerender_all d
 
     let reporters t = t.initial_reporters
@@ -490,7 +485,7 @@ module Make (Platform : Platform.S) = struct
     let display = Display.start ?config t in
     Fun.protect
       (fun () -> Reporters.apply_all f (Display.reporters display))
-      ~finally:(fun () -> Display.finalize display)
+      ~finally:(fun () -> Display.finalise display)
 
   let with_reporter ?config b f = with_reporters ?config (Multi.line b) f
 end

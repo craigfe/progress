@@ -2,13 +2,13 @@ open Progress
 
 let bar color message =
   let total = 1_000_000_000L in
-  let open Line in
+  let open Line.Using_int64 in
   list
     [ rpad 16 (constf " %s" message)
-    ; Int64.bytes
-    ; Int64.(rate Units.Bytes.of_float)
-    ; Int64.bar ~color ~style:`UTF8 ~total ()
-    ; Int64.percentage_of total ++ const " "
+    ; bytes
+    ; bytes_per_sec
+    ; bar ~color ~style:`UTF8 ~total ()
+    ; percentage_of total ++ const " "
     ]
   |> Multi.line
 

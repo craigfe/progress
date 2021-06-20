@@ -52,7 +52,7 @@ let fold =
   in
   fun t ~f ~init -> aux t.data f init (t.length - 1)
 
-let rate_per_second : type a. a t -> a =
+let per_second : type a. a t -> a =
  fun t ->
   let (module Integer) = t.elt in
   if is_empty t then Integer.zero

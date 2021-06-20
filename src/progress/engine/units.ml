@@ -60,8 +60,10 @@ module Bytes = struct
     Printer.create ~to_string ~string_len ~pp
 
   let of_int = generic (module Integer.Int)
+  let of_int63 = generic (module Integer.Int63)
   let of_int64 = generic (module Integer.Int64)
   let of_float = generic (module Integer.Float)
+  let pp_int63 = Printer.to_pp of_int63
 end
 
 module Duration = struct

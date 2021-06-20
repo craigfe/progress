@@ -15,7 +15,7 @@ open Staged.Syntax
     {2 Width tracking}
 
     We track the rendered "widths" of various components for two reasons: to
-    handle expansive elements / boxes, and to enable the rednerer to respond
+    handle expansive elements / boxes, and to enable the renderer to respond
     correctly to terminal size changes. This is done algebraically for
     performance: the alternative of measuring the rendered width is inefficient
     because it would need to account for UTF-8 encoding and zero-width ANSI
@@ -38,6 +38,7 @@ type 'a t =
           [ `Theta of width:(unit -> int) -> Line_buffer.t -> int | `Val of 'a ]
       }
   | Staged of (unit -> 'a t)
+  | On_finalise of { final : unit t; inner : 'a t }
   | Contramap : 'a t * ('b -> 'a) -> 'b t
   | Cond of { if_ : 'a -> bool; then_ : 'a t }
   | Box of
@@ -57,6 +58,7 @@ let[@warning "-unused-value-declaration"] rec pp_dump : type a. a t pp =
   | Cond { then_; _ } -> Fmt.pf ppf "Cond { then_ = %a }" pp_dump then_
   | Contramap (x, _) -> Fmt.pf ppf "Contramap ( %a )" pp_dump x
   | Staged f -> Fmt.pf ppf "Staged ( %a )" pp_dump (f ())
+  | On_finalise { inner; _ } -> Fmt.pf ppf "On_finalise ( %a )" pp_dump inner
   | Box { contents; _ } -> Fmt.pf ppf "Box ( %a )" pp_dump contents
   | Group xs -> Fmt.Dump.array pp_dump ppf xs
   | Pair { left; sep; right } ->
@@ -74,6 +76,7 @@ let alpha_unsized ~initial pp = Alpha_unsized { pp; initial }
 let theta ~width pp = Theta { pp; width }
 let conditional pred s = Cond { if_ = pred; then_ = s }
 let contramap ~f x = Contramap (x, f)
+let on_finalise final inner = On_finalise { final; inner }
 
 (** [ticker n] is a function [f] that returns [true] on every [n]th call. *)
 let ticker interval : unit -> bool =
@@ -125,6 +128,7 @@ module Compiled = struct
         }
     | Theta of { pp : Line_buffer.t -> unit event -> int }
     | Contramap : 'a t * ('b -> 'a) -> 'b t
+    | On_finalise of { final : unit t; inner : 'a t }
     | Pad of
         { contents : 'a t
         ; dir : [ `left of Line_buffer.t | `right ]
@@ -145,6 +149,7 @@ module Compiled = struct
     | Noop -> Fmt.string ppf "Noop"
     | Alpha _ -> Fmt.string ppf "Alpha _"
     | Theta _ -> Fmt.string ppf "Theta _"
+    | On_finalise { inner; _ } -> Fmt.pf ppf "On_finalise ( %a )" pp_dump inner
     | Cond { then_; latest_span; width; _ } ->
         Fmt.pf ppf "Cond { if_ = <opaque>; then_ = %a; width = %a; span = %a }"
           pp_dump then_ (Sta_dyn.pp Fmt.int) width Line_buffer.Span.pp
@@ -174,6 +179,7 @@ module Compiler_state : sig
   val consume_space : int Sta_dyn.t -> unit t
   val measure_consumed : 'a t -> ('a * int Sta_dyn.t) t
   val expand : (unit -> int) t
+  val both : 'a t -> 'b t -> ('a * 'b) t
 
   val with_expansion_point :
     int Sta_dyn.t -> 'a t -> ('a * [ `used | `not_used ] * int Sta_dyn.t) t
@@ -201,6 +207,11 @@ end = struct
       let a, s = at s in
       (fab a, s)
   end
+
+  let both l r s =
+    let l, _ = l s in
+    let r, s = r s in
+    ((l, r), s)
 
   let consume_space v s =
     let consumed_static =
@@ -292,6 +303,11 @@ let compile top =
     | Contramap (t, f) ->
         let+ inner = inner t in
         Compiled.Contramap (inner, f)
+    | On_finalise t ->
+        let+ inner, final =
+          Compiler_state.both (inner t.inner) (inner t.final)
+        in
+        Compiled.On_finalise { final; inner }
     | Cond { if_; then_ } ->
         let+ then_, width = Compiler_state.measure_consumed (inner then_) in
         Compiled.Cond
@@ -385,6 +401,7 @@ let report compiled =
     | Contramap (t, f) ->
         let$ inner = aux t in
         fun buf a -> inner buf (f a)
+    | On_finalise { inner; _ } -> aux inner
     | Cond t as _elt ->
         let$ then_ = aux t.then_ in
         fun buf x ->
@@ -395,12 +412,10 @@ let report compiled =
             let finish = Line_buffer.current_position buf in
             t.latest_span <- Line_buffer.Span.between_marks start finish;
             let width = Sta_dyn.get t.width in
-
             (* TODO: Since dynamic widths aren't memoized over a single run,
                it's possible for this to fail due to changing width in the
-               middle of a render, which isn't a bug. Should fix the race
-               condition and then be more defensive here. *)
-
+               middle of a render, which isn't a bug in user code. Should fix
+               the race condition and then be more defensive here. *)
             (* if reported_width <> width then
              *   Fmt.failwith
              *     "Conditional segment not respecting stated width: expected %a, \
@@ -476,6 +491,11 @@ let update top =
               Line_buffer.skip buf t.latest_span;
               Sta_dyn.get t.width)
     | Contramap (inner, _) -> aux inner
+    | On_finalise { final; inner } ->
+        let$ final_report = report final and$ inner = aux inner in
+        fun uncond event ppf ->
+          if Poly.(event = `finish) then final_report ppf ()
+          else inner uncond event ppf
     | Group g ->
         let updaters = Array.map g ~f:(aux >> Staged.prj) in
         Staged.inj (fun uncond event ppf ->

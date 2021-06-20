@@ -61,35 +61,33 @@ module type S = sig
 
     val push : 'a t -> 'a -> unit
     val noop : 'a t
-  end
 
-  module Reporters : sig
-    type (_, _) t =
-      | [] : ('a, 'a) t
-      | ( :: ) : 'a * ('b, 'c) t -> ('a -> 'b, 'c) t
+    type (_, _) list =
+      | [] : ('a, 'a) list
+      | ( :: ) : 'a * ('b, 'c) list -> ('a -> 'b, 'c) list
   end
 
   (** Functions for explicitly starting and stopping the process of rendering a
       bar; useful when the code doing the progress reporting cannot be
       conveniently delimited inside {!with_display}. All {!display}s must be
-      properly {!finalize}d, and it is not possible to interleave rendering of
+      properly {!finalise}d, and it is not possible to interleave rendering of
       displays. *)
   module Display : sig
     type ('a, 'b) t
-    (** The type of active progress bar displaye. *)
+    (** The type of active progress bar displays. *)
 
     val start : ?config:config -> ('a, 'b) multi -> ('a, 'b) t
     (** Initiate rendering of a progress bar display. Raises [Failure] if there
         is already an active progress bar display. *)
 
     val tick : _ t -> unit
-    val reporters : ('a, 'b) t -> ('a, 'b) Reporters.t
+    val reporters : ('a, unit) t -> ('a, unit) Reporter.list
     val add_line : ?above:int -> (_, _) t -> 'a line -> 'a Reporter.t
-    val finalize_line : (_, _) t -> _ Reporter.t -> unit
+    val finalise_line : (_, _) t -> _ Reporter.t -> unit
 
-    val finalize : (_, _) t -> unit
+    val finalise : (_, _) t -> unit
     (** Terminate the given progress bar display. Raises [Failure] if the
-        display has already been finalized. *)
+        display has already been finalised. *)
   end
 end
 

@@ -29,11 +29,19 @@ module Make (Platform : Platform.S) = struct
     include Line
   end
 
-  type 'a reporter = 'a -> unit
-
   module Display = Renderer.Display
   module Reporter = Renderer.Reporter
-  module Reporters = Renderer.Reporters
+
+  let counter ~total ?(style = `ASCII) ?message ?pp () =
+    let map_option ~f x = Option.fold ~none:(Line.noop ()) ~some:f x in
+    let open Line.Using_int64 in
+    list
+      [ map_option message ~f:const
+      ; map_option pp ~f:of_printer
+      ; elapsed ()
+      ; bar ~style ~total ()
+      ; percentage_of total
+      ]
 
   let interject_with = Renderer.interject_with
   let with_reporters = Renderer.with_reporters

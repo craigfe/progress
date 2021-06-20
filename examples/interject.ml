@@ -3,7 +3,7 @@ let bar =
     list
       [ spinner ~color:(Progress.Color.of_ansi `green) ()
       ; bar ~style:`ASCII ~total:100 ()
-      ; count ~width:3 ++ const "/100"
+      ; count_to 100
       ])
 
 let run () =

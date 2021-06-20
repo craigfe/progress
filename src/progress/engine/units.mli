@@ -1,3 +1,10 @@
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+   Distributed under the MIT license. See terms at the end of this file.
+  ————————————————————————————————————————————————————————————————————————————*)
+
+open! Import
+
 module Duration : sig
   val mm_ss : Duration.t Printer.t
   (** Renders a time span in fixed-width [MM:SS] form. *)
@@ -48,6 +55,8 @@ module Bytes : sig
 
   val pib : int -> int64
   (** [pib n] is [n] pebibytes. *)
+
+  val pp_int63 : int63 Fmt.t
 end
 
 (*————————————————————————————————————————————————————————————————————————————

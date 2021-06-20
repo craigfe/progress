@@ -5,7 +5,7 @@ let almost f = f -. Float.epsilon
 let ( let@ ) f x = f x
 
 let config =
-  Progress.Config.create ~ppf:Format.str_formatter ~hide_cursor:false
+  Progress.Config.v ~ppf:Format.str_formatter ~hide_cursor:false
     ~persistent:true ~min_interval:None ()
 
 let read_bar () =
@@ -39,7 +39,7 @@ let test_pair () =
 let test_unicode_bar () =
   let () =
     let@ report =
-      Progress.Line.Float.bar_unaccumulated ~style:`UTF8 ~width:(`Fixed 3)
+      Progress.Line.Using_float.bar_unaccumulated ~style:`UTF8 ~width:(`Fixed 3)
         ~total:1. ()
       |> Progress.with_reporter ~config
     in
@@ -72,7 +72,7 @@ let test_unicode_bar () =
   clear_test_state ();
   let () =
     let@ report =
-      Progress.Line.Float.bar_unaccumulated ~style:`UTF8 ~width:(`Fixed 5)
+      Progress.Line.Using_float.bar_unaccumulated ~style:`UTF8 ~width:(`Fixed 5)
         ~total:1. ()
       |> Progress.with_reporter ~config
     in
@@ -91,13 +91,13 @@ let test_unicode_bar () =
 let test_progress_bar_lifecycle () =
   let open Progress.Units.Bytes in
   let@ report =
-    let open Progress.Line in
+    let open Progress.Line.Using_int64 in
     list
       [ const "<msg>"
-      ; Int64.bytes
-      ; Int64.bar ~style:`ASCII ~width:(`Fixed 29) ~total:(gib 1) ()
+      ; bytes
+      ; bar ~style:`ASCII ~width:(`Fixed 29) ~total:(gib 1) ()
         ++ const " "
-        ++ Int64.percentage_of (gib 1)
+        ++ percentage_of (gib 1)
       ]
     |> Progress.with_reporter ~config
   in
@@ -130,9 +130,9 @@ let test_progress_bar_width () =
   let check_width width =
     clear_test_state ();
     let@ _report =
-      let open Progress.Line in
+      let open Progress.Line.Using_int64 in
       Progress.with_reporter ~config
-        (Int64.bar ~style:`ASCII ~width:(`Fixed width) ~total:1L ())
+        (bar ~style:`ASCII ~width:(`Fixed width) ~total:1L ())
       (* Progress.with_reporters ~config
        *   (Progress.counter ~style:`ASCII ~total:1L ~sampling_interval:1 ~width
        *      ~message ?pp
@@ -149,7 +149,7 @@ let test_progress_bar_width () =
 
 module Boxes = struct
   let unsized =
-    Progress.Line.Primitives.alpha_unsized ~initial:(`Val ())
+    Progress.Line.Internals.alpha_unsized ~initial:(`Val ())
       (fun ~width:_ _ _ -> 0)
 
   let test_unsized_not_in_box () =
@@ -157,7 +157,7 @@ module Boxes = struct
       (Invalid_argument
          "Encountered an expanding element that is not contained in a box")
     @@ fun () ->
-    Progress.(with_reporter Line.Primitives.(to_line unsized) Fun.id ())
+    Progress.(with_reporter Line.Internals.(to_line unsized) Fun.id ())
 
   let test_two_unsized_in_box () =
     Alcotest.check_raises "Two unsized elements in a box"
@@ -167,7 +167,7 @@ module Boxes = struct
     @@ fun () ->
     Progress.(
       with_reporter
-        Line.Primitives.(to_line @@ box_fixed 10 (array [| unsized; unsized |]))
+        Line.Internals.(to_line @@ box_fixed 10 (array [| unsized; unsized |]))
         Fun.id ())
 end
 

@@ -17,7 +17,7 @@ module Config = struct
     if Unix.(isatty stderr) then Default.ppf
     else Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
 
-  let create ?(ppf = stderr_if_tty) ?hide_cursor ?persistent ?max_width
-      ?min_interval () : t =
-    create ~ppf ?hide_cursor ?persistent ?max_width ?min_interval ()
+  let v ?(ppf = stderr_if_tty) ?hide_cursor ?persistent ?max_width ?min_interval
+      () : t =
+    v ~ppf ?hide_cursor ?persistent ?max_width ?min_interval ()
 end

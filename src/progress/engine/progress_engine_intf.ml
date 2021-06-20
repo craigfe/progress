@@ -27,7 +27,7 @@ module type S = sig
 
   (** {1 Description} *)
 
-  type 'a reporter = 'a -> unit
+  type 'a reporter := 'a -> unit
   (** A {i reporter} for values of type ['a]. In this library, each progress bar
       has its own reporting function. *)
 
@@ -48,13 +48,37 @@ module type S = sig
       Multi.S with type 'a line := 'a Line.t and type 'a reporter := 'a reporter
   end
 
+  val counter :
+       total:int64
+    -> ?style:[ `ASCII | `UTF8 | `Custom of string list ]
+    -> ?message:string
+    -> ?pp:int64 Printer.t
+    -> unit
+    -> int64 Line.t
+  (** [counter ~total ()] is a progress bar of the form:
+
+      {[
+        <message?> <count?> MM:SS [########..............................]  XX%
+      ]}
+
+      where each reported value contributes cumulatively towards an eventual
+      total of [total]. Optional parameters are as follows:
+
+      - [?style] specifies whether to use a UTF-8 or an ASCII encoding for the
+        progress bar. The UTF-8 encoding shows a higher resolution of progress,
+        but may not be supported in all terminals. The default is [`ASCII].
+
+      - [?pp] is used to pretty-print the [<count>] segment, if passed. For
+        example, {!Units.bytes} can be used for totals measured in bytes. The
+        default is to not display this segment. *)
+
   (** {1 Rendering} *)
 
   (** Configuration for progress bar rendering. *)
   module Config : sig
     type t
 
-    val create :
+    val v :
          ?ppf:Format.formatter
       -> ?hide_cursor:bool
       -> ?persistent:bool
