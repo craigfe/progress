@@ -101,29 +101,29 @@ let test_progress_bar_lifecycle () =
       ]
     |> Progress.with_reporter ~config
   in
-  check_bar "<msg>     0.0 B    [---------------------------]   0%";
+  check_bar "<msg>    0.0 B   [---------------------------]   0%";
   report (kib 1 -- 1L);
-  check_bar "<msg>  1023.0 B    [---------------------------]   0%";
+  check_bar "<msg> 1023.0 B   [---------------------------]   0%";
   report 1L;
-  check_bar "<msg>     1.0 KiB  [---------------------------]   0%";
+  check_bar "<msg>    1.0 KiB [---------------------------]   0%";
   report (mib 1 -- kib 1 -- 1L);
   (* Should always round downwards. *)
-  check_bar "<msg>  1023.9 KiB  [---------------------------]   0%";
+  check_bar "<msg> 1023.9 KiB [---------------------------]   0%";
   report 1L;
-  check_bar "<msg>     1.0 MiB  [---------------------------]   0%";
+  check_bar "<msg>    1.0 MiB [---------------------------]   0%";
   report (mib 49);
-  check_bar "<msg>    50.0 MiB  [#--------------------------]   4%";
+  check_bar "<msg>   50.0 MiB [#--------------------------]   4%";
   report (mib 450);
-  check_bar "<msg>   500.0 MiB  [#############--------------]  48%";
+  check_bar "<msg>  500.0 MiB [#############--------------]  48%";
   report (gib 1 -- mib 500 -- 1L);
   (* 1 byte from completion. Should show 99% and not a full 1024 MiB. *)
-  check_bar "<msg>  1023.9 MiB  [##########################-]  99%";
+  check_bar "<msg> 1023.9 MiB [##########################-]  99%";
   report 1L;
   (* Now exactly complete *)
-  check_bar "<msg>     1.0 GiB  [###########################] 100%";
+  check_bar "<msg>    1.0 GiB [###########################] 100%";
   (* Subsequent reports don't overflow the bar *)
   report (gib 1 // 2L);
-  check_bar "<msg>     1.5 GiB  [###########################] 100%";
+  check_bar "<msg>    1.5 GiB [###########################] 100%";
   ()
 
 let test_progress_bar_width () =
