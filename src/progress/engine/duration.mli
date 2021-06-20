@@ -4,12 +4,13 @@
   ————————————————————————————————————————————————————————————————————————————*)
 
 type t = Mtime.Span.t
-(** The type of time durations. *)
+(** The type of time durations. This module is just a convenience wrapper around
+    {!Mtime.Span}.*)
 
 val equal : t -> t -> bool
 val compare : t -> t -> int
 
-(** {2 Round values} *)
+(** {1 Round values} *)
 
 val nanosecond : t
 val microsecond : t
@@ -19,7 +20,7 @@ val minute : t
 val hour : t
 val day : t
 
-(** {2 Convertors} *)
+(** {1 Convertors} *)
 
 val of_ns : float -> t
 val of_us : float -> t
@@ -29,7 +30,7 @@ val of_min : float -> t
 val of_hour : float -> t
 val of_day : float -> t
 
-(** From integers: *)
+(** {2 From integers} *)
 
 val of_int_ms : int -> t
 val of_int64_ms : int64 -> t
@@ -37,7 +38,7 @@ val of_int_sec : int -> t
 val of_int64_sec : int64 -> t
 val of_int_min : int -> t
 
-(** Infix operators *)
+(** {2 Infix operators} *)
 
 val ( + ) : t -> t -> t
 val ( < ) : t -> t -> bool

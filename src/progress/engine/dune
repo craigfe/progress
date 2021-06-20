@@ -6,4 +6,5 @@
   (re_export optint)
   fmt
   uutf
+  uucp
   vector))

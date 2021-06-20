@@ -6,7 +6,7 @@ let expect_pp_fixed pp_fixed s f =
   Alcotest.(check string) (Fmt.str "Expected rendering of %s" s) s result;
   Alcotest.(check int)
     "Expected length"
-    (Progress.Printer.width pp_fixed)
+    (Progress.Printer.print_width pp_fixed)
     (String.length result)
 
 let test_percentage () =

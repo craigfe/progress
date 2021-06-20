@@ -138,19 +138,13 @@ module Integer_independent (Platform : Platform.S) = struct
       Primitives.alpha_unsized ~initial:(`Val "") (fun ~width buf -> function
         | `start -> 0 (* TODO: chosen randomly *)
         | `finish s | `report s | `rerender s ->
-            let input_len = String.length s in
             let output_len = width () - 1 (* XXX: why is -1 necessary? *) in
-            let () =
-              match input_len <= output_len with
-              | true ->
-                  Line_buffer.add_string buf s;
-                  for _ = input_len to output_len do
-                    Line_buffer.add_char buf ' '
-                  done
-              | false ->
-                  Line_buffer.add_substring buf s ~off:0 ~len:(output_len - 4);
-                  Line_buffer.add_string buf " ..."
+            let pp =
+              Staged.prj
+              @@ Printer.Internals.to_line_printer
+                   (Printer.string ~width:output_len)
             in
+            pp buf s;
             output_len)
     in
     Basic segment
@@ -383,8 +377,10 @@ module Make (Platform : Platform.S) = struct
       let acc segment = Acc { segment; elt = (module Integer) }
 
       let of_printer ?init printer =
-        let pp = update_only @@ Staged.prj (Printer.to_line_printer printer) in
-        let width = Printer.width printer in
+        let pp =
+          update_only @@ Staged.prj @@ Printer.Internals.to_line_printer printer
+        in
+        let width = Printer.print_width printer in
         let initial =
           match init with
           | Some v -> `Val v
@@ -398,10 +394,11 @@ module Make (Platform : Platform.S) = struct
         Basic (Primitives.alpha ~width ~initial pp)
 
       let count_pp printer =
-        let pp = Staged.prj (Printer.to_line_printer printer) in
+        let pp = Staged.prj @@ Printer.Internals.to_line_printer printer in
         acc
         @@ Primitives.contramap ~f:Acc.accumulator
-        @@ Primitives.alpha ~width:(Printer.width printer)
+        @@ Primitives.alpha
+             ~width:(Printer.print_width printer)
              ~initial:(`Val Integer.zero) (update_only pp)
 
       let bytes = count_pp (Units.Bytes.generic (module Integer))
@@ -416,10 +413,10 @@ module Make (Platform : Platform.S) = struct
       let count ?pp ~width () =
         let pp =
           match pp with
-          | None -> Printer.integer ~width (module Integer)
+          | None -> Printer.Internals.integer ~width (module Integer)
           | Some x -> x
         in
-        let pp = Staged.prj (Printer.to_line_printer pp) in
+        let pp = Staged.prj (Printer.Internals.to_line_printer pp) in
         acc
         @@ Primitives.contramap ~f:Acc.accumulator
         @@ Primitives.alpha ~initial:(`Val Integer.zero) ~width (update_only pp)
@@ -428,7 +425,7 @@ module Make (Platform : Platform.S) = struct
         let total = Integer.to_string total in
         let width =
           match pp with
-          | Some pp -> Printer.width pp
+          | Some pp -> Printer.print_width pp
           | None -> String.length total
         in
         List [ count ~width (); using (fun _ -> ()) sep; const total ]
@@ -545,12 +542,12 @@ module Make (Platform : Platform.S) = struct
 
       let rate pp_val =
         let pp_rate =
-          let pp_val = Staged.prj (Printer.to_line_printer pp_val) in
+          let pp_val = Staged.prj (Printer.Internals.to_line_printer pp_val) in
           fun buf x ->
             pp_val buf x;
             Line_buffer.add_string buf "/s"
         in
-        let width = Printer.width pp_val + 2 in
+        let width = Printer.print_width pp_val + 2 in
         acc
         @@ Primitives.contramap
              ~f:(Acc.flow_meter >> Flow_meter.per_second >> Integer.to_float)
@@ -562,14 +559,15 @@ module Make (Platform : Platform.S) = struct
         let span_segment =
           let printer =
             let pp =
-              Staged.prj (Printer.to_line_printer Units.Duration.mm_ss)
+              Staged.prj
+                (Printer.Internals.to_line_printer Units.Duration.mm_ss)
             in
             fun ppf -> function
               | `start -> ()
               | `finish _ -> pp ppf Mtime.Span.max_span (* renders as [--:--] *)
               | `report x | `rerender x -> pp ppf x
           in
-          let width = Printer.width Units.Duration.mm_ss in
+          let width = Printer.print_width Units.Duration.mm_ss in
           let initial = `Val Mtime.Span.max_span in
           Primitives.alpha ~width ~initial printer
         in
@@ -589,7 +587,7 @@ module Make (Platform : Platform.S) = struct
 
       let elapsed () =
         let print_time =
-          Staged.prj (Printer.to_line_printer Units.Duration.mm_ss)
+          Staged.prj (Printer.Internals.to_line_printer Units.Duration.mm_ss)
         in
         let segment =
           Primitives.stateful (fun () ->

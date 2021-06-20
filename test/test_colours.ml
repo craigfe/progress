@@ -1,3 +1,5 @@
+open Common
+
 open struct
   module Color = Progress.Color
   module Ansi = Progress.Internals.Ansi
@@ -11,13 +13,6 @@ open struct
       (Fmt.str "RGB (%d, %d, %d)" r g b)
       (Fmt.to_to_string Color.pp_dump x)
 end
-
-let check_invalid ~__POS__:pos f =
-  match f () with
-  | _ ->
-      Alcotest.fail ~pos
-        "Expected [Invalid_argument], but no exception was raised."
-  | exception Invalid_argument _ -> ()
 
 let test_rgb () =
   check_invalid ~__POS__ (fun () -> Color.of_rgb (-1) 0 0);
