@@ -1,16 +1,22 @@
 let examples =
   Examples.
-    [ ("Bar_styles", Bar_styles.run)
-    ; ("Download", Download.run)
-    ; ("Installer", Installer.run)
-    ; ("Interject", Interject.run)
-    ; ("Spinners", Spinners.run)
-    ; ("Stack", Stack.run)
+    [ ( "bar_styles"
+      , "Demo of possible progress bar configurations."
+      , Bar_styles.run )
+    ; ("cargo", "Port of the Cargo install progress bar.", Cargo.run)
+    ; ("yarn", "Yarn-like download and install sequence.", Yarn.run)
+    ; ("interject", "Logging while displaying a progress bar.", Interject.run)
+    ; ("spinners", "Demo of possible spinner configurations.", Spinners.run)
+    ; ("readme", "Demonstration included in the README", Readme.run)
+    ; ("download", "Rainbow-coloured download sequence.", Download.run)
     ]
 
 let available_examples () =
   Format.eprintf "Available examples: @.";
-  ListLabels.iter examples ~f:(fun (name, _) -> Format.eprintf "- %s@." name)
+  ListLabels.iter examples ~f:(fun (name, desc, _) ->
+      Format.eprintf "- %-12s %a@." name
+        Fmt.(styled `Faint (parens string))
+        desc)
 
 let usage () =
   Format.eprintf "@.";
@@ -26,7 +32,11 @@ let () =
   match Sys.argv with
   | [| _ |] | [| _; "-h" | "-help" | "--help" |] -> usage ()
   | [| _; name |] -> (
-      match List.assoc_opt (String.capitalize_ascii name) examples with
+      match
+        List.find_opt
+          (fun (n, _, _) -> n = String.lowercase_ascii name)
+          examples
+      with
       | None ->
           Format.eprintf "%a: unrecognised example name `%a`.@.@."
             Fmt.(styled `Bold @@ styled `Red string)
@@ -35,7 +45,7 @@ let () =
             name;
           available_examples ();
           exit 1
-      | Some f -> f ())
+      | Some (_, _, f) -> f ())
   | _ ->
       usage ();
       exit 1

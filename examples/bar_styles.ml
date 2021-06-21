@@ -1,17 +1,24 @@
-let[@ocamlformat "disable"] bars =
-  [ "Rough bar", `Custom [ " "; "█" ]                                   , "#DC2F02"
-  ; "Fine bar" , `Custom [ " "; "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉"; "█" ], "#E85D04"
-  ; "Vertical" , `Custom [ " "; "▁"; "▂"; "▃"; "▄"; "▅"; "▆"; "▇"; "█" ], "#F48C06"
-  ; "Blocky"   , `Custom [ " "; "▖"; "▌"; "▛"; "█" ]                    , "#FAA307"
-  ; "Fade in"  , `Custom [ " "; "░"; "▒"; "▓"; "█" ]                    , "#FFBA08"
+let bar_specs =
+  [ ("Default ASCII", `ASCII, "#DC2F02")
+  ; ("Rough bar", `Custom (" ", [ ">" ], "="), "#DC2F02")
+  ; ("Rough bar", `UTF8, "#DC2F02")
+  ; ("Default UTF-8", `Custom (" ", [], "█"), "#DC2F02")
+  ; ( "Fine bar"
+    , `Custom (" ", [ "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉" ], "█")
+    , "#E85D04" )
+  ; ( "Vertical"
+    , `Custom (" ", [ "▁"; "▂"; "▃"; "▄"; "▅"; "▆"; "▇" ], "█")
+    , "#F48C06" )
+  ; ("Blocky", `Custom (" ", [ "▖"; "▌"; "▛" ], "█"), "#FAA307")
+  ; ("Fade in", `Custom (" ", [ "░"; "▒"; "▓" ], "█"), "#FFBA08")
   ]
 
 let bars =
-  bars
-  |> List.map (fun (name, style, color) ->
-         let open Progress.Line in
-         lpad 13 (constf "%s  " name)
-         ++ bar ~style ~color:(Progress.Color.of_hex color) ~total:1000 ())
+  let pick_colour = Utils.colour_picker () in
+  let open Progress.Line in
+  ListLabels.map bar_specs ~f:(fun (name, style, _color) ->
+      lpad 20 (constf "%s –  " name)
+      ++ bar ~style ~color:(pick_colour ()) ~total:1000 ())
   |> Progress.Multi.lines
 
 let pick_random_function l =
@@ -20,9 +27,11 @@ let pick_random_function l =
   fun x -> List.nth l (Random.int len) x
 
 let run () =
-  Progress.with_reporters bars (fun reporters ->
+  print_endline "";
+  Progress.with_reporters ~config:(Progress.Config.v ~max_width:(Some 80) ())
+    bars (fun reporters ->
       let random_reporter = pick_random_function reporters in
-      for _ = 0 to 6000 do
+      for _ = 0 to 1000 * List.length bar_specs do
         random_reporter 1;
-        Unix.sleepf 0.002
+        Unix.sleepf 0.001
       done)

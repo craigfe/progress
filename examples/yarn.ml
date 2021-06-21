@@ -1,3 +1,7 @@
+(* This example ports the following example from Indicatif (Rust progress bar
+   library) to use Progress instead:
+   https://github.com/mitsuhiko/indicatif/blob/556db194b5ffeb4596275f1ce1d477f300bb4626/examples/yarnish.rs *)
+
 let line_prefix ~stages =
   let count = ref 0 in
   fun ppf ->
@@ -24,7 +28,11 @@ let with_bars f =
         ++ string)
     |> Progress.Multi.lines
   in
-  Progress.(with_reporters ~config @@ bars) f
+  let display = Progress.Display.start ~config bars in
+  let [ reporters ] = Progress.Display.reporters display in
+  let a = f display reporters in
+  Progress.Display.finalise display;
+  a
 
 let pick_random l =
   let len = List.length l in
@@ -56,19 +64,18 @@ let run () =
         Unix.sleepf 0.001
       done);
   Fmt.pr "%t 📃  Building fresh packages ... @." line_prefix;
-  with_bars (fun reporters ->
+  with_bars (fun display reporters ->
       (* Give everyone something to do *)
       List.iter (fun f -> f (random_action ())) reporters;
 
       (* Finish a task every so often *)
       let random_reporter = pick_random reporters in
-      for _ = 1 to 20 do
+      for _ = 1 to 100 do
         random_reporter () (random_action ());
 
         (* Advance the spinners while we wait *)
-        for _ = 1 to 10 do
-          (* Progress.tick (); *)
-          (* TODO: reinstate w/ better with_bars that gives display *)
+        for _ = 1 to 5 do
+          Progress.Display.tick display;
           Unix.sleepf 0.05
         done
       done);

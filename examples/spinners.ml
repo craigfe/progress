@@ -3,10 +3,17 @@ module Ansi = Internals.Ansi
 
 let apply_color color s = Ansi.(code color) ^ s ^ Ansi.(code none)
 
+let pick_colour =
+  let i = ref 0 in
+  let colours = [| `magenta; `blue; `cyan; `green; `yellow; `red |] in
+  fun () ->
+    i := (!i + 1) mod Array.length colours;
+    Color.of_ansi colours.(!i)
+
 (** Examples taken from: https://github.com/sindresorhus/cli-spinners/ *)
 
 include struct
-  let spin frames min_interval = Line.spinner ~frames ~min_interval ()
+  let spin frames min_interval = Line.spinner ~color:(pick_colour ()) ~frames ~min_interval ()
 
   let dots1     = spin [ "⠋"; "⠙"; "⠹"; "⠸"; "⠼"; "⠴"; "⠦"; "⠧"; "⠇"; "⠏" ]
   let dots2     = spin [ "⣾"; "⣽"; "⣻"; "⢿"; "⡿"; "⣟"; "⣯"; "⣷" ]
