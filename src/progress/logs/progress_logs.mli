@@ -1,3 +1,8 @@
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+   Distributed under the MIT license. See terms at the end of this file.
+  ————————————————————————————————————————————————————————————————————————————*)
+
 (** Extensions to the {{:https://erratique.ch/software/logs} [Logs]} library
     designed to cooperate with progress bar rendering. *)
 

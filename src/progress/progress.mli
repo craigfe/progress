@@ -1,3 +1,8 @@
+(*————————————————————————————————————————————————————————————————————————————
+   Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
+   Distributed under the MIT license. See terms at the end of this file.
+  ————————————————————————————————————————————————————————————————————————————*)
+
 (** A library for displaying progress bars, including support for rendering
     multiple bars at once. Start by {{!description} describing} of a sequence of
     progress bars, then begin {{!rendering} rendering} them.
