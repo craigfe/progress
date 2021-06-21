@@ -84,17 +84,6 @@ module Bar_list = struct
   include Multi.Hlist (Bar_renderer)
 end
 
-module Reporter = struct
-  type 'a t =
-    { uid : Bar_id.t; update : unconditional:bool -> unit; report : 'a -> unit }
-
-  let report t = t.report
-
-  type (_, _) list =
-    | [] : ('a, 'a) list
-    | ( :: ) : 'a * ('b, 'c) list -> ('a -> 'b, 'c) list
-end
-
 module Display : sig
   type t
 
@@ -288,9 +277,23 @@ end = struct
     Format.fprintf ppf "%s%!" (if hide_cursor then Ansi.show_cursor else "")
 end
 
+module Reporter = struct
+  type 'a t =
+    { uid : Bar_id.t
+    ; display : Display.Unique_id.t
+    ; update : unconditional:bool -> unit
+    ; report : 'a -> unit
+    }
+
+  let report t = t.report
+
+  type (_, _) list =
+    | [] : ('a, 'a) list
+    | ( :: ) : 'a * ('b, 'c) list -> ('a -> 'b, 'c) list
+end
+
 module Make (Platform : Platform.S) = struct
   module Config = Config
-  module Reporter = Reporter
   module Line = Line.Make (Platform)
 
   module Global : sig
@@ -399,6 +402,15 @@ module Make (Platform : Platform.S) = struct
     | None -> f ()
     | Some d -> Display.interject_with d f
 
+  module Reporter = struct
+    include Reporter
+
+    let finalise (t : _ t) =
+      match Global.find_display t.display with
+      | Error `finalised -> failwith "Display already finalised"
+      | Ok display -> Display.finalise_line display t.uid
+  end
+
   module Reporters = struct
     type nonrec ('a, 'b) t = ('a, 'b) Reporter.list
 
@@ -449,13 +461,7 @@ module Make (Platform : Platform.S) = struct
           let uid = Bar_renderer.id bar in
           let report = reporter_of_bar d bar in
           let update = updater_of_bar d bar in
-          { uid; report; update }
-
-    let finalise_line t r =
-      match Global.find_display t.uid with
-      | Error `finalised -> failwith "Display already finalised"
-      | Ok display -> Display.finalise_line display r.Reporter.uid
-    (* TODO: use [bar] / [line] consistently *)
+          { display = Display.uid d; uid; report; update }
 
     let finalise t =
       match Global.find_display t.uid with

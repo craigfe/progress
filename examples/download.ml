@@ -66,7 +66,7 @@ let run () =
   let [ completed ] = Display.reporters display in
   let nb_workers = 5 in
   let finish_item (worker : Worker.t) =
-    Display.finalise_line display (Option.get worker.reporter);
+    Reporter.finalise (Option.get worker.reporter);
     completed ()
   in
   let pick_item t (worker : Worker.t) =

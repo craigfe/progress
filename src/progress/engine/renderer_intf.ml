@@ -81,6 +81,7 @@ module type S = sig
     type 'a t
 
     val report : 'a t -> 'a -> unit
+    val finalise : _ t -> unit
 
     type (_, _) list =
       | [] : ('a, 'a) list
@@ -106,8 +107,6 @@ module type S = sig
 
     val add_line : ?above:int -> (_, _) t -> 'a line -> 'a Reporter.t
     (** Add a line to an ongoing display, and get its reporting function. *)
-
-    val finalise_line : (_, _) t -> _ Reporter.t -> unit
 
     val finalise : (_, _) t -> unit
     (** Terminate the given progress bar display. Raises [Failure] if the
