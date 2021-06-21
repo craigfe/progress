@@ -3,7 +3,7 @@
  (modules
   (:standard \ main))
  (libraries progress progress.logs unix logs logs.fmt fmt mtime
-   mtime.clock.os memtrace))
+   mtime.clock.os))
 
 (executable
  (name main)

@@ -36,7 +36,6 @@ let main () =
   done
 
 let run () =
-  Memtrace.trace_if_requested ();
   let () =
     (* Run with [VERBOSE=true] to see log entries being interleaved with
        progress bar rendering. *)
