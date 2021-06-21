@@ -15,12 +15,15 @@ depends: [
   "mtime"
   "terminal_size"
   "uutf"
+  "uucp"
+  "optint" {>= "0.1.0"}
   "alcotest" {>= "1.1.0" & with-test}
   "astring" {with-test}
-  "fmt" {with-test}
+  "fmt"
+  "vector"
   "odoc" {with-doc}
 ]
-depopts: ["logs" "fmt"]
+depopts: ["logs"]
 build: [
   ["dune" "subst"] {dev}
   [
