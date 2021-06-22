@@ -15,10 +15,10 @@ let bar color message =
 let main () =
   let layout =
     let open Multi in
-    bar (Color.of_hex "#90e0ef") "index.html"
-    ++ bar (Color.of_hex "#48cae4") "sitemap.xml"
-    ++ bar (Color.of_hex "#00b4d8") "img/kittens.jpg"
-    ++ bar (Color.of_hex "#0096c7") "img/puppies.jpg"
+    bar (Color.hex "#90e0ef") "index.html"
+    ++ bar (Color.hex "#48cae4") "sitemap.xml"
+    ++ bar (Color.hex "#00b4d8") "img/kittens.jpg"
+    ++ bar (Color.hex "#0096c7") "img/puppies.jpg"
   in
   with_reporters layout @@ fun a b c d ->
   let pick_random () =

@@ -4,7 +4,7 @@ let pick_colour = Utils.colour_picker ()
 
 let bar ~total =
   let open Line in
-  let spinner = spinner ~color:(Color.of_ansi `green) () in
+  let spinner = spinner ~color:(Color.ansi `green) () in
   let bar = bar ~color:(pick_colour ()) ~style:`ASCII ~total () in
   list
     [ spinner

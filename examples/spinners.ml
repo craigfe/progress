@@ -8,7 +8,7 @@ let pick_colour =
   let colours = [| `magenta; `blue; `cyan; `green; `yellow; `red |] in
   fun () ->
     i := (!i + 1) mod Array.length colours;
-    Color.of_ansi colours.(!i)
+    Color.ansi colours.(!i)
 
 (** Examples taken from: https://github.com/sindresorhus/cli-spinners/ *)
 
@@ -62,7 +62,7 @@ let unlimited_bar min_interval =
     List.init width (fun i ->
         String.concat ""
           (List.init width (fun x ->
-               if x = i then apply_color (Ansi.fg @@ Color.of_ansi `cyan) ">"
+               if x = i then apply_color (Ansi.fg @@ Color.ansi `cyan) ">"
                else apply_color Ansi.faint "-")))
   in
   let spin = Line.spinner ~min_interval ~frames () in

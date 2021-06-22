@@ -51,7 +51,7 @@ let test_string () =
 
   (* Strings containing ANSI colour escapes *)
   let () =
-    let col c s = Ansi.(code (fg (Color.of_ansi c))) ^ s ^ Ansi.(code none) in
+    let col c s = Ansi.(code (fg (Color.ansi c))) ^ s ^ Ansi.(code none) in
     (* Build up a coloured "hello world" string, retaining prefixes *)
     let h = col `red "h" in
     let he = h ^ col `blue "e" in

@@ -1,37 +1,34 @@
-let bar_specs =
-  [ ("Default ASCII", `ASCII, "#DC2F02")
-  ; ("Rough bar", `Custom (" ", [ ">" ], "="), "#DC2F02")
-  ; ("Rough bar", `UTF8, "#DC2F02")
-  ; ("Default UTF-8", `Custom (" ", [], "█"), "#DC2F02")
-  ; ( "Fine bar"
-    , `Custom (" ", [ "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉" ], "█")
-    , "#E85D04" )
-  ; ( "Vertical"
-    , `Custom (" ", [ "▁"; "▂"; "▃"; "▄"; "▅"; "▆"; "▇" ], "█")
-    , "#F48C06" )
-  ; ("Blocky", `Custom (" ", [ "▖"; "▌"; "▛" ], "█"), "#FAA307")
-  ; ("Fade in", `Custom (" ", [ "░"; "▒"; "▓" ], "█"), "#FFBA08")
+let[@ocamlformat "disable"] bar_styles =
+  let open Progress.Line.Bar_style in
+  let open Progress.Color in
+  let brackets = ("[", "]") in
+  let bars = ("│", "│") in
+  [ ("ASCII"    , ascii |> with_color (ansi `cyan) |> with_empty_color (ansi `blue))
+  ; ("arrow"    , v ~delims:brackets ~color:(ansi `red) [ "="; ">"; " " ])
+  ; ("dots"     , v ~delims:brackets ~color:(ansi `magenta) [ "." ])
+  ; ("digits"   , v ~delims:brackets [ "9"; "8"; "7"; "6"; "5"; "4"; "3"; "2"; "1"; "0"])
+  ; ("UTF8"     , utf8 |> with_color (ansi `green))
+  ; ("rough bar", v ~delims:bars ~color:(hex "#DC2F02") [ "█"; " " ])
+  ; ("fine bar" , v ~delims:bars ~color:(hex "#E85D04") [ "█"; "▉"; "▊"; "▋"; "▌"; "▍"; "▎"; "▏"; " " ] )
+  ; ("vertical" , v ~delims:bars ~color:(hex "#F48C06") [ "█"; "▇"; "▆"; "▅"; "▄"; "▃"; "▂"; "▁"; " " ] )
+  ; ("blocky"   , v ~delims:bars ~color:(hex "#FAA307") [ "█"; "▛"; "▌"; "▖"; " " ])
+  ; ("fade in"  , v ~delims:bars ~color:(hex "#FFBA08") [ "█"; "▓"; "▒"; "░"; " " ])
   ]
 
-let bars =
+let layout =
   let pick_colour = Utils.colour_picker () in
   let open Progress.Line in
-  ListLabels.map bar_specs ~f:(fun (name, style, _color) ->
-      lpad 20 (constf "%s –  " name)
-      ++ bar ~style ~color:(pick_colour ()) ~total:1000 ())
-  |> Progress.Multi.lines
-
-let pick_random_function l =
-  Random.self_init ();
-  let len = List.length l in
-  fun x -> List.nth l (Random.int len) x
+  let bars =
+    ListLabels.map bar_styles ~f:(fun (name, style) ->
+        lpad 17 (constf "%s : " name)
+        ++ bar ~style:(`Custom style) ~color:(pick_colour ()) ~total:1000 ())
+  in
+  Progress.Multi.(blank ++ lines bars ++ blank)
 
 let run () =
-  print_endline "";
-  Progress.with_reporters ~config:(Progress.Config.v ~max_width:(Some 80) ())
-    bars (fun reporters ->
-      let random_reporter = pick_random_function reporters in
-      for _ = 0 to 1000 * List.length bar_specs do
-        random_reporter 1;
-        Unix.sleepf 0.001
+  Progress.with_reporters ~config:(Progress.Config.v ~max_width:(Some 50) ())
+    layout (fun reporters ->
+      for _ = 0 to 1000 do
+        List.iter (fun f -> f 1) reporters;
+        Unix.sleepf 0.006
       done)

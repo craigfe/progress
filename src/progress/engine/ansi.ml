@@ -34,11 +34,11 @@ module Color = struct
     | Ansi (#plain as x) -> Fmt.pf ppf "ANSI (%a)" pp_plain x
     | Ansi (`bright x) -> Fmt.pf ppf "ANSI (bright %a)" pp_plain x
 
-  let of_ansi x = Ansi x
+  let ansi x = Ansi x
 
-  let of_rgb =
+  let rgb =
     let invalid_component typ n =
-      Fmt.invalid_arg "Color.of_rgb: invalid %s component %d" typ n
+      Fmt.invalid_arg "Color.rgb: invalid %s component %d" typ n
     in
     fun r g b ->
       if r < 0 || r > 255 then invalid_component "red" r;
@@ -46,21 +46,21 @@ module Color = struct
       if b < 0 || b > 255 then invalid_component "blue" b;
       Rgb (r, g, b)
 
-  let of_hex =
+  let hex =
     let invalid_length =
-      Fmt.invalid_arg "Color.of_hex: invalid hexstring length %d"
+      Fmt.invalid_arg "Color.hex: invalid hexstring length %d"
     in
     let hex c =
       if c >= '0' && c <= '9' then Char.code c - Char.code '0'
       else if c >= 'a' && c <= 'f' then Char.code c - Char.code 'a' + 10
       else if c >= 'A' && c <= 'F' then Char.code c - Char.code 'A' + 10
-      else Fmt.invalid_arg "Color.of_hex: invalid hexstring character %c" c
+      else Fmt.invalid_arg "Color.hex: invalid hexstring character %c" c
     in
     fun s ->
       let len = String.length s in
       if len = 0 then invalid_length len;
       if s.[0] <> '#' then
-        invalid_arg "Color.of_hex: hexstrings must start with '#'";
+        invalid_arg "Color.hex: hexstrings must start with '#'";
       let r1, r0, g1, g0, b1, b0 =
         match len with
         | 7 -> (hex s.[1], hex s.[2], hex s.[3], hex s.[4], hex s.[5], hex s.[6])
@@ -70,7 +70,7 @@ module Color = struct
             (r, r, g, g, b, b)
         | _ -> invalid_length len
       in
-      of_rgb ((16 * r1) + r0) ((16 * g1) + g0) ((16 * b1) + b0)
+      rgb ((16 * r1) + r0) ((16 * g1) + g0) ((16 * b1) + b0)
 end
 
 module Style = struct

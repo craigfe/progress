@@ -32,7 +32,7 @@ module type Ansi = sig
 
     (** {1 4-bit ANSI colours}
 
-        Colours built using {!of_ansi} will be rendered using the standard
+        Colours built using {!ansi} will be rendered using the standard
         {{:https://en.wikipedia.org/wiki/ANSI_escape_code#3-bit_and_4-bit} 4-bit
         ANSI escape codes} for terminals. The actual colours displayed to the
         user depend on their terminal configuration / theme, ensuring that they
@@ -41,7 +41,7 @@ module type Ansi = sig
     type plain =
       [ `black | `blue | `cyan | `green | `magenta | `red | `white | `yellow ]
 
-    val of_ansi : [ plain | `bright of plain ] -> t
+    val ansi : [ plain | `bright of plain ] -> t
 
     (** {1 24-bit RGB colours}
 
@@ -51,18 +51,18 @@ module type Ansi = sig
         rendered exactly as requested, offering greater flexibility at the risk
         of clashing with the user's theming. *)
 
-    val of_rgb : int -> int -> int -> t
-    (** [of_rgb r g b] is the RGB24 colour with the given red, green and blue
+    val rgb : int -> int -> int -> t
+    (** [rgb r g b] is the RGB24 colour with the given red, green and blue
         colour components respectively. Raises [Invalid_argument] if any of the
         components are outside the range [\[0, 255\]]. *)
 
-    val of_hex : string -> t
-    (** [of_hex s] is the RGB24 colour given by the
+    val hex : string -> t
+    (** [hex s] is the RGB24 colour given by the
         {{:https://en.wikipedia.org/wiki/Web_colors#Hex_triplet} hex triplet}
         [s], which must start with [#]. Examples:
 
-        - [of_hex "#FF8C00"] = [of_rgb 0xFF 0x8C 0x00]
-        - [of_hex "#fa0"] = [of_rgb 0xFF 0xAA 0x00]
+        - [hex "#FF8C00"] = [rgb 0xFF 0x8C 0x00]
+        - [hex "#fa0"] = [rgb 0xFF 0xAA 0x00]
 
         Raises [Invalid_argument] if the given string is not a [#]-prefixed hex
         triplet. *)

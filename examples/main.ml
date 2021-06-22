@@ -1,14 +1,14 @@
 let examples =
   Examples.
     [ ( "bar_styles"
-      , "Demo of possible progress bar configurations."
+      , "Demo of possible progress bar configurations"
       , Bar_styles.run )
-    ; ("cargo", "Port of the Cargo install progress bar.", Cargo.run)
-    ; ("yarn", "Yarn-like download and install sequence.", Yarn.run)
-    ; ("interject", "Logging while displaying a progress bar.", Interject.run)
-    ; ("spinners", "Demo of possible spinner configurations.", Spinners.run)
+    ; ("cargo", "Port of the Cargo install progress bar", Cargo.run)
+    ; ("download", "Rainbow-coloured download sequence", Download.run)
+    ; ("interject", "Logging while displaying a progress bar", Interject.run)
     ; ("readme", "Demonstration included in the README", Readme.run)
-    ; ("download", "Rainbow-coloured download sequence.", Download.run)
+    ; ("spinners", "Demo of possible spinner configurations", Spinners.run)
+    ; ("yarn", "Yarn-like download and install sequence", Yarn.run)
     ]
 
 let available_examples () =
