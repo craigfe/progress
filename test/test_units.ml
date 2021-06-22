@@ -1,16 +1,19 @@
 let almost f = f -. Float.epsilon
 let ( - ) = Int64.sub
 
-let expect_pp_fixed pp_fixed s f =
+let expect_pp_fixed ?relaxed_length ~pp:pp_fixed s f =
   let result = Progress.Printer.to_to_string pp_fixed f in
   Alcotest.(check string) (Fmt.str "Expected rendering of %s" s) s result;
-  Alcotest.(check int)
-    "Expected length"
-    (Progress.Printer.print_width pp_fixed)
-    (String.length result)
+  match relaxed_length with
+  | Some () -> ()
+  | None ->
+      Alcotest.(check int)
+        "Expected length"
+        (Progress.Printer.print_width pp_fixed)
+        (String.length result)
 
 let test_percentage () =
-  let expect = expect_pp_fixed Progress.Units.Percentage.of_float in
+  let expect = expect_pp_fixed ~pp:Progress.Units.Percentage.of_float in
   expect "  0%" (-0.1);
   expect "  0%" (almost 0.01);
   expect "  1%" 0.01;
@@ -24,7 +27,7 @@ let test_percentage () =
   ()
 
 let test_bytes () =
-  let expect = expect_pp_fixed Progress.Units.Bytes.of_int64 in
+  let expect = expect_pp_fixed ~pp:Progress.Units.Bytes.of_int64 in
   let open Progress.Units.Bytes in
   expect "   0.0 B  " 0L;
   expect " 999.0 B  " 999L;
@@ -37,20 +40,42 @@ let test_bytes () =
   expect "   1.0 EiB" (pib 1024);
   ()
 
-let test_seconds () =
-  let expect = expect_pp_fixed Progress.Units.Duration.mm_ss in
-  expect "00:00" (Mtime.Span.of_uint64_ns 0L);
-  expect "00:29" (Mtime.Span.of_uint64_ns 29_600_000_000L);
-  expect "00:30" (Mtime.Span.of_uint64_ns 30_000_000_000L);
-  expect "00:30" (Mtime.Span.of_uint64_ns 30_400_000_000L);
-  expect "00:59" (Mtime.Span.of_uint64_ns 59_600_000_000L);
-  expect "01:00" (Mtime.Span.of_uint64_ns 60_000_000_000L);
-  expect "01:00" (Mtime.Span.of_uint64_ns 60_400_000_000L);
+let test_duration () =
+  let module D = Progress.Duration.Of_int in
+  let () =
+    let expect = expect_pp_fixed ~pp:Progress.Units.Duration.mm_ss in
+    expect "00:00" D.(sec 0);
+    expect "00:29" D.(sec 29);
+    expect "00:30" D.(sec 30);
+    expect "00:30" D.(ms 30_400);
+    expect "00:59" D.(ms 59_600);
+    expect "01:00" D.(min 1);
+    expect "01:00" D.(min 1 + ms 400);
+    expect "99:00" D.(min 99);
+    expect "99:59" D.(min 99 + sec 59);
+    (* Fail gracefully: *)
+    expect ~relaxed_length:() "100:00" D.(min 100)
+  in
+
+  let () =
+    let expect = expect_pp_fixed ~pp:Progress.Units.Duration.hh_mm_ss in
+    expect "00:00:00" D.(sec 0);
+    expect "00:00:59" D.(ms 59_600);
+    expect "00:01:00" D.(min 1);
+    expect "00:01:00" D.(min 1 + ms 400);
+    expect "00:59:59" D.(min 59 + sec 59 + ms 999);
+    expect "01:00:00" D.(hour 1);
+    expect "01:00:00" D.(hour 1 + ms 1);
+    expect "99:59:59" D.(hour 99 + min 59 + sec 59 + ms 999);
+    (* Fail gracefully: *)
+    expect ~relaxed_length:() "100:00:00" D.(hour 100)
+  in
+
   ()
 
 let tests =
   Alcotest.
     [ test_case "percentage" `Quick test_percentage
     ; test_case "bytes" `Quick test_bytes
-    ; test_case "seconds" `Quick test_seconds
+    ; test_case "duration" `Quick test_duration
     ]

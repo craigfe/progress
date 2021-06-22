@@ -7,10 +7,13 @@ open! Import
 
 module Duration : sig
   val mm_ss : Duration.t Printer.t
-  (** Renders a time span in fixed-width [MM:SS] form. *)
+  (** Prints a time span in fixed-width [MM:SS] form. *)
+
+  val hh_mm_ss : Duration.t Printer.t
+  (** Prints a time span in fixed-width [HH:MM:SS] form. *)
 end
 
-(** Prints a proportion as a percentage. e.g.
+(** Prints a proportion as a percentage.
 
     {[
       0.      ↦  "  0%"
@@ -24,7 +27,7 @@ module Percentage : sig
   val of_float : float Printer.t
 end
 
-(** Prints a numeric value as as a byte count. e.g.
+(** Prints a numeric value as as a byte count.
 
     {[
       0                ↦  "   0.0 B  "

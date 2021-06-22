@@ -33,10 +33,19 @@ val of_day : float -> t
 (** {2 From integers} *)
 
 val of_int_ms : int -> t
-val of_int64_ms : int64 -> t
 val of_int_sec : int -> t
-val of_int64_sec : int64 -> t
 val of_int_min : int -> t
+val of_int_hour : int -> t
+val of_int64_ms : int64 -> t
+val of_int64_sec : int64 -> t
+
+module Of_int : sig
+  val ms : int -> t
+  val sec : int -> t
+  val min : int -> t
+  val hour : int -> t
+  val ( + ) : t -> t -> t
+end
 
 (** {2 Infix operators} *)
 
