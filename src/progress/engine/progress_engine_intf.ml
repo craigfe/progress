@@ -44,7 +44,7 @@ module type S = sig
 
   val counter :
        total:int64
-    -> ?style:[ `ASCII | `UTF8 | `Custom of string list ]
+    -> ?style:[ `ASCII | `UTF8 | `Custom of Line.Bar_style.t ]
     -> ?message:string
     -> ?pp:int64 Printer.t
     -> unit

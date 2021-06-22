@@ -148,10 +148,22 @@ end = struct
 
   let uid { uid; _ } = uid
 
+  (* Terminals generally don't wrap blank suffixes of lines (e.g. [" \n"] is
+     equivalent to ["\n"]), so we should account for this when estimating the
+     width at which a given line will be wrapped. *)
+  let get_blank_suffix_length =
+    let rec aux str = function
+      | -1 -> -1
+      | i -> ( match str.[i] with ' ' -> aux str (i - 1) | _ -> i)
+    in
+    fun str ->
+      let last_index = String.length str - 1 in
+      last_index - aux str last_index
+
   let rerender_line_and_advance { config = { ppf; _ }; _ } (E bar) new_width
       data =
     let old_width = bar.latest_width in
-    bar.latest_width <- new_width;
+    bar.latest_width <- new_width - get_blank_suffix_length data;
     Format.pp_print_string ppf data;
     if new_width < old_width then Format.pp_print_string ppf Ansi.erase_line
 

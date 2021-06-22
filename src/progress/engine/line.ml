@@ -111,14 +111,30 @@ module Integer_independent (Platform : Platform.S) = struct
   let noop () = Noop
 
   let const s =
-    let len = String.length s and len_utf8 = String.Utf8.length s in
+    let len = String.length s
+    and width = Printer.Internals.guess_printed_width s in
     let segment =
-      Primitives.theta ~width:len_utf8 (fun buf _ ->
+      Primitives.theta ~width (fun buf _ ->
           Line_buffer.add_substring buf s ~off:0 ~len)
     in
     Basic segment
 
-  let constf fmt = Format.kasprintf const fmt
+  (* Like [Format.str_formatter], but with [Fmt] set to use [`Ansi_tty] style rendering. *)
+  let str_formatter_buf, str_formatter =
+    let buf = Buffer.create 0 in
+    let ppf = Format.formatter_of_buffer buf in
+    Fmt.set_style_renderer ppf `Ansi_tty;
+    (buf, ppf)
+
+  let constf fmt =
+    Fmt.kpf
+      (fun ppf ->
+        Format.pp_print_flush ppf ();
+        let str = Buffer.contents str_formatter_buf in
+        Buffer.clear str_formatter_buf;
+        const str)
+      str_formatter fmt
+
   let pair ?(sep = noop ()) a b = Pair (a, sep, b)
 
   let list ?(sep = const " ") xs =
@@ -136,16 +152,17 @@ module Integer_independent (Platform : Platform.S) = struct
   let string =
     let segment =
       Primitives.alpha_unsized ~initial:(`Val "") (fun ~width buf -> function
-        | `start -> 0 (* TODO: chosen randomly *)
-        | `finish s | `report s | `rerender s ->
+        | `finish s | `report s | `rerender s | `tick s ->
             let output_len = width () - 1 (* XXX: why is -1 necessary? *) in
-            let pp =
-              Staged.prj
-              @@ Printer.Internals.to_line_printer
-                   (Printer.string ~width:output_len)
-            in
-            pp buf s;
-            output_len)
+            if output_len <= 0 then 0
+            else
+              let pp =
+                Staged.prj
+                @@ Printer.Internals.to_line_printer
+                     (Printer.string ~width:output_len)
+              in
+              pp buf s;
+              output_len)
     in
     Basic segment
 
