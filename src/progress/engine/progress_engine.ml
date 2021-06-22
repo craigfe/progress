@@ -37,7 +37,7 @@ module Make (Platform : Platform) = struct
   module Display = Renderer.Display
   module Reporter = Renderer.Reporter
 
-  let counter ~total ?(style = `ASCII) ?message ?pp () =
+  let counter ?(style = `ASCII) ?message ?pp total =
     let map_option ~f x = Option.fold ~none:(Line.noop ()) ~some:f x in
     let open Line.Using_int64 in
     list

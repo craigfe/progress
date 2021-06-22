@@ -36,7 +36,7 @@ module type S = sig
       the same type of reported values. *)
 
   val ( ++ ) : ('a, 'b) t -> ('b, 'c) t -> ('a, 'c) t
-  (** Stack progress bars vertically. [a / b] is a set with [a] stacked on top
+  (** Stack progress bars vertically. [a ++ b] is a set with [a] stacked on top
       of [b]. The two sections have separate reporting functions, passed
       consecutively to the {!with_reporters} continuation when rendering. *)
 

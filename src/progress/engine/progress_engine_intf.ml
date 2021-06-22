@@ -40,31 +40,25 @@ module type S = sig
       Multi.S with type 'a line := 'a Line.t and type 'a reporter := 'a reporter
   end
 
-  (** {2 Pre-provided layouts} *)
+  (** {2 Pre-provided lines} *)
 
   val counter :
-       total:int64
-    -> ?style:[ `ASCII | `UTF8 | `Custom of Line.Bar_style.t ]
+       ?style:[ `ASCII | `UTF8 | `Custom of Line.Bar_style.t ]
     -> ?message:string
     -> ?pp:int64 Printer.t
-    -> unit
+    -> int64
     -> int64 Line.t
-  (** [counter ~total ()] is a progress bar of the form:
+  (** [counter total] is a progress bar of the form:
 
       {[
         <message?> <count?> MM:SS [########..............................]  XX%
       ]}
 
       where each reported value contributes cumulatively towards an eventual
-      total of [total]. Optional parameters are as follows:
-
-      - [?style] specifies whether to use a UTF-8 or an ASCII encoding for the
-        progress bar. The UTF-8 encoding shows a higher resolution of progress,
-        but may not be supported in all terminals. The default is [`ASCII].
-
-      - [?pp] is used to pretty-print the [<count>] segment, if passed. For
-        example, {!Units.bytes} can be used for totals measured in bytes. The
-        default is to not display this segment. *)
+      total of [total]. [?style] specifies the {{!Line.Bar_style.t}
+      [Bar_style.t]} to use for rendering the bar, and [?pp] is used to
+      pretty-print the [<count>] segment, if passed. (For example,
+      {!Units.Bytes.of_int64} can be used for totals measured in bytes.) *)
 
   (** {1 Rendering}
 

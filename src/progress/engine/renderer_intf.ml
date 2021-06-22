@@ -106,11 +106,20 @@ module type S = sig
       interleave rendering of displays. *)
 
   module Reporter : sig
-    type 'a t
+    type -'a t
+    (** The (abstract) type of reporter functions used by the manual lifecycle
+        management functions in {!Display}. An ['a t] is conceptually an
+        ['a -> unit] function, but can be explicitly {!finalise}d. *)
 
     val report : 'a t -> 'a -> unit
-    val finalise : _ t -> unit
 
+    val finalise : _ t -> unit
+    (** [finalise t] terminates rendering of the line associated with reporter
+        [t]. Attempting to {!report} to a finalised reporter will raise an
+        exception. *)
+
+    (** A heterogeneous list type, used by {!Display} for returning a list of
+        reporters corresponding to multi-line progress displays. *)
     type (_, _) list =
       | [] : ('a, 'a) list
       | ( :: ) : 'a * ('b, 'c) list -> ('a -> 'b, 'c) list
@@ -119,22 +128,31 @@ module type S = sig
   module Display : sig
     type ('a, 'b) t
     (** The type of active progress bar displays. The type parameters ['a] and
-        ['b] store a list of the reporting functions used *)
+        ['b] track the types of the reporting functions supplied by {!reporters}
+        (see {!Multi.t} for details).*)
 
     val start : ?config:config -> ('a, 'b) multi -> ('a, 'b) t
     (** Initiate rendering of a progress bar display. Raises [Failure] if there
         is already an active progress bar display. *)
 
     val reporters : ('a, unit) t -> ('a, unit) Reporter.list
-    (** [reporters d] is the list of reporting functions for the .
+    (** [reporters d] is the list of initial reporting functions belonging to
+        display [d].
 
-        {b Note:} this list does not include any reporters added {i during}
-        progress bar rendering via {!add_line}. *)
+        {b Note}
+        {i this list does not include any reporters added {i during} progress
+           bar rendering via {!add_line}.} *)
 
     val tick : _ t -> unit
+    (** [tick d] re-renders the contents of display [d] without reporting any
+        specific values. This function can be used to update spinners,
+        durations, etc. when there is no actual progress to report. *)
 
     val add_line : ?above:int -> (_, _) t -> 'a line -> 'a Reporter.t
-    (** Add a line to an ongoing display, and get its reporting function. *)
+    (** Add a line to an ongoing display, and get its reporting function. By
+        default, the line is added to the {i bottom} of the display
+        ([above = 0]); the [~above] argument can be passed to add the line above
+        some number of existing lines. *)
 
     val finalise : (_, _) t -> unit
     (** Terminate the given progress bar display. Raises [Failure] if the

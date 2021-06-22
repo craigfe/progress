@@ -58,12 +58,26 @@ module type DSL = sig
   (** [const s] is the segment that always displays [s]. *)
 
   val constf : ('a, Format.formatter, unit, _ t) format4 -> 'a
-  (** [constf fmt a b c ...] is equivalent to
-      [const (Format.asprintf fmt a b c ...)]. *)
+  (** Like {!const}, but takes a format string and corresponding arguments.
+      [constf "..." a b c ...] is equivalent to
+      [const (Format.asprintf "..." a b c ...)], except that colours added with
+      [Fmt.styled] are not discarded. *)
 
   val string : string t
   (** A line segment that displays a dynamically-sized string message. Use
       {!lpad} and {!rpad} to pad the message up to a given length. *)
+
+  val lpad : int -> 'a t -> 'a t
+  (** [lpad n t] left-pads the segment [t] to size [n] by adding blank space at
+      the start. *)
+
+  val rpad : int -> 'a t -> 'a t
+  (** [rpad n t] right-pads the segment [t] to size [n] by adding blank space at
+      the end. *)
+
+  val of_printer : ?init:'a -> 'a printer -> 'a t
+  (** [of_printer p] is a segment that renders the latest reported value using
+      printer [p]. See {!accumulator} *)
 
   (** {2:counting Counting segments}
 
@@ -90,6 +104,8 @@ module type DSL = sig
   (** [percentage_of target] renders the running total as a percentage of
       [target], i.e. [42%]. Values outside the range [\[0, 100\]] will be
       clamped to either [0] or [100]. *)
+
+  (** {2:graphical Graphical segments} *)
 
   module Bar_style : sig
     type t
@@ -193,10 +209,6 @@ module type DSL = sig
   val ticker_up_to : ?sep:unit t -> integer -> _ t
   (** TODO: document. *)
 
-  val of_printer : ?init:'a -> 'a printer -> 'a t
-  (** TODO: Rename to [of_printer] and keep a distinction between accumulated
-      printers. *)
-
   (** {2:time Time-sensitive segments} *)
 
   val bytes_per_sec : integer t
@@ -230,14 +242,6 @@ module type DSL = sig
   (** Horizontally join a pair of segments consuming different reported values
       into a single segment that consumes a pair. *)
 
-  val lpad : int -> 'a t -> 'a t
-  (** [lpad n t] left-pads the segment [t] to size [n] by adding blank space at
-      the start. *)
-
-  val rpad : int -> 'a t -> 'a t
-  (** [rpad n t] right-pads the segment [t] to size [n] by adding blank space at
-      the end. *)
-
   val using : ('a -> 'b) -> 'b t -> 'a t
   (** [using f s] is a segment that first applies [f] to the reported value and
       then behaves as segment [s]. *)
@@ -270,7 +274,19 @@ module type S = sig
   include DSL with type integer := int
   (** @inline *)
 
-  (** {1:integers Alternative integer types} *)
+  (** {1:integers Alternative integer types}
+
+      Many of the line segments above are specialised to [int] values for
+      simplicity (and performance), but certain use-cases may require different
+      types (e.g. for file transfers greater than [2 GiB] on 32-bit platforms).
+      The following modules re-export the [Line] DSL with different integer
+      speciialisations, and are intended to be opened locally, e.g.
+
+      {[
+        let my_line =
+          let open Progress.Line.Using_int64 in
+          list [ const "Downloading large file"; bar total; bytes ]
+      ]} *)
 
   module Integer_dependent : sig
     (** {!S} contains just the line segments that can be specialised to an

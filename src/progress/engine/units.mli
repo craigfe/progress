@@ -5,6 +5,9 @@
 
 open! Import
 
+(** Pretty-printing utilities for common units used in progress bars. *)
+
+(** Printers for time durations (e.g. [MM:SS], [HH:MM:SS]). *)
 module Duration : sig
   val mm_ss : Duration.t Printer.t
   (** Prints a time span in fixed-width [MM:SS] form. *)
@@ -13,7 +16,7 @@ module Duration : sig
   (** Prints a time span in fixed-width [HH:MM:SS] form. *)
 end
 
-(** Prints a proportion as a percentage.
+(** Prints a proportion as a percentage (e.g. [42%]).
 
     {[
       0.      ↦  "  0%"
