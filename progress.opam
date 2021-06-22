@@ -13,6 +13,7 @@ depends: [
   "dune" {>= "2.7"}
   "ocaml" {>= "4.08.0"}
   "fmt"
+  "logs" {>= "0.7.0"}
   "mtime"
   "terminal_size"
   "uucp"
@@ -21,10 +22,8 @@ depends: [
   "optint" {>= "0.1.0"}
   "alcotest" {with-test & >= "1.4.0"}
   "astring" {with-test}
-  "logs" {with-test & >= "0.7.0"}
   "odoc" {with-doc}
 ]
-depopts: ["logs"]
 build: [
   ["dune" "subst"] {dev}
   [

@@ -7,10 +7,8 @@
     multiple bars at once. Start by {{!description} describing} of a sequence of
     progress bars, then begin {{!rendering} rendering} them.
 
-    - See {!Progress_logs} for related extensions to the
-      {{:https://erratique.ch/software/logs} Logs} library.
-    - See {!Progress_engine} for an equivalent API that is portable to non-Unix
-      platforms. *)
+    See {!Progress_engine} for an equivalent API that is portable to non-Unix
+    platforms. *)
 
 include Progress_engine.S
 (** @inline *)

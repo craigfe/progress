@@ -18,6 +18,7 @@ progress bar formats. Supports rendering multiple progress bars simultaneously.\
  (depends
   (ocaml (>= 4.08.0))
   fmt
+  (logs (>= 0.7.0))
   mtime
   terminal_size
   uucp
@@ -25,6 +26,4 @@ progress bar formats. Supports rendering multiple progress bars simultaneously.\
   vector
   (optint (>= 0.1.0))
   (alcotest (and :with-test (>= 1.4.0)))
-  (astring :with-test)
-  (logs (and :with-test (>= 0.7.0))))
- (depopts logs))
+  (astring :with-test)))

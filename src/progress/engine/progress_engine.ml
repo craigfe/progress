@@ -49,6 +49,8 @@ module Make (Platform : Platform) = struct
       ]
 
   let interject_with = Renderer.interject_with
+  let instrument_logs_reporter = Renderer.instrument_logs_reporter
+  let logs_reporter = Renderer.logs_reporter
   let with_reporters = Renderer.with_reporters
   let with_reporter ?config b f = with_reporters ?config (Multi.line b) f
 end

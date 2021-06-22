@@ -1,9 +1,0 @@
-(library
- (name progress_logs)
- (public_name progress.logs)
- (optional)
- (libraries
-  (re_export progress)
-  logs
-  logs.fmt
-  fmt))

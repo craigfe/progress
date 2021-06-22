@@ -44,8 +44,7 @@ let run () =
     | Some _ ->
         (* Configure a [Logs] reporter that behaves properly with concurrent
            progress bar rendering. *)
-        Logs.set_reporter
-          (Progress_logs.instrument_reporter (Logs_fmt.reporter ()));
+        Logs.set_reporter (Progress.logs_reporter ());
         Logs.set_level (Some Info)
   in
   main ()

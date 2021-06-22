@@ -34,7 +34,7 @@ let packages =
   |> Vector.of_list ~dummy:("", "")
 
 let setup_logs () =
-  let reporter = Progress_logs.instrument_reporter (Logs_fmt.reporter ()) in
+  let reporter = Progress.logs_reporter () in
   Fmt_tty.setup_std_outputs ();
   Logs_threaded.enable ();
   Logs.set_reporter reporter

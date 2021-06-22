@@ -5,6 +5,8 @@
   (re_export mtime)
   (re_export optint)
   fmt
+  logs
+  logs.fmt
   uutf
   uucp
   vector))

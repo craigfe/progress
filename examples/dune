@@ -2,8 +2,8 @@
  (name examples)
  (modules
   (:standard \ main))
- (libraries progress progress.logs unix logs logs.fmt logs.threaded fmt
-   fmt.tty mtime mtime.clock.os vector threads.posix))
+ (libraries progress unix logs logs.fmt logs.threaded fmt fmt.tty mtime
+   mtime.clock.os vector threads.posix))
 
 (executable
  (name main)
