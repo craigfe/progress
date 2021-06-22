@@ -12,15 +12,16 @@ bug-reports: "https://github.com/CraigFe/progress/issues"
 depends: [
   "dune" {>= "2.7"}
   "ocaml" {>= "4.08.0"}
+  "fmt"
   "mtime"
   "terminal_size"
-  "uutf"
   "uucp"
-  "optint" {>= "0.1.0"}
-  "alcotest" {>= "1.1.0" & with-test}
-  "astring" {with-test}
-  "fmt"
+  "uutf"
   "vector"
+  "optint" {>= "0.1.0"}
+  "alcotest" {with-test & >= "1.4.0"}
+  "astring" {with-test}
+  "logs" {with-test & >= "0.7.0"}
   "odoc" {with-doc}
 ]
 depopts: ["logs"]

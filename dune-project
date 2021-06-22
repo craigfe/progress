@@ -17,13 +17,14 @@ progress bar formats. Supports rendering multiple progress bars simultaneously.\
  (documentation https://CraigFe.github.io/progress/)
  (depends
   (ocaml (>= 4.08.0))
+  fmt
   mtime
   terminal_size
-  uutf
   uucp
+  uutf
+  vector
   (optint (>= 0.1.0))
-  (alcotest (and (>= 1.1.0) :with-test))
+  (alcotest (and :with-test (>= 1.4.0)))
   (astring :with-test)
-  fmt
-  vector)
+  (logs (and :with-test (>= 0.7.0))))
  (depopts logs))
