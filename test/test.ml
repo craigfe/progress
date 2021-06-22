@@ -12,8 +12,8 @@ let read_bar () =
   Format.flush_str_formatter ()
   |> String.trim ~drop:(function '\r' | '\n' -> true | _ -> false)
 
-let check_bar expected =
-  Alcotest.check
+let check_bar ~__POS__:pos expected =
+  Alcotest.check ~pos
     Alcotest.(testable Fmt.Dump.string String.equal)
     ("Expected state: " ^ expected)
     expected (read_bar ())
@@ -30,61 +30,61 @@ let test_pair () =
   in
   let () =
     let@ report = Progress.with_reporter ~config bar in
-    check_bar "0, foo";
+    check_bar ~__POS__ "0, foo";
     report (1, "bar");
-    check_bar "1, bar"
+    check_bar ~__POS__ "1, bar"
   in
-  check_bar "1, bar"
+  check_bar ~__POS__ "1, bar"
 
 let test_unicode_bar () =
   let () =
     let@ report =
       Progress.Line.Using_float.bar_unaccumulated ~style:`UTF8 ~width:(`Fixed 3)
-        ~total:1. ()
+        1.
       |> Progress.with_reporter ~config
     in
-    let expect s f =
+    let expect ~__POS__:pos s f =
       report f;
-      check_bar s
+      check_bar ~__POS__:pos s
     in
-    check_bar "│ │";
-    expect "" 0.;
-    expect "" (almost (1. /. 8.));
-    expect "│▏│" (1. /. 8.);
-    expect "" (almost (2. /. 8.));
-    expect "│▎│" (2. /. 8.);
-    expect "" (almost (3. /. 8.));
-    expect "│▍│" (3. /. 8.);
-    expect "" (almost (4. /. 8.));
-    expect "│▌│" (4. /. 8.);
-    expect "" (almost (5. /. 8.));
-    expect "│▋│" (5. /. 8.);
-    expect "" (almost (6. /. 8.));
-    expect "│▊│" (6. /. 8.);
-    expect "" (almost (7. /. 8.));
-    expect "│▉│" (7. /. 8.);
-    expect "" (almost 1.);
-    expect "│█│" 1.;
-    expect "" (1. +. Float.epsilon);
-    expect "" (1. +. (1. /. 8.));
-    expect "" (almost 2.)
+    check_bar ~__POS__ "│ │";
+    expect ~__POS__ "" 0.;
+    expect ~__POS__ "" (almost (1. /. 8.));
+    expect ~__POS__ "│▏│" (1. /. 8.);
+    expect ~__POS__ "" (almost (2. /. 8.));
+    expect ~__POS__ "│▎│" (2. /. 8.);
+    expect ~__POS__ "" (almost (3. /. 8.));
+    expect ~__POS__ "│▍│" (3. /. 8.);
+    expect ~__POS__ "" (almost (4. /. 8.));
+    expect ~__POS__ "│▌│" (4. /. 8.);
+    expect ~__POS__ "" (almost (5. /. 8.));
+    expect ~__POS__ "│▋│" (5. /. 8.);
+    expect ~__POS__ "" (almost (6. /. 8.));
+    expect ~__POS__ "│▊│" (6. /. 8.);
+    expect ~__POS__ "" (almost (7. /. 8.));
+    expect ~__POS__ "│▉│" (7. /. 8.);
+    expect ~__POS__ "" (almost 1.);
+    expect ~__POS__ "│█│" 1.;
+    expect ~__POS__ "" (1. +. Float.epsilon);
+    expect ~__POS__ "" (1. +. (1. /. 8.));
+    expect ~__POS__ "" (almost 2.)
   in
   clear_test_state ();
   let () =
     let@ report =
       Progress.Line.Using_float.bar_unaccumulated ~style:`UTF8 ~width:(`Fixed 5)
-        ~total:1. ()
+        1.
       |> Progress.with_reporter ~config
     in
     let expect s f =
       report f;
       check_bar s
     in
-    check_bar "│   │";
-    expect "" 0.;
-    expect "│█▌ │" 0.5;
-    expect "│██▉│" (almost 1.);
-    expect "│███│" 1.
+    check_bar ~__POS__ "│   │";
+    expect ~__POS__ "" 0.;
+    expect ~__POS__ "│█▌ │" 0.5;
+    expect ~__POS__ "│██▉│" (almost 1.);
+    expect ~__POS__ "│███│" 1.
   in
   ()
 
@@ -92,38 +92,39 @@ let test_progress_bar_lifecycle () =
   let open Progress.Units.Bytes in
   let@ report =
     let open Progress.Line.Using_int64 in
+    let total = gib 1 in
     list
       [ const "<msg>"
       ; bytes
-      ; bar ~style:`ASCII ~width:(`Fixed 29) ~total:(gib 1) ()
+      ; bar ~style:`ASCII ~width:(`Fixed 29) total
         ++ const " "
-        ++ percentage_of (gib 1)
+        ++ percentage_of total
       ]
     |> Progress.with_reporter ~config
   in
-  check_bar "<msg>    0.0 B   [---------------------------]   0%";
+  check_bar ~__POS__ "<msg>    0.0 B   [---------------------------]   0%";
   report (kib 1 -- 1L);
-  check_bar "<msg> 1023.0 B   [---------------------------]   0%";
+  check_bar ~__POS__ "<msg> 1023.0 B   [---------------------------]   0%";
   report 1L;
-  check_bar "<msg>    1.0 KiB [---------------------------]   0%";
+  check_bar ~__POS__ "<msg>    1.0 KiB [---------------------------]   0%";
   report (mib 1 -- kib 1 -- 1L);
   (* Should always round downwards. *)
-  check_bar "<msg> 1023.9 KiB [---------------------------]   0%";
+  check_bar ~__POS__ "<msg> 1023.9 KiB [---------------------------]   0%";
   report 1L;
-  check_bar "<msg>    1.0 MiB [---------------------------]   0%";
+  check_bar ~__POS__ "<msg>    1.0 MiB [---------------------------]   0%";
   report (mib 49);
-  check_bar "<msg>   50.0 MiB [#--------------------------]   4%";
+  check_bar ~__POS__ "<msg>   50.0 MiB [#--------------------------]   4%";
   report (mib 450);
-  check_bar "<msg>  500.0 MiB [#############--------------]  48%";
+  check_bar ~__POS__ "<msg>  500.0 MiB [#############--------------]  48%";
   report (gib 1 -- mib 500 -- 1L);
   (* 1 byte from completion. Should show 99% and not a full 1024 MiB. *)
-  check_bar "<msg> 1023.9 MiB [##########################-]  99%";
+  check_bar ~__POS__ "<msg> 1023.9 MiB [##########################-]  99%";
   report 1L;
   (* Now exactly complete *)
-  check_bar "<msg>    1.0 GiB [###########################] 100%";
+  check_bar ~__POS__ "<msg>    1.0 GiB [###########################] 100%";
   (* Subsequent reports don't overflow the bar *)
   report (gib 1 // 2L);
-  check_bar "<msg>    1.5 GiB [###########################] 100%";
+  check_bar ~__POS__ "<msg>    1.5 GiB [###########################] 100%";
   ()
 
 let test_progress_bar_width () =
@@ -132,11 +133,7 @@ let test_progress_bar_width () =
     let@ _report =
       let open Progress.Line.Using_int64 in
       Progress.with_reporter ~config
-        (bar ~style:`ASCII ~width:(`Fixed width) ~total:1L ())
-      (* Progress.with_reporters ~config
-       *   (Progress.counter ~style:`ASCII ~total:1L ~sampling_interval:1 ~width
-       *      ~message ?pp
-       *      (module Int64)) *)
+        (bar ~style:`ASCII ~width:(`Fixed width) 1L)
     in
     let s = read_bar () in
     String.length s
