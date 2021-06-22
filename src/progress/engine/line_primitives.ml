@@ -4,6 +4,7 @@
   ————————————————————————————————————————————————————————————————————————————*)
 
 include Line_primitives_intf
+include Line_primitives_intf.Types
 open! Import
 open Staged.Syntax
 
@@ -22,7 +23,6 @@ open Staged.Syntax
     colour codes. *)
 
 type 'a pp = Format.formatter -> 'a -> unit
-type 'a event = [ `start | `report of 'a | `rerender of 'a | `finish of 'a ]
 
 type 'a t =
   | Noop
@@ -448,13 +448,14 @@ let update top =
   let rec aux :
       type a.
          a Compiled.t
-      -> (bool -> [ `rerender | `finish ] -> Line_buffer.t -> int) Staged.t =
-    function
+      -> (bool -> [ `rerender | `tick | `finish ] -> Line_buffer.t -> int)
+         Staged.t = function
     | Noop -> Staged.inj (fun _ _ _ -> 0)
     | Theta { pp } ->
         Staged.inj (fun _ event buf ->
             match event with
             | `rerender -> pp buf (`rerender ())
+            | `tick -> pp buf (`tick ())
             | `finish -> pp buf (`finish ()))
     | Alpha pp -> Staged.inj (fun _ _ buf -> pp.latest buf)
     | Pad { contents; dir; width } ->
@@ -514,6 +515,8 @@ let update top =
 
 let finalise t =
   Staged.map (update t) ~f:(fun f -> f ~unconditional:true `finish)
+
+let tick t = Staged.map (update t) ~f:(fun f -> f ~unconditional:true `tick)
 
 let update t =
   Staged.map (update t) ~f:(fun f ~unconditional buf ->

@@ -21,7 +21,7 @@ let layout =
   let bars =
     ListLabels.map bar_styles ~f:(fun (name, style) ->
         lpad 17 (constf "%s : " name)
-        ++ bar ~style:(`Custom style) ~color:(pick_colour ()) ~total:1000 ())
+        ++ bar ~style:(`Custom style) ~color:(pick_colour ()) 1000)
   in
   Progress.Multi.(blank ++ lines bars ++ blank)
 

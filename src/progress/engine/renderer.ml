@@ -10,6 +10,9 @@ include Renderer_intf
 open! Import
 module Bar_id = Unique_id ()
 
+(* TODO: this module should probably be inlined with the
+  [Line_primitives.Compiled.t] types: since those values only ever correspond to
+  exactly one [Bar_renderer], and both are responsible for state management. *)
 module Bar_renderer : sig
   type 'a t
 
@@ -19,6 +22,7 @@ module Bar_renderer : sig
   val create : 'a Line_primitives.t -> 'a t
   val update : unconditional:bool -> _ t -> unit -> contents
   val report : 'a t -> 'a -> contents
+  val tick : _ t -> contents
   val finalise : _ t -> contents
   val id : _ t -> Bar_id.t
 end = struct
@@ -27,6 +31,7 @@ end = struct
     ; update : unconditional:bool -> int
     ; report : 'a -> int
     ; finalise : unit -> int
+    ; tick : unit -> int
     ; id : Bar_id.t
     ; mutable finalised : bool
     }
@@ -52,14 +57,25 @@ end = struct
       let finalise = Staged.prj (Line_primitives.finalise s) in
       fun () -> finalise line_buffer
     in
+    let tick =
+      let tick = Staged.prj (Line_primitives.tick s) in
+      fun () -> tick line_buffer
+    in
     let id = Bar_id.create () in
-    { line_buffer; report; update; finalise; id; finalised = false }
+    { line_buffer; report; update; finalise; tick; id; finalised = false }
 
   let finalise t =
     let width = t.finalise () in
     let data = Line_buffer.contents t.line_buffer in
     t.finalised <- true;
     { width; data }
+
+  let tick t =
+    if t.finalised then finalise t
+    else
+      let width = t.tick () in
+      let data = Line_buffer.contents t.line_buffer in
+      { width; data }
 
   let update ~unconditional t () =
     (* We continue to render even once the bar has been finalised in order to
@@ -98,7 +114,7 @@ module Display : sig
 
   (* Lifecycle management *)
   val initial_render : t -> unit
-  val rerender_all : t -> unit
+  val tick : t -> unit
   val handle_width_change : t -> int -> unit
   val interject_with : t -> (unit -> 'a) -> 'a
   val cleanup : t -> unit
@@ -179,6 +195,7 @@ end = struct
               let ({ width; data } : Bar_renderer.contents) =
                 match stage with
                 | `update -> Bar_renderer.update ~unconditional bar.renderer ()
+                | `tick -> Bar_renderer.tick bar.renderer
                 | `finalise -> Bar_renderer.finalise bar.renderer
               in
               match data with
@@ -262,9 +279,9 @@ end = struct
     rerender_all_from_top ~stage:`update ~starting_at:0 ~unconditional:true
       display
 
-  let rerender_all ({ config = { ppf; _ }; rows; _ } as t) =
+  let tick ({ config = { ppf; _ }; rows; _ } as t) =
     Ansi.move_up ppf (Vector.length rows - 1);
-    rerender_all_from_top ~stage:`update ~starting_at:0 ~unconditional:false t
+    rerender_all_from_top ~stage:`tick ~starting_at:0 ~unconditional:false t
 
   let interject_with ({ config = { ppf; _ }; rows; _ } as t) f =
     Format.fprintf ppf "%a%s%!" Ansi.move_up
@@ -485,7 +502,7 @@ module Make (Platform : Platform.S) = struct
     let tick t =
       match Global.find_display t.uid with
       | Error `finalised -> ()
-      | Ok d -> Display.rerender_all d
+      | Ok d -> Display.tick d
 
     let reporters t = t.initial_reporters
   end

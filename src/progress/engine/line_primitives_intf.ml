@@ -12,13 +12,22 @@ module type Counter = sig
   val count : t -> Mtime.span
 end
 
+module Types = struct
+  type 'a event =
+    [ `report of 'a (* User has supplied a reported value of type ['a]. *)
+    | `rerender of 'a (* Renderer wants a re-display, giving latest value. *)
+    | `tick of 'a (* User has requested a "tick" (e.g. to update spinners). *)
+    | `finish of 'a (* The bar or display has been finalised. *) ]
+end
+
 (** The DSL of progress bar segments. *)
 module type S = sig
   type 'a t
   (** The type of segments of progress bars that display reported values of type
       ['a]. *)
 
-  type 'a event := [ `start | `report of 'a | `rerender of 'a | `finish of 'a ]
+  include module type of Types
+
   type theta := Line_buffer.t -> unit event -> unit
   type 'a alpha := Line_buffer.t -> 'a event -> unit
 
@@ -99,6 +108,7 @@ module type Line_primitives = sig
     'a Compiled.t -> (unconditional:bool -> Line_buffer.t -> int) Staged.t
 
   val report : 'a Compiled.t -> (Line_buffer.t -> 'a -> int) Staged.t
+  val tick : 'a Compiled.t -> (Line_buffer.t -> int) Staged.t
   val finalise : 'a Compiled.t -> (Line_buffer.t -> int) Staged.t
 end
 

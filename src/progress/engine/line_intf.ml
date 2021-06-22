@@ -10,6 +10,7 @@ module type Integer_dependent = sig
   type integer
   type color
   type 'a printer
+  type bar_style
 
   (**)
   type 'a t
@@ -20,24 +21,22 @@ module type Integer_dependent = sig
   val bytes_per_sec : integer t
   val percentage_of : integer -> integer t
   val rate : float printer -> integer t
-  val eta : total:integer -> integer t
+  val eta : integer -> integer t
+
+  type bar_style := [ `ASCII | `UTF8 | `Custom of bar_style ]
 
   val bar :
-       ?style:[ `ASCII | `UTF8 | `Custom of string list ]
+       ?style:bar_style
     -> ?color:color
-    -> ?color_empty:color
     -> ?width:[ `Fixed of int | `Expand ]
-    -> total:integer
-    -> unit
+    -> integer
     -> integer t
 
   val bar_unaccumulated :
-       ?style:[ `ASCII | `UTF8 | `Custom of string list ]
+       ?style:bar_style
     -> ?color:color
-    -> ?color_empty:color
     -> ?width:[ `Fixed of int | `Expand ]
-    -> total:integer
-    -> unit
+    -> integer
     -> integer t
 end
 
@@ -92,17 +91,83 @@ module type DSL = sig
       [target], i.e. [42%]. Values outside the range [\[0, 100\]] will be
       clamped to either [0] or [100]. *)
 
-  val bar :
-       ?style:[ `ASCII | `UTF8 | `Custom of string list ]
-    -> ?color:color
-    -> ?color_empty:color
-    -> ?width:[ `Fixed of int | `Expand ]
-    -> total:integer
-    -> unit
-    -> integer t
-  (** [bar ~total ()] is a progress bar of the form:
+  module Bar_style : sig
+    type t
+    (** The type of progress bar style specifications. *)
 
-      {[ [#######################################................] ]}
+    val ascii : t
+    (** The style used by [bar ~style:`ASCII] (which is the default). Generates
+        bars of the form [\[######---\]]. *)
+
+    val utf8 : t
+    (** {!utf8} is the style used by [bar ~style:`UTF8]. Uses the UTF-8 block
+        element characters ([U+2588]–[U+258F]) for progress stages, and a
+        box-drawing character ([U+2502]) for delimiters. *)
+
+    (** {1 Custom styles} *)
+
+    val v :
+         ?delims:string * string
+      -> ?color:color
+      -> ?color_empty:color
+      -> string list
+      -> t
+
+    (** [v stages] is a bar that uses the given string {i stages} to render
+        progress. The first stage is interpreted as a "full" segment, with
+        subsequent stages denoting progressively {i less}-full segments until a
+        final "empty" stage (which is implicitly a space if only one stage is
+        provided).
+
+        The optional parameters are as follows:
+
+        - [?delims]: a pair of left and right delimiters used to wrap the body
+          of the progress bar;
+        - [?color]: the color of non-empty segments (including the in-progress
+          one);
+        - [?color_empty]: the color of empty segments.
+
+        {2 Examples}
+
+        - [v \[ "#" \]] renders like "[#######   ]";
+        - [v \[ "="; ">"; " " \]] renders like "[======>    ]";
+        - [v \[ "4"; "3"; "2"; "1"; "0" \]] renders like "[444444410000]";
+        - ... see [examples/bar_styles.ml] in the source repository for more.
+
+        {2 Specifics}
+
+        Each segment of a rendering progress bar is in one of three states:
+        full, empty or in-progress. At any given time, either the bar is
+        entirely full or or there is exactly one in-progress segment. Given the
+        style [v \[s1; s2; ... sN\]], these states are rendered as follows:
+
+        - {b full}: rendered as [s1];
+        - {b empty}: rendered as [sN] if [N >= 1], otherwise [' '];
+        - {b in-progress}: if [N <= 1], then equivalent to the empty state.
+          Otherwise, the intermediate stages [s2], [s3], ... [s{N-1}] denote
+          decreasing progress. For example, if there are four intermediate
+          stages ([N = 6]) then [s2] is used for progress in the range
+          [\[0, 25%)], [s3] for [\[25%, 50%)] etc.
+
+        For the progress bar to render within a fixed size, the user must ensure
+        that each of the [stages] must have the same rendered width. *)
+
+    (** {1 Setters} *)
+
+    val with_color : color -> t -> t
+    val with_empty_color : color -> t -> t
+    val with_delims : (string * string) option -> t -> t
+    val with_stages : string list -> t -> t
+  end
+
+  val bar :
+       ?style:[ `ASCII | `UTF8 | `Custom of Bar_style.t ]
+    -> ?color:color
+    -> ?width:[ `Fixed of int | `Expand ]
+    -> integer
+    -> integer t
+  (** [bar total] is a progress bar of the form:
+      [\[#################...............\]]
 
       The proportion of the bar that is filled is given by
       [<reported_so_far> / total]. Optional parameters are as follows:
@@ -125,6 +190,9 @@ module type DSL = sig
   val ticker : unit -> _ t
   (** TODO: document. *)
 
+  val ticker_up_to : ?sep:unit t -> integer -> _ t
+  (** TODO: document. *)
+
   val of_printer : ?init:'a -> 'a printer -> 'a t
   (** TODO: Rename to [of_printer] and keep a distinction between accumulated
       printers. *)
@@ -134,20 +202,18 @@ module type DSL = sig
   val bytes_per_sec : integer t
   val rate : float printer -> integer t
 
-  val elapsed : unit -> _ t
-  (** Displays the time for which the bar has been rendering, in [MM:SS] form. *)
+  val elapsed : ?pp:Duration.t printer -> unit -> _ t
+  (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
 
-  val eta : total:integer -> integer t
+  val eta : integer -> integer t
   (** Displays an estimate of the remaining time until [total] is accumulated by
       the reporters, in [MM:SS] form. *)
 
   val bar_unaccumulated :
-       ?style:[ `ASCII | `UTF8 | `Custom of string list ]
+       ?style:[ `ASCII | `UTF8 | `Custom of Bar_style.t ]
     -> ?color:color
-    -> ?color_empty:color
     -> ?width:[ `Fixed of int | `Expand ]
-    -> total:integer
-    -> unit
+    -> integer
     -> integer t
   (** TODO: better distinction here *)
 
@@ -176,9 +242,6 @@ module type DSL = sig
   (** [using f s] is a segment that first applies [f] to the reported value and
       then behaves as segment [s]. *)
 
-  val noop : unit -> _ t
-  (** A zero-width line segment that does nothing. *)
-
   (** {1 Utilities}
 
       The following line segments are definable in terms of the others, but
@@ -192,9 +255,14 @@ module type DSL = sig
 
   val braces : 'a t -> 'a t
   (** [braces t] is [const "{" ++ t ++ const "}"]. *)
+
+  val noop : unit -> _ t
+  (** A zero-width line segment that does nothing. This segment will not be
+      surrounded with separators when used in a {!list}, making it a useful
+      "off" state for conditionally-enabled segments. *)
 end
 
-module _ (X : DSL) : Integer_dependent = X
+module _ (X : DSL) : Integer_dependent with type bar_style := X.Bar_style.t = X
 
 module type S = sig
   include DSL with type integer := int
@@ -210,6 +278,7 @@ module type S = sig
         with type 'a t := 'a t
          and type color := color
          and type 'a printer := 'a printer
+         and type bar_style := Bar_style.t
 
     module Make (Integer : Integer.S) : S with type integer := Integer.t
 
@@ -219,6 +288,7 @@ module type S = sig
         with type 'a t := 'a t
          and type color := color
          and type 'a printer := 'a printer
+         and type Bar_style.t := Bar_style.t
   end
 
   module Using_int32 : Integer_dependent.Ext with type integer := int32
@@ -244,11 +314,13 @@ module type S = sig
         list
           [ spinner ()
           ; brackets (elapsed ())
-          ; bar ~total ()
+          ; bar total
           ; bytes
-          ; parens (const "eta: " ++ eta ~total)
+          ; parens (const "eta: " ++ eta total)
           ]
-      ]} *)
+      ]}
+
+      See the [examples/] directory of the source repository for more. *)
 
   (** {1 Library internals} *)
 

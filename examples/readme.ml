@@ -7,7 +7,7 @@ let bar color message =
     [ rpad 16 (constf " %s" message)
     ; bytes
     ; bytes_per_sec
-    ; bar ~color ~style:`UTF8 ~total ()
+    ; bar ~color ~style:`UTF8 total
     ; percentage_of total ++ const " "
     ]
   |> Multi.line

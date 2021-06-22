@@ -5,13 +5,13 @@ let pick_colour = Utils.colour_picker ()
 let bar ~total =
   let open Line in
   let spinner = spinner ~color:(Color.ansi `green) () in
-  let bar = bar ~color:(pick_colour ()) ~style:`ASCII ~total () in
+  let bar = bar ~color:(pick_colour ()) ~style:`ASCII total in
   list
     [ spinner
     ; brackets (elapsed ())
     ; bar
     ; bytes
-    ; parens (const "eta: " ++ eta ~total)
+    ; parens (const "eta: " ++ eta total)
     ]
 
 (* Simple mock for a worker performing a download action. *)

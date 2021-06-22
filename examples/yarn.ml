@@ -15,7 +15,7 @@ let config = Progress.Config.v ~persistent:false ()
 let with_plain_bar ~total f =
   Progress.(
     with_reporter ~config
-      Line.(list [ elapsed (); bar ~total (); percentage_of total ])
+      Line.(list [ elapsed (); bar total; percentage_of total ])
       f)
 
 let with_bars f =

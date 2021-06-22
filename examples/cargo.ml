@@ -48,7 +48,7 @@ let bar =
         (brackets
            (bar
               ~style:(`Custom (Bar_style.v [ "="; ">"; " " ]))
-              ~width:(`Fixed 57) ~total ()))
+              ~width:(`Fixed 57) total))
     ; using fst (count_up_to total) (* TODO: provide ticker_up_to *)
     ; using snd string
     ]

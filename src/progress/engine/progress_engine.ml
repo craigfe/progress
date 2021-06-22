@@ -44,7 +44,7 @@ module Make (Platform : Platform) = struct
       [ map_option message ~f:const
       ; map_option pp ~f:of_printer
       ; elapsed ()
-      ; bar ~style ~total ()
+      ; bar ~style total
       ; percentage_of total
       ]
 

@@ -1,14 +1,16 @@
+let total = 100
+
 let bar =
   Progress.Line.(
     list
       [ spinner ~color:(Progress.Color.ansi `green) ()
-      ; bar ~style:`ASCII ~total:100 ()
-      ; count_up_to 100
+      ; bar ~style:`ASCII total
+      ; count_up_to total
       ])
 
 let run () =
   Progress.with_reporter bar (fun f ->
-      for i = 1 to 100 do
+      for i = 1 to total do
         f 1;
         if i mod 10 = 0 then
           Progress.interject_with (fun () ->
