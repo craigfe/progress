@@ -147,7 +147,7 @@ let test_progress_bar_width () =
 module Boxes = struct
   let unsized =
     Progress.Line.Internals.alpha_unsized ~initial:(`Val ())
-      (fun ~width:_ _ _ -> 0)
+      (fun ~width:_ _ _ _ -> 0)
 
   let test_unsized_not_in_box () =
     Alcotest.check_raises "Unsized element not contained in a box"

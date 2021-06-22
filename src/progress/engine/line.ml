@@ -68,9 +68,6 @@ module Acc = struct
   let flow_meter t = t.flow_meter
 end
 
-let update_only pp ppf = function
-  | `finish x | `report x | `rerender x | `tick x -> pp ppf x
-
 module Timer = struct
   type 'a t = { mutable render_latest : Mtime.t }
 
@@ -150,18 +147,17 @@ module Integer_independent (Platform : Platform.S) = struct
 
   let string =
     let segment =
-      Primitives.alpha_unsized ~initial:(`Val "") (fun ~width buf -> function
-        | `finish s | `report s | `rerender s | `tick s ->
-            let output_len = width () - 1 (* XXX: why is -1 necessary? *) in
-            if output_len <= 0 then 0
-            else
-              let pp =
-                Staged.prj
-                @@ Printer.Internals.to_line_printer
-                     (Printer.string ~width:output_len)
-              in
-              pp buf s;
-              output_len)
+      Primitives.alpha_unsized ~initial:(`Val "") (fun ~width buf _ s ->
+          let output_len = width () - 1 (* XXX: why is -1 necessary? *) in
+          if output_len <= 0 then 0
+          else
+            let pp =
+              Staged.prj
+              @@ Printer.Internals.to_line_printer
+                   (Printer.string ~width:output_len)
+            in
+            pp buf s;
+            output_len)
     in
     Basic segment
 
@@ -170,10 +166,7 @@ module Integer_independent (Platform : Platform.S) = struct
 
   let ticker () =
     let segment =
-      let pp ~width buf count =
-        let count =
-          match count with `finish x | `report x | `rerender x | `tick x -> x
-        in
+      let pp ~width buf _ count =
         let width = width () in
         let pp =
           Staged.prj
@@ -278,7 +271,7 @@ module Integer_independent (Platform : Platform.S) = struct
            let counter = Modulo_counter.create (Spinner.stage_count spinner) in
            apply_debounce
            @@ Primitives.theta ~width:spinner.Spinner.width (fun buf -> function
-                | `finish () ->
+                | `finish ->
                     let final_frame =
                       match spinner.final_frame with
                       | None -> spinner.frames.(Modulo_counter.tick counter)
@@ -286,11 +279,11 @@ module Integer_independent (Platform : Platform.S) = struct
                     in
                     with_color_opt color buf (fun () ->
                         Line_buffer.add_string buf final_frame)
-                | (`report () | `tick () | `rerender ()) as e ->
+                | (`report | `tick | `rerender) as e ->
                     let tick =
                       match e with
-                      | `report () | `tick () -> Modulo_counter.tick counter
-                      | `rerender () -> Modulo_counter.latest counter
+                      | `report | `tick -> Modulo_counter.tick counter
+                      | `rerender -> Modulo_counter.latest counter
                     in
                     let frame = spinner.Spinner.frames.(tick) in
                     with_color_opt color buf (fun () ->
@@ -474,9 +467,7 @@ module Make (Platform : Platform.S) = struct
       let acc segment = Acc { segment; elt = (module Integer) }
 
       let of_printer ?init printer =
-        let pp =
-          update_only @@ Staged.prj @@ Printer.Internals.to_line_printer printer
-        in
+        let pp = Staged.prj @@ Printer.Internals.to_line_printer printer in
         let width = Printer.print_width printer in
         let initial =
           match init with
@@ -488,15 +479,14 @@ module Make (Platform : Platform.S) = struct
                     Line_buffer.add_char buf ' '
                   done)
         in
-        Basic (Primitives.alpha ~width ~initial pp)
+        Basic (Primitives.alpha ~width ~initial (fun buf _ x -> pp buf x))
 
       let count_pp printer =
         let pp = Staged.prj @@ Printer.Internals.to_line_printer printer in
         acc
         @@ Primitives.contramap ~f:Acc.accumulator
-        @@ Primitives.alpha
-             ~width:(Printer.print_width printer)
-             ~initial:(`Val Integer.zero) (update_only pp)
+        @@ Primitives.alpha ~width:(Printer.print_width printer)
+             ~initial:(`Val Integer.zero) (fun buf _ x -> pp buf x)
 
       let bytes = count_pp (Units.Bytes.generic (module Integer))
 
@@ -516,7 +506,8 @@ module Make (Platform : Platform.S) = struct
         let pp = Staged.prj (Printer.Internals.to_line_printer pp) in
         acc
         @@ Primitives.contramap ~f:Acc.accumulator
-        @@ Primitives.alpha ~initial:(`Val Integer.zero) ~width (update_only pp)
+        @@ Primitives.alpha ~initial:(`Val Integer.zero) ~width (fun buf _ x ->
+               pp buf x)
 
       let count_up_to ?pp ?(sep = const "/") total =
         let total = Integer.to_string total in
@@ -531,12 +522,14 @@ module Make (Platform : Platform.S) = struct
         let total = Integer.to_string total in
         let width = String.length total in
         let pp =
-          update_only
-          @@ Staged.prj
+          Staged.prj
           @@ Printer.Internals.to_line_printer
           @@ Printer.Internals.integer ~width (module Integer)
         in
-        let segment = Primitives.alpha ~width ~initial:(`Val Integer.zero) pp in
+        let segment =
+          Primitives.alpha ~width ~initial:(`Val Integer.zero) (fun buf _ x ->
+              pp buf x)
+        in
         List
           [ Contramap
               ( Acc
@@ -600,14 +593,11 @@ module Make (Platform : Platform.S) = struct
           match width with
           | `Fixed width ->
               if width < 3 then failwith "Not enough space for a progress bar";
-              Primitives.alpha ~width ~initial:(`Val 0.) (fun buf -> function
-                | `finish x | `report x | `rerender x | `tick x ->
-                    ignore (bar ~style ~color (fun _ -> width) x buf : int))
+              Primitives.alpha ~width ~initial:(`Val 0.) (fun buf _ x ->
+                  ignore (bar ~style ~color (fun _ -> width) x buf : int))
           | `Expand ->
-              Primitives.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf ->
-                function
-                | `finish x | `report x | `rerender x | `tick x ->
-                    bar ~style ~color width x ppf))
+              Primitives.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf _ x ->
+                  bar ~style ~color width x ppf))
 
       let bar ?(style = `ASCII) ?color ?(width = `Expand) total =
         let proportion x = Integer.to_float x /. Integer.to_float total in
@@ -615,14 +605,11 @@ module Make (Platform : Platform.S) = struct
           match width with
           | `Fixed width ->
               if width < 3 then failwith "Not enough space for a progress bar";
-              Primitives.alpha ~width ~initial:(`Val 0.) (fun buf -> function
-                | `finish x | `report x | `rerender x | `tick x ->
-                    ignore (bar ~style ~color (fun _ -> width) x buf : int))
+              Primitives.alpha ~width ~initial:(`Val 0.) (fun buf _ x ->
+                  ignore (bar ~style ~color (fun _ -> width) x buf : int))
           | `Expand ->
-              Primitives.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf ->
-                function
-                | `finish x | `report x | `rerender x | `tick x ->
-                    bar ~style ~color width x ppf)
+              Primitives.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf _ x ->
+                  bar ~style ~color width x ppf)
         in
         acc
           (Primitives.contramap proportion_segment
@@ -631,7 +618,7 @@ module Make (Platform : Platform.S) = struct
       let rate pp_val =
         let pp_rate =
           let pp_val = Staged.prj (Printer.Internals.to_line_printer pp_val) in
-          fun buf x ->
+          fun buf _ x ->
             pp_val buf x;
             Line_buffer.add_string buf "/s"
         in
@@ -639,7 +626,7 @@ module Make (Platform : Platform.S) = struct
         acc
         @@ Primitives.contramap
              ~f:(Acc.flow_meter >> Flow_meter.per_second >> Integer.to_float)
-        @@ Primitives.alpha ~width ~initial:(`Val 0.) (update_only pp_rate)
+        @@ Primitives.alpha ~width ~initial:(`Val 0.) pp_rate
 
       let bytes_per_sec = rate Units.Bytes.of_float
 
@@ -650,11 +637,10 @@ module Make (Platform : Platform.S) = struct
               Staged.prj
                 (Printer.Internals.to_line_printer Units.Duration.mm_ss)
             in
-            fun ppf -> function
-              | `finish _ -> pp ppf Mtime.Span.max_span (* renders as [--:--] *)
-              | `report x
-              | `rerender x
-              | `tick x
+            fun ppf event x ->
+              match event with
+              | `finish -> pp ppf Mtime.Span.max_span (* renders as [--:--] *)
+              | `report | `rerender | `tick
               (* TODO: tick should cause the estimate to be re-evaluated. *) ->
                   pp ppf x
           in
@@ -685,11 +671,11 @@ module Make (Platform : Platform.S) = struct
               let finished = ref false in
               let pp buf e =
                 (match e with
-                | `tick _ | `report _ -> latest := Clock.count elapsed
-                | `finish _ when not !finished ->
+                | `tick | `report -> latest := Clock.count elapsed
+                | `finish when not !finished ->
                     latest := Clock.count elapsed;
                     finished := true
-                | `rerender _ | `finish _ -> ());
+                | `rerender | `finish -> ());
                 print_time buf !latest
               in
               Primitives.theta ~width:5 pp)

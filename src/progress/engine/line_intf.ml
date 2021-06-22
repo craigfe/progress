@@ -262,7 +262,9 @@ module type DSL = sig
       "off" state for conditionally-enabled segments. *)
 end
 
-module _ (X : DSL) : Integer_dependent with type bar_style := X.Bar_style.t = X
+module Assert_subtype (X : DSL) :
+  Integer_dependent with type bar_style := X.Bar_style.t =
+  X
 
 module type S = sig
   include DSL with type integer := int

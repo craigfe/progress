@@ -13,11 +13,11 @@ module type Counter = sig
 end
 
 module Types = struct
-  type 'a event =
-    [ `report of 'a (* User has supplied a reported value of type ['a]. *)
-    | `rerender of 'a (* Renderer wants a re-display, giving latest value. *)
-    | `tick of 'a (* User has requested a "tick" (e.g. to update spinners). *)
-    | `finish of 'a (* The bar or display has been finalised. *) ]
+  type event =
+    [ `report (* User has supplied a reported value. *)
+    | `rerender (* Renderer wants a re-display. *)
+    | `tick (* User has requested a "tick" (e.g. to update spinners). *)
+    | `finish (* The bar or display has been finalised. *) ]
 end
 
 (** The DSL of progress bar segments. *)
@@ -28,8 +28,8 @@ module type S = sig
 
   include module type of Types
 
-  type theta := Line_buffer.t -> unit event -> unit
-  type 'a alpha := Line_buffer.t -> 'a event -> unit
+  type theta := Line_buffer.t -> event -> unit
+  type 'a alpha := Line_buffer.t -> event -> 'a -> unit
 
   val noop : unit -> _ t
   val theta : width:int -> theta -> _ t
@@ -43,7 +43,7 @@ module type S = sig
   val alpha_unsized :
        initial:
          [ `Theta of width:(unit -> int) -> Line_buffer.t -> int | `Val of 'a ]
-    -> (width:(unit -> int) -> Line_buffer.t -> 'a event -> int)
+    -> (width:(unit -> int) -> Line_buffer.t -> event -> 'a -> int)
     -> 'a t
 
   val array : 'a t array -> 'a t
@@ -52,7 +52,7 @@ module type S = sig
   val on_finalise : 'a -> 'a t -> 'a t
 
   val of_pp :
-    width:int -> initial:'a -> (Format.formatter -> 'a event -> unit) -> 'a t
+    width:int -> initial:'a -> (Format.formatter -> event -> 'a -> unit) -> 'a t
   (** [of_pp ~width pp] is a segment that uses the supplied fixed-width
       pretty-printer to render the value. The pretty-printer must never emit
       newline characters. *)

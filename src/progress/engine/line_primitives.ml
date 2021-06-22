@@ -26,14 +26,14 @@ type 'a pp = Format.formatter -> 'a -> unit
 
 type 'a t =
   | Noop
-  | Theta of { pp : Line_buffer.t -> unit event -> unit; width : int }
+  | Theta of { pp : Line_buffer.t -> event -> unit; width : int }
   | Alpha of
-      { pp : Line_buffer.t -> 'a event -> unit
+      { pp : Line_buffer.t -> event -> 'a -> unit
       ; initial : [ `Theta of Line_buffer.t -> unit | `Val of 'a ]
       ; width : int
       }
   | Alpha_unsized of
-      { pp : width:(unit -> int) -> Line_buffer.t -> 'a event -> int
+      { pp : width:(unit -> int) -> Line_buffer.t -> event -> 'a -> int
       ; initial :
           [ `Theta of width:(unit -> int) -> Line_buffer.t -> int | `Val of 'a ]
       }
@@ -123,10 +123,10 @@ module Compiled = struct
   type 'a t =
     | Noop
     | Alpha of
-        { pp : Line_buffer.t -> 'a event -> int
+        { pp : Line_buffer.t -> event -> 'a -> int
         ; mutable latest : Line_buffer.t -> int
         }
-    | Theta of { pp : Line_buffer.t -> unit event -> int }
+    | Theta of { pp : Line_buffer.t -> event -> int }
     | Contramap : 'a t * ('b -> 'a) -> 'b t
     | On_finalise of { final : 'a; inner : 'a t }
     | Pad of
@@ -276,19 +276,19 @@ let compile top =
         let pp ppf x = pp ~width ppf x in
         let latest buf =
           match initial with
-          | `Val v -> pp buf (`rerender v)
+          | `Val v -> pp buf `rerender v
           | `Theta f -> f ~width buf
         in
         Compiled.Alpha { pp; latest }
     | Alpha { pp; width; initial } ->
-        let pp ppf x =
-          pp ppf x;
+        let pp a b c =
+          pp a b c;
           width
         in
         let+ () = Compiler_state.consume_space (Static width) in
         let latest buf =
           match initial with
-          | `Val v -> pp buf (`rerender v)
+          | `Val v -> pp buf `rerender v
           | `Theta f ->
               f buf;
               width
@@ -389,14 +389,11 @@ let report compiled =
       -> (Line_buffer.t -> a -> int) Staged.t =
    fun typ -> function
     | Noop -> Staged.inj (fun _ _ -> 0)
-    | Theta { pp } -> Staged.inj (fun buf (_ : a) -> pp buf (`report ()))
+    | Theta { pp } -> Staged.inj (fun buf (_ : a) -> pp buf `report)
     | Alpha pp ->
         Staged.inj (fun buf x ->
-            pp.latest <- (fun buf -> pp.pp buf (`rerender x));
-            let x =
-              match typ with `report -> `report x | `finish -> `finish x
-            in
-            pp.pp buf x)
+            pp.latest <- (fun buf -> pp.pp buf `rerender x);
+            pp.pp buf (typ :> event) x)
     | Contramap (t, f) ->
         let$ inner = aux typ t in
         fun buf a -> inner buf (f a)
@@ -451,12 +448,7 @@ let update top =
       -> (bool -> [ `rerender | `tick | `finish ] -> Line_buffer.t -> int)
          Staged.t = function
     | Noop -> Staged.inj (fun _ _ _ -> 0)
-    | Theta { pp } ->
-        Staged.inj (fun _ event buf ->
-            match event with
-            | `rerender -> pp buf (`rerender ())
-            | `tick -> pp buf (`tick ())
-            | `finish -> pp buf (`finish ()))
+    | Theta { pp } -> Staged.inj (fun _ event buf -> pp buf (event :> event))
     | Alpha pp -> Staged.inj (fun _ _ buf -> pp.latest buf)
     | Pad { contents; dir; width } ->
         let$ contents = aux contents and$ pad = apply_padding dir width in
