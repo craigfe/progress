@@ -60,8 +60,6 @@ val print_width : _ t -> int
 (** {1 Internals} *)
 
 module Internals : sig
-  val guess_printed_width : string -> int
-  val truncate_to_width : int -> string -> Buffer.t
   val integer : width:int -> (module Integer.S with type t = 'a) -> 'a t
   val to_line_printer : 'a t -> (Line_buffer.t -> 'a -> unit) Staged.t
 end

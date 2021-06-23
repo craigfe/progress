@@ -3,7 +3,6 @@ open Common
 open struct
   module Printer = Progress.Printer
   module Color = Progress.Color
-  module Ansi = Progress.Internals.Ansi
 
   let check_print print ~__POS__:pos str x =
     Alcotest.(check ~pos (testable Fmt.Dump.string String.equal))
@@ -51,7 +50,9 @@ let test_string () =
 
   (* Strings containing ANSI colour escapes *)
   let () =
-    let col c s = Ansi.(code (fg (Color.ansi c))) ^ s ^ Ansi.(code none) in
+    let col c s =
+      Terminal.Style.(code (fg (Color.ansi c))) ^ s ^ Terminal.Style.(code none)
+    in
     (* Build up a coloured "hello world" string, retaining prefixes *)
     let h = col `red "h" in
     let he = h ^ col `blue "e" in

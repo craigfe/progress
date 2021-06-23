@@ -13,7 +13,7 @@ module type S = sig
 
       Some basic types used throughout the rest of the library: *)
 
-  module Color = Ansi.Color
+  module Color = Terminal.Color
   module Duration = Duration
   module Printer = Printer
   module Units = Units
@@ -129,14 +129,6 @@ module type S = sig
        and type 'a line := 'a Line.t
        and type ('a, 'b) multi := ('a, 'b) Multi.t
        and type config := Config.t
-
-  (** {1 Internals} *)
-
-  module Internals : sig
-    module Ansi : sig
-      include Ansi.Style with type color := Color.t
-    end
-  end
 end
 
 module type Progress_engine = sig

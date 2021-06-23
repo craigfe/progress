@@ -185,6 +185,5 @@ let () =
         ] )
     ; ("line", Test_line.tests)
     ; ("units", Test_units.tests)
-    ; ("colours", Test_colours.tests)
     ; ("printers", Test_printers.tests)
     ]

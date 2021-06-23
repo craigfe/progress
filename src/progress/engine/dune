@@ -9,4 +9,5 @@
   logs.fmt
   uutf
   uucp
+  terminal
   vector))

@@ -181,7 +181,8 @@ end = struct
     let old_width = bar.latest_width in
     bar.latest_width <- new_width - get_blank_suffix_length data;
     Format.pp_print_string ppf data;
-    if new_width < old_width then Format.pp_print_string ppf Ansi.erase_line
+    if new_width < old_width then
+      Format.pp_print_string ppf Terminal.Ansi.erase_line
 
   let rerender_all_from_top ~stage ~starting_at ~unconditional
       ({ config = { ppf; _ }; rows; _ } as t) =
@@ -190,7 +191,7 @@ end = struct
         let is_last = idx = total_rows - 1 in
         let () =
           match slot with
-          | None -> Format.fprintf ppf "%s" Ansi.erase_line
+          | None -> Format.fprintf ppf "%s" Terminal.Ansi.erase_line
           | Some (E bar) -> (
               let ({ width; data } : Bar_renderer.contents) =
                 match stage with
@@ -226,9 +227,9 @@ end = struct
 
         (* NOTE: we add an initial carriage return to avoid overflowing the line if
            the user has typed into the terminal between renders. *)
-        Format.fprintf ppf "\r%a" Ansi.move_up distance_from_base;
+        Format.fprintf ppf "\r%a" Terminal.Ansi.move_up distance_from_base;
         rerender_line_and_advance t (E bar) width data;
-        Format.fprintf ppf "%a\r%!" Ansi.move_down distance_from_base
+        Format.fprintf ppf "%a\r%!" Terminal.Ansi.move_down distance_from_base
 
   let finalise_line t uid =
     let (E bar) = get_bar_exn ~msg:"Bar already finalised" t.bars uid in
@@ -249,7 +250,7 @@ end = struct
     (* The cursor is now one line above the bottom. Move to the correct starting
        position for a re-render of the affected suffix of the display. *)
     Format.pp_force_newline t.config.ppf ();
-    Ansi.move_up t.config.ppf above;
+    Terminal.Ansi.move_up t.config.ppf above;
     rerender_all_from_top ~stage:`update ~starting_at:position
       ~unconditional:true t
 
@@ -274,36 +275,38 @@ end = struct
       overflow_rows ~old_width:latest_widths.(row_count - 1) ~new_width
     in
     let move_up = overflows + row_count - 1 - bottom_overflow in
-    Ansi.move_up ppf move_up;
-    if overflows > 0 then Format.pp_print_string ppf Ansi.erase_display_suffix;
+    Terminal.Ansi.move_up ppf move_up;
+    if overflows > 0 then
+      Format.pp_print_string ppf Terminal.Ansi.erase_display_suffix;
     rerender_all_from_top ~stage:`update ~starting_at:0 ~unconditional:true
       display
 
   let tick ({ config = { ppf; _ }; rows; _ } as t) =
-    Ansi.move_up ppf (Vector.length rows - 1);
+    Terminal.Ansi.move_up ppf (Vector.length rows - 1);
     rerender_all_from_top ~stage:`tick ~starting_at:0 ~unconditional:false t
 
   let interject_with ({ config = { ppf; _ }; rows; _ } as t) f =
-    Format.fprintf ppf "%a%s%!" Ansi.move_up
+    Format.fprintf ppf "%a%s%!" Terminal.Ansi.move_up
       (Vector.length rows - 1)
-      Ansi.erase_line;
+      Terminal.Ansi.erase_line;
     Fun.protect f ~finally:(fun () ->
         rerender_all_from_top ~stage:`update ~starting_at:0 ~unconditional:true
           t)
 
   let cleanup { config; _ } =
     if config.hide_cursor then
-      Format.fprintf config.ppf "\n%s%!" Ansi.show_cursor
+      Format.fprintf config.ppf "\n%s%!" Terminal.Ansi.show_cursor
 
   let finalise
       ({ config = { ppf; hide_cursor; persistent; _ }; rows; _ } as display) =
-    Ansi.move_up ppf (Vector.length rows - 1);
+    Terminal.Ansi.move_up ppf (Vector.length rows - 1);
     if persistent then (
       rerender_all_from_top ~stage:`finalise ~starting_at:0 ~unconditional:true
         display;
       Format.fprintf ppf "@,@]")
-    else Format.pp_print_string ppf Ansi.erase_line;
-    Format.fprintf ppf "%s%!" (if hide_cursor then Ansi.show_cursor else "")
+    else Format.pp_print_string ppf Terminal.Ansi.erase_line;
+    Format.fprintf ppf "%s%!"
+      (if hide_cursor then Terminal.Ansi.show_cursor else "")
 end
 
 module Reporter = struct
@@ -476,7 +479,8 @@ module Make (Platform : Platform.S) = struct
       let display = Display.create ~config bars in
       Global.set_active_exn display;
       Format.pp_open_box ppf 0;
-      if config.hide_cursor then Format.pp_print_string ppf Ansi.hide_cursor;
+      if config.hide_cursor then
+        Format.pp_print_string ppf Terminal.Ansi.hide_cursor;
       Display.initial_render display;
       let rec inner : type a b. (a, b) Bar_list.t -> (a, b) Hlist.t = function
         | Zero -> []

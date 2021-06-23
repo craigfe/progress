@@ -3,8 +3,26 @@
    Distributed under the MIT license. See terms at the end of this file.
   ————————————————————————————————————————————————————————————————————————————*)
 
-include Ansi_intf.Ansi
-(** @inline *)
+module Color = Color
+module Style = Style
+module Ansi = Ansi
+
+let guess_printed_width, truncate_to_width =
+  Ansi.(guess_printed_width, truncate_to_width)
+
+type dimensions = { rows : int; columns : int }
+
+external sigwinch : unit -> int option = "ocaml_terminal_get_sigwinch"
+
+external get_dimensions : unit -> dimensions option
+  = "ocaml_terminal_get_terminal_dimensions"
+
+let get_columns () =
+  match get_dimensions () with
+  | Some { columns; _ } -> Some columns
+  | None -> None
+
+let sigwinch = sigwinch ()
 
 (*————————————————————————————————————————————————————————————————————————————
    Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>

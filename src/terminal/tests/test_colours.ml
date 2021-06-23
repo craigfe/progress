@@ -1,9 +1,13 @@
-open Common
+open Terminal
+
+let check_invalid ~__POS__:pos f =
+  match f () with
+  | _ ->
+      Alcotest.fail ~pos
+        "Expected [Invalid_argument], but no exception was raised."
+  | exception Invalid_argument _ -> ()
 
 open struct
-  module Color = Progress.Color
-  module Ansi = Progress.Internals.Ansi
-
   let check_string ~__POS__:pos =
     Alcotest.(check ~pos (testable Fmt.Dump.string String.equal)) ""
 
@@ -18,7 +22,7 @@ let test_rgb () =
   check_invalid ~__POS__ (fun () -> Color.rgb (-1) 0 0);
   check_invalid ~__POS__ (fun () -> Color.rgb 0 256 0);
   check_string ~__POS__ "\027[38;2;41;42;43m"
-    (Color.rgb 41 42 43 |> Ansi.fg |> Ansi.code);
+    (Color.rgb 41 42 43 |> Style.fg |> Style.code);
   ()
 
 let test_hex () =

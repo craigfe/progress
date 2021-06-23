@@ -107,8 +107,7 @@ module Integer_independent (Platform : Platform.S) = struct
   let noop () = Noop
 
   let const s =
-    let len = String.length s
-    and width = Printer.Internals.guess_printed_width s in
+    let len = String.length s and width = Terminal.guess_printed_width s in
     let segment =
       Primitives.theta ~width (fun buf _ ->
           Line_buffer.add_substring buf s ~off:0 ~len)
@@ -191,9 +190,9 @@ module Integer_independent (Platform : Platform.S) = struct
     match color with
     | None -> f ()
     | Some s ->
-        Line_buffer.add_string buf Ansi.Style.(code (fg s));
+        Line_buffer.add_string buf Terminal.Style.(code (fg s));
         let a = f () in
-        Line_buffer.add_string buf Ansi.Style.(code none);
+        Line_buffer.add_string buf Terminal.Style.(code none);
         a
 
   module Modulo_counter : sig
@@ -296,8 +295,8 @@ module Bar_style = struct
     ; blank_space : string
     ; full_space : string
     ; in_progress_stages : string array
-    ; color : Ansi.Color.t option
-    ; color_empty : Ansi.Color.t option
+    ; color : Terminal.Color.t option
+    ; color_empty : Terminal.Color.t option
     ; total_delimiter_width : int
     ; segment_width : int
           (* TODO: test that segment widths other than 1 are supported *)
@@ -329,7 +328,7 @@ module Bar_style = struct
   let parse_stages ctx = function
     | [] -> Fmt.invalid_arg "%s: empty list of bar stages supplied" ctx
     | full_space :: xs ->
-        let segment_width = Printer.Internals.guess_printed_width full_space in
+        let segment_width = Terminal.guess_printed_width full_space in
         if segment_width = 0 then
           Fmt.invalid_arg
             "%s: supplied stage '%s' has estimated printed width of 0" ctx
@@ -343,8 +342,7 @@ module Bar_style = struct
 
   let guess_delims_width = function
     | None -> 0
-    | Some (l, r) ->
-        Printer.Internals.(guess_printed_width l + guess_printed_width r)
+    | Some (l, r) -> Terminal.(guess_printed_width l + guess_printed_width r)
 
   let v ?delims ?color ?color_empty stages =
     let full_space, in_progress_stages, blank_space, segment_width =
@@ -452,14 +450,14 @@ module Make (Platform : Platform.S) = struct
     module type S =
       Integer_dependent
         with type 'a t := 'a t
-         and type color := Ansi.Color.t
+         and type color := Terminal.Color.t
          and type 'a printer := 'a Printer.t
          and type bar_style := Bar_style.t
 
     module type Ext =
       DSL
         with type 'a t := 'a t
-         and type color := Ansi.Color.t
+         and type color := Terminal.Color.t
          and type 'a printer := 'a Printer.t
          and type Bar_style.t := Bar_style.t
 

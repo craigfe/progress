@@ -374,7 +374,7 @@ module type Line = sig
     include
       S
         with type 'a t := 'a t
-         and type color := Ansi.Color.t
+         and type color := Terminal.Color.t
          and type 'a printer := 'a Printer.t
 
     val to_primitive : Config.t -> 'a t -> 'a Internals.t

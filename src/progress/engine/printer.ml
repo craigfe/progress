@@ -47,94 +47,12 @@ let integer (type a) ~width (module Integer : Integer.S with type t = a) : a t =
 
 let int ~width = integer ~width (module Integer.Int)
 
-let malformed_string s =
-  Fmt.invalid_arg "Printer.string: malformed UTF-8 string: %S" s
-
-module Length_counter = struct
-  (* Counting length of UTF-8 strings while skipping ANSI escape sequences. See
-      https://en.wikipedia.org/wiki/ANSI_escape_code#Fe_Escape_sequences for
-      details. *)
-  type t =
-    { mutable acc : int
-    ; mutable state :
-        [ `Normal
-        | `Parsing_ansi_sequence (* Read '\x1b', but not the subsequent byte. *)
-        | `Ansi_parameter_bytes (* Inside a CSI parameter sequence *) ]
-    }
-
-  let empty () = { acc = 0; state = `Normal }
-  let is_initial_ansi_byte c = Char.equal c '\x1b'
-
-  let is_final_ansi_byte c =
-    let c = Char.code c in
-    c >= 0x40 && c <= 0x7e
-
-  let guess_printed_char_length c =
-    match Uucp.Break.tty_width_hint c with
-    | -1 -> 1 (* Assume width of 1 if [Uucp] can't guess *)
-    | n -> n
-
-  let add t c =
-    match Uchar.is_char c with
-    | false -> t.acc <- t.acc + guess_printed_char_length c
-    | true -> (
-        let c = Uchar.to_char c in
-        match t.state with
-        | `Normal ->
-            if is_initial_ansi_byte c then t.state <- `Parsing_ansi_sequence
-            else t.acc <- t.acc + 1
-        | `Parsing_ansi_sequence ->
-            if Char.equal c '[' (* Control sequence introducer *) then
-              t.state <- `Ansi_parameter_bytes
-            else t.state <- `Normal
-        | `Ansi_parameter_bytes ->
-            if is_final_ansi_byte c then t.state <- `Normal)
-
-  let count t = t.acc
-end
-
-let guess_printed_string_length s =
-  let count = Length_counter.empty () in
-  Uutf.String.fold_utf_8
-    (fun () _ -> function
-      | `Malformed _ -> malformed_string s
-      | `Uchar c -> Length_counter.add count c)
-    () s;
-  Length_counter.count count
-
-let truncate_to_width width s =
-  let buf = Buffer.create width in
-  let count = Length_counter.empty () in
-  let exception Exit in
-  try
-    Uutf.String.fold_utf_8
-      (fun () i -> function
-        | `Malformed _ -> malformed_string s
-        | `Uchar c ->
-            if Length_counter.count count = width then (
-              (* Check for display reset, and add it if it's there; truncating
-                 this would cause the open colour to leak. *)
-              let display_reset = "\027[0m" in
-              if
-                i + 4 < String.length s
-                && String.equal (String.sub s ~pos:i ~len:4) display_reset
-              then Buffer.add_string buf display_reset;
-              raise Exit)
-            else (
-              Length_counter.add count c;
-              let count = Length_counter.count count in
-              if count <= width then Buffer.add_utf_8_uchar buf c
-              else raise Exit))
-      () s;
-    buf
-  with Exit -> buf
-
 let string ~width =
   if width < 0 then failwith "Printer.string: negative print length";
   let ellipsis_length = min 3 width in
   let ellipsis = String.make ellipsis_length '.' in
   let to_string s =
-    let printed_len = guess_printed_string_length s in
+    let printed_len = Terminal.guess_printed_width s in
     let padding = width - printed_len in
     if padding = 0 then s
     else if padding > 0 then (
@@ -143,9 +61,8 @@ let string ~width =
       unsafe_blit_string s 0 buf 0 len;
       Bytes.unsafe_to_string buf)
     else
-      let buf = truncate_to_width (width - ellipsis_length) s in
-      Buffer.add_string buf ellipsis;
-      Buffer.contents buf
+      let s = Terminal.truncate_to_width (width - ellipsis_length) s in
+      s ^ ellipsis
   in
   create ~string_len:width ~to_string ()
 
@@ -165,8 +82,6 @@ let print_width { write_len; _ } = write_len
 
 module Internals = struct
   let integer = integer
-  let guess_printed_width = guess_printed_string_length
-  let truncate_to_width = truncate_to_width
   let to_line_printer = to_line_printer
 end
 
