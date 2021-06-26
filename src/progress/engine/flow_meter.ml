@@ -77,8 +77,10 @@ let per_second : type a. a t -> a =
       let end_time = t.timestamps.(t.most_recently_added) in
       Mtime.Span.to_s (Mtime.span start_time end_time)
     in
-    let est = Integer.to_float sum /. interval in
-    Integer.of_float est
+    if Float.compare interval Float.epsilon < 0 then Integer.zero
+    else
+      let est = Integer.to_float sum /. interval in
+      Integer.of_float est
 
 (*————————————————————————————————————————————————————————————————————————————
    Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
