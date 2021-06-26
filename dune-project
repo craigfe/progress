@@ -31,6 +31,8 @@ progress bar formats. Supports rendering multiple progress bars simultaneously.\
 (package
  (name terminal)
  (synopsis "Basic utilities for interacting with terminals")
+ (description "Basic utilities for interacting with terminals")
+ (documentation https://CraigFe.github.io/progress/)
  (depends
   (ocaml (>= 4.03.0))
   (uucp (>= 1.1.0))
