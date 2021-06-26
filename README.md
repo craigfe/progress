@@ -9,7 +9,8 @@
 
 - allows user-defined progress bar layouts;
 - supports rendering multiple progress bars simultaneously;
-- dynamically responds to changes in terminal size.
+- dynamically responds to changes in terminal size;
+- supports interleaving logging with progress bar rendering.
 
 The documentation is available [online][docs].
 
