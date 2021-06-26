@@ -1,16 +1,13 @@
 open Terminal
 open Common
 
-open struct
-  let check_string pos =
-    Alcotest.(check ~pos (testable Fmt.Dump.string String.equal)) ""
+let check_string pos = Alcotest.(check ~pos (testable Fmt.Dump.string ( = ))) ""
 
-  let check_color pos (r, g, b) x =
-    Alcotest.(check ~pos string)
-      ""
-      (Fmt.str "RGB (%d, %d, %d)" r g b)
-      (Fmt.to_to_string Color.pp_dump x)
-end
+let check_color pos (r, g, b) x =
+  Alcotest.(check ~pos string)
+    ""
+    (Fmt.str "RGB (%d, %d, %d)" r g b)
+    (Fmt.to_to_string Color.pp_dump x)
 
 let test_rgb () =
   check_invalid __POS__ (fun () -> Color.rgb (-1) 0 0);
