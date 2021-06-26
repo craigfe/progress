@@ -9,6 +9,7 @@ open! Import
 module type Integer_dependent = sig
   type integer
   type color
+  type duration
   type 'a printer
   type bar_style
 
@@ -21,7 +22,7 @@ module type Integer_dependent = sig
   val bytes_per_sec : integer t
   val percentage_of : integer -> integer t
   val rate : float printer -> integer t
-  val eta : integer -> integer t
+  val eta : ?pp:duration printer -> integer -> integer t
 
   type bar_style := [ `ASCII | `UTF8 | `Custom of bar_style ]
 
@@ -232,7 +233,7 @@ module type DSL = sig
   val elapsed : ?pp:duration printer -> unit -> _ t
   (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
 
-  val eta : integer -> integer t
+  val eta : ?pp:duration printer -> integer -> integer t
   (** Displays an estimate of the remaining time until [total] is accumulated by
       the reporters, in [MM:SS] form. *)
 
@@ -314,6 +315,7 @@ module type S = sig
       Integer_dependent
         with type 'a t := 'a t
          and type color := color
+         and type duration := duration
          and type 'a printer := 'a printer
          and type bar_style := Bar_style.t
 
