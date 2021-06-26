@@ -69,12 +69,15 @@ let uchar_size u =
   | u when u <= 0x10FFFF -> 4
   | _ -> assert false
 
+exception Exit of int
+
+let string_equal : string -> string -> bool = ( = )
+
 let truncate_to_width width s =
   if width < 0 then
     Format.kasprintf invalid_arg
       "Terminal.truncate_to_width: negative width %d requested" width;
   let count = Length_counter.empty () in
-  let exception Exit of int in
   try
     Uutf.String.fold_utf_8
       (fun () i -> function
@@ -86,7 +89,7 @@ let truncate_to_width width s =
               let display_reset = "\027[0m" in
               if
                 i + 4 <= String.length s
-                && String.equal (String.sub s ~pos:i ~len:4) display_reset
+                && string_equal (String.sub s ~pos:i ~len:4) display_reset
               then raise (Exit (i + 4))
               else raise (Exit i)
             else (

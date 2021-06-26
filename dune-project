@@ -33,7 +33,7 @@ progress bar formats. Supports rendering multiple progress bars simultaneously.\
  (synopsis "Basic utilities for interacting with terminals")
  (depends
   (ocaml (>= 4.03.0))
-  uucp
+  (uucp (>= 1.1.0))
   uutf
   stdlib-shims
   (alcotest :with-test)
