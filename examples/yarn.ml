@@ -70,7 +70,7 @@ let run () =
 
       (* Finish a task every so often *)
       let random_reporter = pick_random reporters in
-      for _ = 1 to 100 do
+      for _ = 1 to 50 do
         random_reporter () (random_action ());
 
         (* Advance the spinners while we wait *)
