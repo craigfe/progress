@@ -183,7 +183,6 @@ let () =
         ; test_case "Two unsized elements in box" `Quick
             Boxes.test_two_unsized_in_box
         ] )
-    ; ("line", Test_line.tests)
     ; ("units", Test_units.tests)
     ; ("printers", Test_printers.tests)
     ; ("flow_meter", Test_flow_meter.tests)
