@@ -395,7 +395,13 @@ h2 {
 }
 
 h3 {
+  margin-top: 1.4em;
   font-size: 1.25em;
+}
+
+h4 {
+  margin-top: 1em;
+  margin-bottom: 0.7em;
 }
 
 small,
@@ -797,6 +803,9 @@ td.def-doc *:first-child {
 /* Mobile adjustements. */
 
 @media only screen and (max-width: 95ex) {
+  body {
+    margin-left: 4ex;
+  }
   .odoc-content {
     margin: auto;
     padding: 2em;

@@ -1,0 +1,8 @@
+(rule
+ (alias docs)
+ (deps
+  (universe)
+  (alias_rec doc)
+  (source_tree docs))
+ (action
+  (bash "cp -fr docs/{odoc.css,fonts} _doc/_html")))
