@@ -1,27 +1,160 @@
 @charset "UTF-8";
 /* Copyright (c) 2016 The odoc contributors. All rights reserved.
    Distributed under the ISC license, see terms at the end of the file.
-   odoc 1.5.1 */
+   %%NAME%% %%VERSION%% */
 
 /* Fonts */
-@import url('https://fonts.googleapis.com/css?family=Fira+Mono:400,500');
-@import url('https://fonts.googleapis.com/css?family=Noticia+Text:400,400i,700');
-@import url('https://fonts.googleapis.com/css?family=Fira+Sans:400,400i,500,500i,600,600i,700,700i');
 
+@font-face {
+  font-family: "JetBrainsMono";
+  src: url("./fonts/JetBrainsMono-Regular.woff2") format("woff2"),
+    url("./fonts/JetBrainsMono-Regular.woff") format("woff");
+
+  font-weight: normal;
+  font-style: normal;
+}
+
+@import url("https://rsms.me/inter/inter.css");
+
+@font-face {
+  font-family: "Lato";
+  font-style: normal;
+  font-weight: 400;
+  src: url("./fonts/lato-v17-latin-regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Lato";
+  font-style: normal;
+  font-weight: 700;
+  src: url("./fonts/lato-v17-latin-700.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Lato";
+  font-style: italic;
+  font-weight: 400;
+  src: url("./fonts/lato-v17-latin-italic.woff2") format("woff2");
+}
+
+@import url("https://fonts.googleapis.com/css?family=Noticia+Text:400,400i,700");
+@import url("https://fonts.googleapis.com/css?family=Fira+Sans:400,400i,500,500i,600,600i,700,700i");
+
+:root {
+  --font-code: JetBrainsMono, courier;
+  --font: Lato, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
+    Ubuntu, Cantarell, Open Sans, Helvetica Neue, Helvetica, Arial, sans-serif;
+
+  --font-heading: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto,
+    Oxygen, Ubuntu, Cantarell, Open Sans, Helvetica Neue, Helvetica, Arial,
+    sans-serif;
+
+  --link-color: #3d8fd1;
+  --anchor-hover: #555;
+  --anchor-color: #d5d5d5;
+  --xref-shadow: #cc6666;
+  --header-shadow: #ddd;
+  --by-name-version-color: #aaa;
+  --by-name-nav-link-color: #222;
+  --target-background: rgba(187, 239, 253, 0.3);
+  --target-shadow: rgba(187, 239, 253, 0.8);
+  --pre-border-color: #eee;
+  --code-background: #f6f8fa;
+  --spec-summary-border-color: #5c9cf5;
+  --spec-summary-background: var(--code-background);
+  --spec-summary-hover-background: #ebeff2;
+  --spec-details-after-background: rgba(0, 4, 15, 0.05);
+  --spec-details-after-shadow: rgba(204, 204, 204, 0.53);
+}
 
 /* Reset a few things. */
 
-html, body, div, span, applet, object, iframe, h1, h2, h3, h4, h5, h6, p, blockquote, pre, a, abbr, acronym, address, big, cite, code, del, dfn, em, img, ins, kbd, q, s, samp, small, strike, strong, sub, sup, tt, var, b, u, i, center, dl, dt, dd, ol, ul, li, fieldset, form, label, legend, table, caption, tbody, tfoot, thead, tr, th, td, article, aside, canvas, details, embed, figure, figcaption, footer, header, hgroup, menu, nav, output, ruby, section, summary, time, mark, audio, video {
+html,
+body,
+div,
+span,
+applet,
+object,
+iframe,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+blockquote,
+pre,
+a,
+abbr,
+acronym,
+address,
+big,
+cite,
+code,
+del,
+dfn,
+em,
+img,
+ins,
+kbd,
+q,
+s,
+samp,
+small,
+strike,
+strong,
+sub,
+sup,
+tt,
+var,
+b,
+u,
+i,
+center,
+dl,
+dt,
+dd,
+ol,
+ul,
+li,
+fieldset,
+form,
+label,
+legend,
+table,
+caption,
+tbody,
+tfoot,
+thead,
+tr,
+th,
+td,
+article,
+aside,
+canvas,
+details,
+embed,
+figure,
+figcaption,
+footer,
+header,
+hgroup,
+menu,
+nav,
+output,
+ruby,
+section,
+summary,
+time,
+mark,
+audio,
+video {
   margin: 0;
   padding: 0;
   border: 0;
-  font-size: inherit;
   font: inherit;
-  line-height: inherit;
   vertical-align: baseline;
-  text-align: inherit;
-  color: inherit;
-  background: transparent;
 }
 
 table {
@@ -29,7 +162,9 @@ table {
   border-spacing: 0;
 }
 
-*, *:before, *:after {
+*,
+*:before,
+*:after {
   box-sizing: border-box;
 }
 
@@ -38,38 +173,49 @@ html {
 }
 
 body {
-  font-family: "Fira Sans", Helvetica, Arial, sans-serif;
   text-align: left;
-  color: #333;
-  background: #FFFFFF;
+  background: #ffffff;
+  color: var(--color);
+  background-color: var(--main-background);
 }
 
-.content {
+body {
   max-width: 90ex;
   margin-left: calc(10vw + 20ex);
   margin-right: 4ex;
   margin-top: 20px;
   margin-bottom: 50px;
-  font-family: "Noticia Text", Georgia, serif;
+  font-family: var(--font);
   line-height: 1.5;
 }
 
-.content>header {
+header {
   margin-bottom: 30px;
 }
 
-.content>header nav {
-  font-family: "Fira Sans", Helvetica, Arial, sans-serif;
+nav {
+  font-family: var(--font);
 }
 
 /* Basic markup elements */
 
-b, strong {
-  font-weight: 500;
+b,
+strong {
+  font-weight: bold;
 }
 
-i, em {
+i {
   font-style: italic;
+}
+
+em,
+i em.odd {
+  font-style: italic;
+}
+
+em.odd,
+i em {
+  font-style: normal;
 }
 
 sup {
@@ -80,7 +226,8 @@ sub {
   vertical-align: sub;
 }
 
-sup, sub {
+sup,
+sub {
   font-size: 12px;
   line-height: 0;
   margin-left: 0.2ex;
@@ -91,24 +238,27 @@ pre {
   margin-bottom: 1.2em;
 }
 
-p, ul, ol {
+p,
+ul,
+ol {
   margin-top: 0.5em;
   margin-bottom: 1em;
 }
-ul, ol {
-  list-style-position: outside
+ul,
+ol {
+  list-style-position: outside;
 }
 
-ul>li {
+ul > li {
   margin-left: 22px;
 }
 
-ol>li {
+ol > li {
   margin-left: 27.2px;
 }
 
-li>*:first-child {
-  margin-top: 0
+li > *:first-child {
+  margin-top: 0;
 }
 
 /* Text alignements, this should be forbidden. */
@@ -129,32 +279,37 @@ li>*:first-child {
 
 a {
   text-decoration: none;
-  color: #2C5CBD;
+  color: #2c5cbd;
+  color: var(--link-color);
 }
 
 a:hover {
-  box-shadow: 0 1px 0 0 #2C5CBD;
+  box-shadow: 0 1px 0 0 #2c5cbd;
+  box-shadow: 0 1px 0 0 var(--link-color);
 }
 
 /* Linked highlight */
 *:target {
-  background-color: rgba(187,239,253,0.3) !important;
-  box-shadow: 0 0px 0 1px rgba(187,239,253,0.8) !important;
+  background-color: rgba(187, 239, 253, 0.3) !important;
+  box-shadow: 0 0px 0 1px rgba(187, 239, 253, 0.8) !important;
+  background-color: var(--target-background) !important;
+  box-shadow: 0 0px 0 1px var(--target-shadow) !important;
   border-radius: 1px;
 }
 
-*:hover>a.anchor {
+*:hover > a.anchor {
   visibility: visible;
 }
 
 a.anchor:before {
-  content: "#"
+  content: "#";
 }
 
 a.anchor:hover {
   box-shadow: none;
   text-decoration: none;
   color: #555;
+  color: var(--anchor-hover);
 }
 
 a.anchor {
@@ -169,6 +324,7 @@ a.anchor {
   padding-left: 0.4em;
   /* To remain selectable */
   color: #d5d5d5;
+  color: var(--anchor-color);
 }
 
 .spec > a.anchor {
@@ -177,23 +333,43 @@ a.anchor {
 }
 
 .xref-unresolved {
-  color: #2C5CBD;
+  color: #2c94bd;
 }
 .xref-unresolved:hover {
-  box-shadow: 0 1px 0 0 #CC6666;
+  box-shadow: 0 1px 0 0 #cc6666;
+  box-shadow: 0 1px 0 0 var(--xref-shadow);
 }
 
 /* Section and document divisions.
    Until at least 4.03 many of the modules of the stdlib start at .h7,
    we restart the sequence there like h2  */
 
-h1, h2, h3, h4, h5, h6, .h7, .h8, .h9, .h10 {
-  font-family: "Fira Sans", Helvetica, Arial, sans-serif;
-  font-weight: 400;
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.h7,
+.h8,
+.h9,
+.h10 {
+  font-family: var(--font-heading);
+  font-weight: 500;
   margin: 0.5em 0 0.5em 0;
   padding-top: 0.1em;
   line-height: 1.2;
   overflow-wrap: break-word;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.spec {
+  scroll-margin-top: 50px;
 }
 
 h1 {
@@ -206,37 +382,48 @@ h1 {
   font-weight: 500;
   font-size: 1.953em;
   box-shadow: 0 1px 0 0 #ddd;
+  box-shadow: 0 1px 0 0 var(--header-shadow);
 }
 
 h2 {
-  font-size: 1.563em;
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 1.263em;
+  margin-top: 1.7em;
+  margin-left: 0.5em;
+  margin-bottom: 1em;
 }
 
 h3 {
+  margin-top: 1.4em;
   font-size: 1.25em;
 }
 
-small, .font_small {
+h4 {
+  margin-top: 1em;
+  margin-bottom: 0.7em;
+}
+
+small,
+.font_small {
   font-size: 0.8em;
 }
 
-h1 code, h1 tt {
-  font-size: inherit;
+h1 code,
+h1 tt {
+  font-size: 95%;
   font-weight: inherit;
 }
 
-h2 code, h2 tt {
-  font-size: inherit;
+h2 code,
+h2 tt {
+  font-size: 95%;
   font-weight: inherit;
 }
 
-h3 code, h3 tt {
-  font-size: inherit;
-  font-weight: inherit;
-}
-
-h3 code, h3 tt {
-  font-size: inherit;
+h3 code,
+h3 tt {
+  font-size: 95%;
   font-weight: inherit;
 }
 
@@ -244,36 +431,69 @@ h4 {
   font-size: 1.12em;
 }
 
+.spec-doc {
+  margin-bottom: 2em;
+}
+
+/* Comment delimiters, hidden but accessible to screen readers and 
+   selected for copy/pasting */
+
+/* Taken from bootstrap */
+/* See also https://stackoverflow.com/a/27769435/4220738 */
+.comment-delim {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* Preformatted and code */
 
-tt, code, pre {
-  font-family: "Fira Mono", courier;
+tt,
+code,
+pre {
+  font-family: var(--font-code);
   font-weight: 400;
 }
 
 pre {
   padding: 0.1em;
   border: 1px solid #eee;
+  border: 1px solid var(--pre-border-color);
   border-radius: 5px;
   overflow-x: auto;
 }
 
-p code, li code {
+p code,
+li code {
   background-color: #f6f8fa;
   color: #0d2b3e;
+  background-color: var(--li-code-background);
+  color: var(--li-code-color);
   border-radius: 3px;
   padding: 0 0.3ex;
 }
 
 p a > code {
-  color: #2C5CBD;
+  color: #2c5cbd;
+  color: var(--link-color);
 }
 
 /* Code blocks (e.g. Examples) */
 
-pre code {
+code {
   font-size: 0.893rem;
+}
+
+:not(pre):not(h1) > code {
+  background: var(--code-background);
+  border-radius: 2px;
+  padding: 2px 4px;
 }
 
 /* Code lexemes */
@@ -282,42 +502,23 @@ pre code {
   font-weight: 500;
 }
 
+.arrow {
+  white-space: nowrap;
+}
+
 /* Module member specification */
 
-.spec:not(.include), .spec.include details summary {
-  background-color: #f6f8fa;
+.spec {
+  background-color: var(--spec-summary-background);
   border-radius: 3px;
-  border-left: 4px solid #5c9cf5;
+  border-left: 4px solid var(--spec-summary-border-color);
   border-right: 5px solid transparent;
   padding: 0.35em 0.5em;
 }
 
-.spec.include details summary:hover {
-  background-color: #ebeff2;
-}
-
-dl, div.spec, .doc, aside {
-  margin-bottom: 20px;
-}
-
-dl > dd {
-  padding: 0.5em;
-}
-
-dd> :first-child {
-  margin-top: 0;
-}
-
-dl:last-child, dd> :last-child, aside:last-child, article:last-child {
-  margin-bottom: 0;
-}
-
-dt+dt {
-  margin-top: 15px;
-}
-
-section+section, section > header + dl {
-  margin-top: 25px;
+div.spec,
+.def-doc {
+  margin-bottom: 15px;
 }
 
 .spec.type .variant {
@@ -341,27 +542,22 @@ div.def {
   padding-left: 2ex;
 }
 
-div.def+div.doc {
+div.def + div.def-doc {
   margin-left: 1ex;
-  margin-top: 2.5px
+  margin-top: 2.5px;
 }
 
-div.doc>*:first-child {
+div.def-doc > *:first-child {
   margin-top: 0;
 }
 
-/* The elements other than heading should be wrapped in <aside> elements. */
-/* heading, body>p, body>ul, body>ol, h3, h4, body>pre { */
-/*   margin-bottom: 30px; */
-/* } */
-
 /* Collapsible inlined include and module */
 
-.spec.include details {
+.odoc-include details {
   position: relative;
 }
 
-.spec.include details:after {
+.odoc-include details:after {
   z-index: -100;
   display: block;
   content: " ";
@@ -373,17 +569,23 @@ div.doc>*:first-child {
   width: 15px;
   background: rgba(0, 4, 15, 0.05);
   box-shadow: 0 0px 0 1px rgba(204, 204, 204, 0.53);
+  background: var(--spec-details-after-background);
+  box-shadow: 0 0px 0 1px var(--spec-details-after-shadow);
 }
 
-.spec.include details summary {
+.odoc-include summary {
   position: relative;
   margin-bottom: 20px;
   cursor: pointer;
   outline: none;
 }
 
+.odoc-include summary:hover {
+  background-color: var(--spec-summary-hover-background);
+}
+
 /* FIXME: Does not work in Firefox. */
-details summary::-webkit-details-marker {
+.odoc-include summary::-webkit-details-marker {
   color: #888;
   transform: scaleX(-1);
   position: absolute;
@@ -401,92 +603,62 @@ div.def table {
 }
 
 td.def {
-  padding-right: 2ex
-}
-
-.record td.def {
   padding-left: 2ex;
 }
 
-td.doc *:first-child {
-  margin-top: 0em
+td.def-doc *:first-child {
+  margin-top: 0em;
 }
 
-/* @ tags */
+/* Lists of @tags */
 
-ul.at-tag {
+.at-tags {
   list-style-type: none;
-  margin-left: 0;
-  padding: 0;
+  margin-left: -3ex;
+}
+.at-tags li {
+  padding-left: 3ex;
+  text-indent: -3ex;
+}
+.at-tags .at-tag {
+  text-transform: capitalize;
 }
 
-ul.at-tag li {
-  margin-left: 0;
-  padding: 0;
+/* Lists of modules */
+
+.modules {
+  list-style-type: none;
+  margin-left: -3ex;
 }
-
-ul.at-tag li p:first-child {
-  margin-top: 0
+.modules li {
+  padding-left: 3ex;
+  text-indent: -3ex;
+  margin-top: 5px;
 }
-
-/* FIXME remove */
-
-span.at-tag {
-  font-weight: bold
-}
-
-.at-tag.deprecated {
-  font-weight: normal;
-  color: crimson
-}
-
-.at-tag.raise {
-  font-weight: bold;
-}
-
-/* FIXME random other things to review. */
-
-.heading {
-  margin-top: 10px;
-  border-bottom: solid;
-  border-width: 1px;
-  border-color: #DDD;
-  text-align: right;
-  font-weight: normal;
-  font-style: italic;
-}
-
-.heading+.sig {
-  margin-top: -20px;
-}
-
-.heading+.parameters {
-  margin-top: -20px;
+.modules .synopsis {
+  padding-left: 1ch;
 }
 
 /* Odig package index */
 
-.by-name ol, .by-tag ol, .errors ol {
+.packages {
   list-style-type: none;
-  margin-left: 0;
+  margin-left: -3ex;
 }
-
-.by-name ol ol, .by-tag ol ol {
-  margin-top: 0;
-  margin-bottom: 0
+.packages li {
+  padding-left: 3ex;
+  text-indent: -3ex;
 }
-
-.by-name li, .by-tag li, .errors li {
-  margin-left: 0;
+.packages li a.anchor {
+  padding-right: 0.5ch;
+  padding-left: 3ch;
 }
-
-.by-name .version {
+.packages .version {
   font-size: 10px;
-  color: #AAA
+  color: var(--by-name-version-color);
 }
-
-.by-name nav {
-  margin-bottom: 10px
+.packages .synopsis {
+  padding-left: 1ch;
 }
 
 .by-name nav a {
@@ -494,22 +666,26 @@ span.at-tag {
   font-size: 18px;
   margin-right: 1ex;
   color: #222;
+  color: var(--by-name-nav-link-color);
   display: inline-block;
 }
 
 .by-tag nav a {
   margin-right: 1ex;
   color: #222;
+  color: var(--by-name-nav-link-color);
   display: inline-block;
 }
 
-.by-tag>ol>li {
-  margin-top: 10px;
+.by-tag ol {
+  list-style-type: none;
 }
-
-.by-tag>ol>li>span, .by-tag>ol>li>ol, .by-tag>ol>li>ol>li {
+.by-tag ol.tags li {
+  margin-left: 1ch;
   display: inline-block;
-  margin-right: 1ex;
+}
+.by-tag td:first-child {
+  text-transform: uppercase;
 }
 
 /* Odig package page */
@@ -522,32 +698,6 @@ span.at-tag {
 
 .package .version {
   font-size: 14px;
-}
-
-h1+.modules, h1+.sel {
-  margin-top: 10px
-}
-
-.sel {
-  font-weight: normal;
-  font-style: italic;
-  font-size: 14px;
-  margin-top: 20px;
-}
-
-.sel+.modules {
-  margin-top: 10px;
-  margin-bottom: 20px;
-  margin-left: 1ex;
-}
-
-.modules {
-  margin: 0;
-}
-
-.modules .module {
-  min-width: 8ex;
-  padding-right: 2ex
 }
 
 .package.info {
@@ -571,24 +721,26 @@ h1+.modules, h1+.sel {
   margin-right: 1ex;
 }
 
-#info-authors li, #info-maintainers li {
+#info-authors li,
+#info-maintainers li {
   display: block;
 }
 
 /* Sidebar and TOC */
 
-.toc:before {
+.odoc-toc:before {
   display: block;
   content: "Contents";
   text-transform: uppercase;
-  font-size: 1em;
+  font-size: 1.1em;
   margin: 1.414em 0 0.5em;
-  font-weight: 500;
+  font-weight: 800;
   color: #777;
+  color: var(--toc-before-color);
   line-height: 1.2;
 }
 
-.toc {
+.odoc-toc {
   position: fixed;
   top: 0px;
   bottom: 0px;
@@ -597,49 +749,53 @@ h1+.modules, h1+.sel {
   min-width: 26ex;
   width: 20%;
   background: #f6f8fa;
+  background: var(--toc-background);
   overflow: auto;
-  color: #1F2D3D;
+  color: #1f2d3d;
+  color: var(--toc-color);
   padding-left: 2ex;
   padding-right: 2ex;
 }
 
-.toc ul li a {
+.odoc-toc ul li a {
   font-family: "Fira Sans", sans-serif;
   font-size: 0.95em;
   color: #333;
+  color: var(--color);
   font-weight: 400;
   line-height: 1.6em;
   display: block;
 }
 
-.toc ul li a:hover {
+.odoc-toc ul li a:hover {
   box-shadow: none;
   text-decoration: underline;
 }
 
 /* First level titles */
 
-.toc>ul>li>a {
+.odoc-toc > ul > li > a {
   font-weight: 500;
 }
 
-.toc li ul {
+.odoc-toc li ul {
   margin: 0px;
 }
 
-.toc ul {
+.odoc-toc ul {
   list-style-type: none;
 }
 
-.toc ul li {
+.odoc-toc ul li {
   margin: 0;
 }
-.toc>ul>li {
+.odoc-toc > ul > li {
   margin-bottom: 0.3em;
 }
 
-.toc ul li li {
+.odoc-toc ul li li {
   border-left: 1px solid #ccc;
+  border-left: 1px solid var(--toc-list-border);
   margin-left: 5px;
   padding-left: 12px;
 }
@@ -647,11 +803,14 @@ h1+.modules, h1+.sel {
 /* Mobile adjustements. */
 
 @media only screen and (max-width: 95ex) {
-  .content {
-    margin: auto;
-    padding: 2.0em;
+  body {
+    margin-left: 4ex;
   }
-  .toc {
+  .odoc-content {
+    margin: auto;
+    padding: 2em;
+  }
+  .odoc-toc {
     position: static;
     width: auto;
     min-width: unset;
@@ -679,8 +838,10 @@ h1+.modules, h1+.sel {
 .hljs {
   display: block;
   background: white;
+  background: var(--code-background);
   padding: 0.5em;
   color: #333333;
+  color: var(--color);
   overflow-x: auto;
 }
 
