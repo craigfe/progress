@@ -431,6 +431,7 @@ module Make (Platform : Platform.S) = struct
       Integer_dependent
         with type 'a t := 'a t
          and type color := Terminal.Color.t
+         and type duration := Duration.t
          and type 'a printer := 'a Printer.t
          and type bar_style := Bar_style.t
 
@@ -603,13 +604,10 @@ module Make (Platform : Platform.S) = struct
 
       let bytes_per_sec = rate Units.Bytes.of_float
 
-      let eta total =
+      let eta ?(pp = Units.Duration.mm_ss) total =
         let span_segment =
           let printer =
-            let pp =
-              Staged.prj
-                (Printer.Internals.to_line_printer Units.Duration.mm_ss)
-            in
+            let pp = Staged.prj (Printer.Internals.to_line_printer pp) in
             fun ppf event x ->
               match event with
               | `finish -> pp ppf Mtime.Span.max_span (* renders as [--:--] *)
