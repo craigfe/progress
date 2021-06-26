@@ -254,9 +254,9 @@ module Integer_independent (Platform : Platform.S) = struct
       | None -> Spinner.default
       | Some [] -> Fmt.invalid_arg "spinner must have at least one stage"
       | Some (x :: xs as frames) ->
-          let width = String.Utf8.length x in
+          let width = Terminal.guess_printed_width x in
           ListLabels.iteri xs ~f:(fun i x ->
-              let width' = String.Utf8.length x in
+              let width' = Terminal.guess_printed_width x in
               if width <> width' then
                 Fmt.invalid_arg
                   "Spinner frames must have the same UTF-8 length. found %d \

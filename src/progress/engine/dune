@@ -7,7 +7,5 @@
   fmt
   logs
   logs.fmt
-  uutf
-  uucp
   terminal
   vector))

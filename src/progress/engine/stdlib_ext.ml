@@ -90,14 +90,6 @@ module Float = struct
   let of_float x = x
 end
 
-module String = struct
-  include String
-
-  module Utf8 = struct
-    let length = Uutf.String.fold_utf_8 (fun count _ _ -> count + 1) 0
-  end
-end
-
 module Option = struct
   include Option
 
