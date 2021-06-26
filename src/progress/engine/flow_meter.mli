@@ -4,13 +4,19 @@
   ————————————————————————————————————————————————————————————————————————————*)
 
 type 'a t
-(** The type of ring buffers. *)
+(** The type of {i flow meters} for some metric: values that compute an online
+    windowed integral of a discrete sequence of [(value, time)] samples. This is
+    useful for e.g. estimating the download rate of a process given a sequence
+    of progress updates. *)
 
 val create :
      clock:(unit -> Mtime.t)
   -> size:int
   -> elt:(module Integer.S with type t = 'a)
   -> 'a t
+(** [create ~clock ~size ~elt] is a flow meter for values of type [elt], using a
+    window size of [size] and the [clock] function for collecting timestamps for
+    recorded values. *)
 
 val record : 'a t -> 'a -> unit
 (** Add a value to the ring buffer. *)

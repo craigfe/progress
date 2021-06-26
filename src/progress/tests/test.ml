@@ -186,4 +186,5 @@ let () =
     ; ("line", Test_line.tests)
     ; ("units", Test_units.tests)
     ; ("printers", Test_printers.tests)
+    ; ("flow_meter", Test_flow_meter.tests)
     ]

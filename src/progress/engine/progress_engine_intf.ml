@@ -137,6 +137,10 @@ module type Progress_engine = sig
 
   module Make (_ : Platform) : S
   module Integer = Integer
+
+  module Exposed_for_testing : sig
+    module Flow_meter = Flow_meter
+  end
 end
 
 (*————————————————————————————————————————————————————————————————————————————

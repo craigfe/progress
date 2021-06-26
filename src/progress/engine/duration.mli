@@ -12,6 +12,7 @@ val compare : t -> t -> int
 
 (** {1 Round values} *)
 
+val zero : t
 val nanosecond : t
 val microsecond : t
 val millisecond : t

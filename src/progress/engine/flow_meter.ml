@@ -13,7 +13,11 @@ type 'a t =
   ; elt : (module Integer.S with type t = 'a)
   }
 
-let create (type a) ~clock:get_time ~size:max_length ~elt : a t =
+let create (type a) ~clock:get_time ~size ~elt : a t =
+  if size <= 0 then
+    Fmt.invalid_arg "Flow_meter.create: non-positive size %d" size;
+  (* We need [n + 1] timestamp samples to integrate over [n] values. *)
+  let max_length = size + 1 in
   let start_time = get_time () in
   { get_time
   ; data = Array.make max_length (Obj.magic None)
@@ -39,6 +43,7 @@ let record t data =
   else (
     (* Increase the buffer size *)
     push t ~key:t.length ~data;
+    t.most_recently_added <- t.length;
     t.length <- succ t.length)
 
 let oldest_index t =
@@ -57,13 +62,21 @@ let per_second : type a. a t -> a =
   let (module Integer) = t.elt in
   if is_empty t then Integer.zero
   else
-    (* The computation here is very sloppy. TODO: test accuracy and precision *)
+    (* Sum all values in the window {i except the first one} and divide by the
+       time interval. We can think of the first value as representing work done
+       just {i before} the time interval starts, so using a half-open sample
+       correctly avoids over-reporting the flow-rate. *)
+    let oldest_index = oldest_index t in
+    let sum =
+      Integer.sub
+        (fold t ~f:Integer.add ~init:Integer.zero)
+        t.data.(oldest_index)
+    in
     let interval =
-      let start_time = t.timestamps.(oldest_index t) in
+      let start_time = t.timestamps.(oldest_index) in
       let end_time = t.timestamps.(t.most_recently_added) in
       Mtime.Span.to_s (Mtime.span start_time end_time)
     in
-    let sum = fold t ~f:Integer.add ~init:Integer.zero in
     let est = Integer.to_float sum /. interval in
     Integer.of_float est
 

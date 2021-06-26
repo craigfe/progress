@@ -19,6 +19,7 @@ let ( = ) = compare_zero ( = )
 let ( >= ) = compare_zero ( >= )
 let ( > ) = compare_zero ( > )
 let v = of_uint64_ns
+let zero = v 0L
 let nanosecond = v 1L
 let microsecond = v 1_000L
 let millisecond = v 1_000_000L

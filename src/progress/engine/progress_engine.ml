@@ -57,6 +57,10 @@ end
 
 module Integer = Integer
 
+module Exposed_for_testing = struct
+  module Flow_meter = Flow_meter
+end
+
 (*————————————————————————————————————————————————————————————————————————————
    Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
 
