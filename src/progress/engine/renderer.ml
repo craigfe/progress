@@ -304,7 +304,7 @@ end = struct
       rerender_all_from_top ~stage:`finalise ~starting_at:0 ~unconditional:true
         display;
       Format.fprintf ppf "@,@]")
-    else Format.pp_print_string ppf Terminal.Ansi.erase_line;
+    else Format.pp_print_string ppf Terminal.Ansi.erase_display_suffix;
     Format.fprintf ppf "%s%!"
       (if hide_cursor then Terminal.Ansi.show_cursor else "")
 end
