@@ -74,24 +74,45 @@ end
 module Ansi : sig
   val show_cursor : string
   val hide_cursor : string
-  val move_up : int Fmt.t
-  val move_down : int Fmt.t
+  val move_up : Format.formatter -> int -> unit
+  val move_down : Format.formatter -> int -> unit
   val erase_line : string
   val erase_display_suffix : string
 end
 
+module Size : sig
+  val sigwinch : int option
+  (** The number of the signal used to indicate terminal size changes. [None] on
+      Windows. *)
+
+  (** Functions for getting the size of the terminal to which [stdout] is
+      attached (provided [stdout] is a TTY). *)
+
+  type dimensions = { rows : int; columns : int }
+
+  val get_dimensions : unit -> dimensions option
+  val get_columns : unit -> int option
+  val get_rows : unit -> int option
+end
+
 val guess_printed_width : string -> int
+(** [guess_printed_width s] returns an estimate of the number of terminal
+    columns that the UTF-8 encoded string [s] would occupy if displayed in a
+    terminal, after stripping any ANSI escape codes in the string.
+
+    {b Note:}
+    {i this function uses a heuristic ({!Uucp.tty_width_hint}) to guess the
+       rendered length of supplied strings. This function is not guaranteed to
+       be correct on all UTF-8 codepoints. See the [Uucp] documentation for
+       details.} *)
+
 val truncate_to_width : int -> string -> string
+(** [truncate_to_width n s] is the longest prefix of UTF-8 encoded string [s]
+    that will fit within [n] columns when displayed in a terminal (without
+    including unbalanced ANSI control sequences after the [n]-th column).
 
-val sigwinch : int option
-(** The number of the signal used to indicate terminal size changes. [None] on
-    Windows. *)
-
-type dimensions = { rows : int; columns : int }
-(** Get the dimensions of the terminal *)
-
-val get_dimensions : unit -> dimensions option
-val get_columns : unit -> int option
+    As with {!guess_printed_width}, the implementation relies on heuristics and
+    so may not be accurate for all inputs (or for all terminal implementations).*)
 
 (*————————————————————————————————————————————————————————————————————————————
    Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>

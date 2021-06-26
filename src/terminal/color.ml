@@ -8,8 +8,9 @@ type plain =
 
 type t = Ansi of [ plain | `bright of plain ] | Rgb of int * int * int
 
-let pp_plain : plain Fmt.t =
-  Fmt.of_to_string (function
+let pp_plain ppf x =
+  Format.fprintf ppf
+    (match x with
     | `black -> "black"
     | `blue -> "blue"
     | `cyan -> "cyan"
@@ -20,15 +21,15 @@ let pp_plain : plain Fmt.t =
     | `yellow -> "yellow")
 
 let pp_dump ppf = function
-  | Rgb (r, g, b) -> Fmt.pf ppf "RGB (%d, %d, %d)" r g b
-  | Ansi (#plain as x) -> Fmt.pf ppf "ANSI (%a)" pp_plain x
-  | Ansi (`bright x) -> Fmt.pf ppf "ANSI (bright %a)" pp_plain x
+  | Rgb (r, g, b) -> Format.fprintf ppf "RGB (%d, %d, %d)" r g b
+  | Ansi (#plain as x) -> Format.fprintf ppf "ANSI (%a)" pp_plain x
+  | Ansi (`bright x) -> Format.fprintf ppf "ANSI (bright %a)" pp_plain x
 
 let ansi x = Ansi x
 
 let rgb =
   let invalid_component typ n =
-    Fmt.invalid_arg "Color.rgb: invalid %s component %d" typ n
+    Format.kasprintf invalid_arg "Color.rgb: invalid %s component %d" typ n
   in
   fun r g b ->
     if r < 0 || r > 255 then invalid_component "red" r;
@@ -38,13 +39,14 @@ let rgb =
 
 let hex =
   let invalid_length =
-    Fmt.invalid_arg "Color.hex: invalid hexstring length %d"
+    Format.kasprintf invalid_arg "Color.hex: invalid hexstring length %d"
   in
   let hex c =
     if c >= '0' && c <= '9' then Char.code c - Char.code '0'
     else if c >= 'a' && c <= 'f' then Char.code c - Char.code 'a' + 10
     else if c >= 'A' && c <= 'F' then Char.code c - Char.code 'A' + 10
-    else Fmt.invalid_arg "Color.hex: invalid hexstring character %c" c
+    else
+      Format.kasprintf invalid_arg "Color.hex: invalid hexstring character %c" c
   in
   fun s ->
     let len = String.length s in

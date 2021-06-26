@@ -6,7 +6,7 @@
 open! Import
 
 let malformed_string s =
-  Fmt.invalid_arg "Terminal.Ansi: malformed UTF-8 string: %S" s
+  Format.kasprintf invalid_arg "Terminal.Ansi: malformed UTF-8 string: %S" s
 
 module Length_counter = struct
   (* Counting length of UTF-8 strings while skipping ANSI escape sequences. See
@@ -70,6 +70,9 @@ let uchar_size u =
   | _ -> assert false
 
 let truncate_to_width width s =
+  if width < 0 then
+    Format.kasprintf invalid_arg
+      "Terminal.truncate_to_width: negative width %d requested" width;
   let count = Length_counter.empty () in
   let exception Exit of int in
   try
@@ -82,7 +85,7 @@ let truncate_to_width width s =
                  this would cause the open colour to leak. *)
               let display_reset = "\027[0m" in
               if
-                i + 4 < String.length s
+                i + 4 <= String.length s
                 && String.equal (String.sub s ~pos:i ~len:4) display_reset
               then raise (Exit (i + 4))
               else raise (Exit i)

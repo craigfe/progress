@@ -8,13 +8,13 @@ let latest_width = ref None
 
 let initialise =
   let handle_signal _ =
-    let width = Terminal.get_columns () in
+    let width = Terminal.Size.get_columns () in
     latest_width := width;
     !on_change width
   in
   lazy
-    (latest_width := Terminal.get_columns ();
-     match Terminal.sigwinch with
+    (latest_width := Terminal.Size.get_columns ();
+     match Terminal.Size.sigwinch with
      | None -> ()
      | Some n -> Sys.set_signal n (Signal_handle handle_signal))
 
