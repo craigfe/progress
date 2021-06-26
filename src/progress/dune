@@ -3,9 +3,7 @@
  (public_name progress)
  (libraries
   (re_export progress.engine)
-   mtime.clock.os
   (re_export terminal)
+  mtime.clock.os
   fmt
-  uutf
-  terminal_size
   unix))

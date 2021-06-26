@@ -20,10 +20,20 @@ progress bar formats. Supports rendering multiple progress bars simultaneously.\
   fmt
   (logs (>= 0.7.0))
   mtime
-  terminal_size
   uucp
   uutf
   vector
   (optint (>= 0.1.0))
   (alcotest (and :with-test (>= 1.4.0)))
   (astring :with-test)))
+
+(package
+ (name terminal)
+ (synopsis "Basic utilities for interacting with terminals")
+ (depends
+  uucp
+  uutf
+  (alcotest :with-test)
+  (fmt :with-test)
+  (astring :with-test)
+  (mtime :with-test)))
