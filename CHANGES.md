@@ -1,4 +1,4 @@
-### Unreleased
+### 0.2.0 (2021-06-26)
 
 Major update of the API, including a number of new features:
 
