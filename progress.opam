@@ -11,7 +11,8 @@ doc: "https://CraigFe.github.io/progress/"
 bug-reports: "https://github.com/CraigFe/progress/issues"
 depends: [
   "dune" {>= "2.7"}
-  "ocaml" {>= "4.08.0"}
+  "ocaml" {>= "4.03.0"}
+  "terminal" {= version}
   "fmt"
   "logs" {>= "0.7.0"}
   "mtime"

@@ -1,3 +1,4 @@
 (test
  (name test)
+ (package terminal)
  (libraries terminal alcotest fmt))

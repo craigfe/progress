@@ -1,3 +1,4 @@
 (test
  (name test)
+ (package progress)
  (libraries progress alcotest astring fmt mtime))
