@@ -17,6 +17,7 @@ progress bar formats. Supports rendering multiple progress bars simultaneously.\
  (documentation https://CraigFe.github.io/progress/)
  (depends
   (ocaml (>= 4.08.0))
+  (terminal (= :version))
   fmt
   (logs (>= 0.7.0))
   mtime
@@ -31,8 +32,10 @@ progress bar formats. Supports rendering multiple progress bars simultaneously.\
  (name terminal)
  (synopsis "Basic utilities for interacting with terminals")
  (depends
+  (ocaml (>= 4.03.0))
   uucp
   uutf
+  stdlib-shims
   (alcotest :with-test)
   (fmt :with-test)
   (astring :with-test)

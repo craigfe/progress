@@ -7,8 +7,10 @@ homepage: "https://github.com/CraigFe/progress"
 bug-reports: "https://github.com/CraigFe/progress/issues"
 depends: [
   "dune" {>= "2.7"}
+  "ocaml" {>= "4.03.0"}
   "uucp"
   "uutf"
+  "stdlib-shims"
   "alcotest" {with-test}
   "fmt" {with-test}
   "astring" {with-test}
