@@ -29,6 +29,7 @@ module type S = sig
       Line.S
         with type 'a t = 'a Line.t
          and type color := Color.t
+         and type duration := Duration.t
          and type 'a printer := 'a Printer.t
   end
 
@@ -63,7 +64,7 @@ module type S = sig
   (** {1 Rendering}
 
       Once you have a {{!description} description} of the progress bar to be
-      rendered (either a [Line.t] or a [Multi.t]), begin rendering it by using
+      rendered (either a {!Line.t} or a {!Multi.t}), begin rendering it by using
       {!with_reporter} or {!with_reporters} respectively. *)
 
   type 'a reporter := 'a -> unit
@@ -96,7 +97,9 @@ module type S = sig
           bar (in addition to the one by the terminal width). Defaults to
           [None].
 
-        - [min_interval]: the minimal *)
+        - [min_interval]: the minimum time interval between re-renders of the
+          progress bar display (i.e. a debounce threshold). Defaults to 1/60th
+          of a second. *)
 
     val ( || ) : t -> t -> t
     (** Merge two config values, with settings from the left taking priority.

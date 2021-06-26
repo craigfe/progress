@@ -7,6 +7,21 @@
     multiple bars at once. Start by {{!description} describing} of a sequence of
     progress bars, then begin {{!rendering} rendering} them.
 
+    {[
+      (** Description: "⠼️ [###########--------------------] 37/100" *)
+      let bar ~total =
+        let open Progress.Line in
+        list [ spinner (); bar total; count_to total ]
+
+      (** Rendering: get access to a function [f] for reporting progress. *)
+      let run () =
+        Progress.with_reporter (bar ~total:100) (fun f ->
+            for i = 1 to 100 do
+              (* ... do some work ... *)
+              f 1 (* report some progress *)
+            done)
+    ]}
+
     See {!Progress_engine} for an equivalent API that is portable to non-Unix
     platforms. *)
 

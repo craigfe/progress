@@ -15,8 +15,8 @@ module type Integer_dependent = sig
   (**)
   type 'a t
 
-  val count : ?pp:integer printer -> width:int -> unit -> integer t
-  val count_up_to : ?pp:integer printer -> ?sep:unit t -> integer -> integer t
+  val sum : ?pp:integer printer -> width:int -> unit -> integer t
+  val count_to : ?pp:integer printer -> ?sep:unit t -> integer -> integer t
   val bytes : integer t
   val bytes_per_sec : integer t
   val percentage_of : integer -> integer t
@@ -38,6 +38,7 @@ end
 module type DSL = sig
   type integer
   type color
+  type duration
   type 'a printer
 
   type 'a t
@@ -70,25 +71,21 @@ module type DSL = sig
       the end. *)
 
   val of_printer : ?init:'a -> 'a printer -> 'a t
-  (** [of_printer p] is a segment that renders the latest reported value using
-      printer [p]. See {!accumulator} *)
+  (** [of_printer p] is a segment that renders the {i latest} reported value
+      using printer [p]. See {!sum} for a variant that reports accumulated
+      values instead. *)
 
   (** {2:counting Counting segments}
 
       These segments all consume integer values and display the accumulated
-      total of all reported values in some way. The top-level [Line] segments
-      are specialised to [int] values; see "{!integers}" for variants supporting
+      total of reported values in some way. The top-level [Line] segments are
+      specialised to [int] values; see "{!integers}" for variants supporting
       [int32], [int64] etc. *)
 
-  val count : ?pp:integer printer -> width:int -> unit -> integer t
-  (** [count ~width ()] displays a running total of reported values using
-      [width]-many terminal columns. If passed, [pp] overrides the printer used
-      for rendering the count. *)
-
-  val count_up_to : ?pp:integer printer -> ?sep:unit t -> integer -> integer t
-  (** [count_up_to target] is like {!count}, but also renders the target total
-      after a given separator, i.e. [42/100]. [sep] defaults to [const "/"]. The
-      width of the segment is inferred by printing [total]. *)
+  val count_to : ?pp:integer printer -> ?sep:unit t -> integer -> integer t
+  (** [count_to target] renders both the current running total of reported
+      values and the fixed value [target], separated by the the given separator,
+      i.e. [42/100]. [sep] defaults to [const "/"]. *)
 
   val bytes : integer t
   (** Prints the running total as a number of bytes, using ISO/IEC binary
@@ -98,6 +95,11 @@ module type DSL = sig
   (** [percentage_of target] renders the running total as a percentage of
       [target], i.e. [42%]. Values outside the range [\[0, 100\]] will be
       clamped to either [0] or [100]. *)
+
+  val sum : ?pp:integer printer -> width:int -> unit -> integer t
+  (** [sum ~width ()] displays a running total of reported values using
+      [width]-many terminal columns. If passed, [pp] overrides the printer used
+      for rendering the count. *)
 
   (** {2:graphical Graphical segments} *)
 
@@ -187,34 +189,57 @@ module type DSL = sig
         progress bar. The UTF-8 encoding shows a higher resolution of progress,
         but may not be supported in all terminals. The default is [`ASCII].
 
+      - [?color] causes the filled portion of the bar to be rendered with the
+        given colour. (Equivalent to setting the colour with
+        {!Bar_style.with_color}.)
+
       - [?width] is the width of the bar in columns. Defaults to [`Expand],
         which causes the bar to occupy the remaining rendering space after
-        accounting for other line segments on the same line. *)
+        accounting for other line segments on the same line.
+
+      - [?data] changes the metric that is indicated by the progress bar. [`Sum]
+        (the default) causes the progress bar to correspond to the
+        {i running total} of values reported so far. [`Latest] causes each
+        reported value to overwrite the previous one instead. *)
 
   val spinner :
-       ?color:color
-    -> ?frames:string list
-    -> ?min_interval:Duration.t option
+       ?frames:string list
+    -> ?color:color
+    -> ?min_interval:duration option
     -> unit
     -> _ t
+  (** [spinner ()] is a small segment that cycles over a fixed number of frames
+      each time a value is reported. e.g.
 
-  val ticker : unit -> _ t
-  (** TODO: document. *)
+      {[
+        ⠋ → ⠙ → ⠹ → ⠸ → ⠼ → ⠴ → ⠦ → ⠧ → ⠇ → ⠏ → ...
+      ]}
 
-  val ticker_up_to : ?sep:unit t -> integer -> _ t
-  (** TODO: document. *)
+      Optional prameters are as follows:
+
+      - [?frames] alters the sequence of frames rendered by the spinner;
+      - [?color] causes each frame to be rendered with the given colour;
+      - [?min_interval] is the minimum time interval between frame transitions
+        of the spinner (i.e. a debounce threshold). The default is [Some 80ms]. *)
 
   (** {2:time Time-sensitive segments} *)
 
   val bytes_per_sec : integer t
-  val rate : float printer -> integer t
+  (** [bytes_per_sec] renders the rate of change of the running total as a
+      number of bytes per second, using ISO/IEC binary prefixes (e.g.
+      [10.4 MiB/s]). *)
 
-  val elapsed : ?pp:Duration.t printer -> unit -> _ t
+  val elapsed : ?pp:duration printer -> unit -> _ t
   (** Displays the time for which the bar has been rendering in [MM:SS] form. *)
 
   val eta : integer -> integer t
   (** Displays an estimate of the remaining time until [total] is accumulated by
       the reporters, in [MM:SS] form. *)
+
+  val rate : float printer -> integer t
+  (** [rate pp] is an integer segment that uses [pp] to print the {i rate} of
+      reported values per second. (For instance, [bytes_per_sec] is
+      [rate Units.Bytes.of_float].)*)
 
   (** {1:combinators Combining segments} *)
 
@@ -251,6 +276,13 @@ module type DSL = sig
   (** A zero-width line segment that does nothing. This segment will not be
       surrounded with separators when used in a {!list}, making it a useful
       "off" state for conditionally-enabled segments. *)
+
+  val spacer : int -> _ t
+  (** [spacer n] is [const (String.make n ' ')]. *)
+
+  val ticker_to : ?sep:unit t -> integer -> _ t
+  (** [ticker_to total] is [using ~f:(fun _ -> 1) (counter_to total)]. i.e. it
+      renders the total {i number} of reported values of some arbitrary type. *)
 end
 
 module Assert_subtype (X : DSL) :
@@ -267,7 +299,7 @@ module type S = sig
       simplicity (and performance), but certain use-cases may require different
       types (e.g. for file transfers greater than [2 GiB] on 32-bit platforms).
       The following modules re-export the [Line] DSL with different integer
-      speciialisations, and are intended to be opened locally, e.g.
+      specialisations, and are intended to be opened locally, e.g.
 
       {[
         let my_line =
@@ -292,6 +324,7 @@ module type S = sig
       DSL
         with type 'a t := 'a t
          and type color := color
+         and type duration := duration
          and type 'a printer := 'a printer
          and type Bar_style.t := Bar_style.t
   end
@@ -303,25 +336,27 @@ module type S = sig
 
   (** {1:examples Examples}
 
-      - A
-
       {[
-        [##################################################################] 100/100
-      ]}
-      {[ (* Described by: *) const " " ++ count ~up_to:100 ]}
-      - An progress bar for a file download:
-
-      {[
-        ⠏ [01:04] [######---------------------------------------]  293.9 MiB (eta: 07:12)
+        (* Renders: "[######---------------------------------------]  14/100" *)
+        bar 100 ++ const " " ++ count_to 100
       ]}
       {[
-        (* Described by: *)
+        (* Renders: "⠏ [01:04] [####-----------------]  293.9 MiB (eta: 07:12)" *)
         list
           [ spinner ()
           ; brackets (elapsed ())
           ; bar total
           ; bytes
           ; parens (const "eta: " ++ eta total)
+          ]
+      ]}
+      {[
+        (* Renders: "  a.txt │██████████████████████████▋   │   91.4 MiB/s  92%" *)
+        list
+          [ lpad 7 (const file_name)
+          ; bar ~style:`UTF8 total
+          ; bytes_per_sec
+          ; percentage_of total
           ]
       ]}
 
@@ -362,6 +397,7 @@ module type Line = sig
       S
         with type 'a t := 'a t
          and type color := Terminal.Color.t
+         and type duration := Duration.t
          and type 'a printer := 'a Printer.t
 
     val to_primitive : Config.t -> 'a t -> 'a Internals.t

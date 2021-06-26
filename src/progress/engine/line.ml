@@ -114,6 +114,8 @@ module Integer_independent (Platform : Platform.S) = struct
     in
     Basic segment
 
+  let spacer n = const (String.make n ' ')
+
   (* Like [Format.str_formatter], but with [Fmt] set to use [`Ansi_tty] style rendering. *)
   let str_formatter_buf, str_formatter =
     let buf = Buffer.create 0 in
@@ -162,27 +164,6 @@ module Integer_independent (Platform : Platform.S) = struct
 
   let lpad sz t = Map (Primitives.box_fixed ~pad:`left sz, t)
   let rpad sz t = Map (Primitives.box_fixed ~pad:`right sz, t)
-
-  let ticker () =
-    let segment =
-      let pp ~width buf _ count =
-        let width = width () in
-        let pp =
-          Staged.prj
-          @@ Printer.Internals.to_line_printer
-               (Printer.Internals.integer ~width (module Int63))
-        in
-        pp buf count;
-        width
-      in
-      Primitives.alpha_unsized ~initial:(`Val Int63.zero) pp
-    in
-    Contramap
-      ( Acc
-          { segment = Primitives.contramap ~f:Acc.accumulator segment
-          ; elt = (module Integer.Int63)
-          }
-      , fun _ -> Int63.one )
 
   (* Spinners *)
 
@@ -248,7 +229,7 @@ module Integer_independent (Platform : Platform.S) = struct
     let stage_count t = Array.length t.frames
   end
 
-  let spinner ?color ?frames ?(min_interval = Some (Duration.of_int_ms 80)) () =
+  let spinner ?frames ?color ?(min_interval = Some (Duration.of_int_ms 80)) () =
     let spinner =
       match frames with
       | None -> Spinner.default
@@ -299,7 +280,6 @@ module Bar_style = struct
     ; color_empty : Terminal.Color.t option
     ; total_delimiter_width : int
     ; segment_width : int
-          (* TODO: test that segment widths other than 1 are supported *)
     }
 
   let ascii =
@@ -458,6 +438,7 @@ module Make (Platform : Platform.S) = struct
       DSL
         with type 'a t := 'a t
          and type color := Terminal.Color.t
+         and type duration := Duration.t
          and type 'a printer := 'a Printer.t
          and type Bar_style.t := Bar_style.t
 
@@ -495,7 +476,7 @@ module Make (Platform : Platform.S) = struct
         in
         count_pp printer
 
-      let count ?pp ~width () =
+      let sum ?pp ~width () =
         let pp =
           match pp with
           | None -> Printer.Internals.integer ~width (module Integer)
@@ -507,16 +488,16 @@ module Make (Platform : Platform.S) = struct
         @@ Primitives.alpha ~initial:(`Val Integer.zero) ~width (fun buf _ x ->
                pp buf x)
 
-      let count_up_to ?pp ?(sep = const "/") total =
+      let count_to ?pp ?(sep = const "/") total =
         let total = Integer.to_string total in
         let width =
           match pp with
           | Some pp -> Printer.print_width pp
           | None -> String.length total
         in
-        List [ count ~width (); using (fun _ -> ()) sep; const total ]
+        List [ sum ~width (); using (fun _ -> ()) sep; const total ]
 
-      let ticker_up_to ?(sep = const "/") total =
+      let ticker_to ?(sep = const "/") total =
         let total = Integer.to_string total in
         let width = String.length total in
         let pp =
@@ -546,12 +527,14 @@ module Make (Platform : Platform.S) = struct
       let bar (spec : Bar_style.t) width proportion buf =
         let final_stage = Array.length spec.in_progress_stages in
         let width = width () in
-        let bar_width = width - spec.total_delimiter_width in
-        let squaresf = Float.of_int bar_width *. proportion in
+        let bar_segments =
+          (width - spec.total_delimiter_width) / spec.segment_width
+        in
+        let squaresf = Float.of_int bar_segments *. proportion in
         let squares = Float.to_int squaresf in
-        let filled = min squares bar_width in
+        let filled = min squares bar_segments in
         let not_filled =
-          bar_width - filled - if final_stage = 0 then 0 else 1
+          bar_segments - filled - if final_stage = 0 then 0 else 1
         in
         Option.iter (fun (x, _) -> Line_buffer.add_string buf x) spec.delimiters;
         with_color_opt spec.color buf (fun () ->
@@ -559,7 +542,7 @@ module Make (Platform : Platform.S) = struct
               Line_buffer.add_string buf spec.full_space
             done);
         let () =
-          if filled <> bar_width then (
+          if filled <> bar_segments then (
             let chunks = Float.to_int (squaresf *. Float.of_int final_stage) in
             let index = chunks - (filled * final_stage) in
             if index >= 0 && index < final_stage then
