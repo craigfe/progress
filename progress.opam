@@ -15,7 +15,7 @@ depends: [
   "terminal" {= version}
   "fmt"
   "logs" {>= "0.7.0"}
-  "mtime"
+  "mtime" {>= "1.1.0"}
   "uucp"
   "uutf"
   "vector"
