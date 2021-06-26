@@ -577,27 +577,15 @@ module Make (Platform : Platform.S) = struct
       let with_prop f v t = match v with None -> t | Some v -> f v t
 
       let bar ~style ~color =
-        match style with
-        | `ASCII -> bar (Bar_style.ascii |> with_prop Bar_style.with_color color)
-        | `UTF8 -> bar (Bar_style.utf8 |> with_prop Bar_style.with_color color)
-        | `Custom style -> bar style
+        let style =
+          match style with
+          | `ASCII -> Bar_style.ascii
+          | `UTF8 -> Bar_style.utf8
+          | `Custom style -> style
+        in
+        bar (style |> with_prop Bar_style.with_color color)
 
-      (* TODO: fix duplication with below *)
-      let bar_unaccumulated ?(style = `ASCII) ?color ?(width = `Expand) total =
-        let proportion x = Integer.to_float x /. Integer.to_float total in
-        Basic
-          (Primitives.contramap ~f:proportion
-          @@
-          match width with
-          | `Fixed width ->
-              if width < 3 then failwith "Not enough space for a progress bar";
-              Primitives.alpha ~width ~initial:(`Val 0.) (fun buf _ x ->
-                  ignore (bar ~style ~color (fun _ -> width) x buf : int))
-          | `Expand ->
-              Primitives.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf _ x ->
-                  bar ~style ~color width x ppf))
-
-      let bar ?(style = `ASCII) ?color ?(width = `Expand) total =
+      let bar ?(style = `ASCII) ?color ?(width = `Expand) ?(data = `Sum) total =
         let proportion x = Integer.to_float x /. Integer.to_float total in
         let proportion_segment =
           match width with
@@ -609,9 +597,13 @@ module Make (Platform : Platform.S) = struct
               Primitives.alpha_unsized ~initial:(`Val 0.) (fun ~width ppf _ x ->
                   bar ~style ~color width x ppf)
         in
-        acc
-          (Primitives.contramap proportion_segment
-             ~f:(Acc.accumulator >> proportion))
+        match data with
+        | `Latest ->
+            Basic (Primitives.contramap proportion_segment ~f:proportion)
+        | `Sum ->
+            acc
+              (Primitives.contramap proportion_segment
+                 ~f:(Acc.accumulator >> proportion))
 
       let rate pp_val =
         let pp_rate =

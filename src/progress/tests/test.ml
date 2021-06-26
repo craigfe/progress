@@ -39,7 +39,7 @@ let test_pair () =
 let test_unicode_bar () =
   let () =
     let@ report =
-      Progress.Line.Using_float.bar_unaccumulated ~style:`UTF8 ~width:(`Fixed 3)
+      Progress.Line.Using_float.bar ~data:`Latest ~style:`UTF8 ~width:(`Fixed 3)
         1.
       |> Progress.with_reporter ~config
     in
@@ -72,7 +72,7 @@ let test_unicode_bar () =
   clear_test_state ();
   let () =
     let@ report =
-      Progress.Line.Using_float.bar_unaccumulated ~style:`UTF8 ~width:(`Fixed 5)
+      Progress.Line.Using_float.bar ~data:`Latest ~style:`UTF8 ~width:(`Fixed 5)
         1.
       |> Progress.with_reporter ~config
     in

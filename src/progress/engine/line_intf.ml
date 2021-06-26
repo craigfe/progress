@@ -29,13 +29,7 @@ module type Integer_dependent = sig
        ?style:bar_style
     -> ?color:color
     -> ?width:[ `Fixed of int | `Expand ]
-    -> integer
-    -> integer t
-
-  val bar_unaccumulated :
-       ?style:bar_style
-    -> ?color:color
-    -> ?width:[ `Fixed of int | `Expand ]
+    -> ?data:[ `Sum | `Latest ]
     -> integer
     -> integer t
 end
@@ -180,6 +174,7 @@ module type DSL = sig
        ?style:[ `ASCII | `UTF8 | `Custom of Bar_style.t ]
     -> ?color:color
     -> ?width:[ `Fixed of int | `Expand ]
+    -> ?data:[ `Sum | `Latest ]
     -> integer
     -> integer t
   (** [bar total] is a progress bar of the form:
@@ -220,14 +215,6 @@ module type DSL = sig
   val eta : integer -> integer t
   (** Displays an estimate of the remaining time until [total] is accumulated by
       the reporters, in [MM:SS] form. *)
-
-  val bar_unaccumulated :
-       ?style:[ `ASCII | `UTF8 | `Custom of Bar_style.t ]
-    -> ?color:color
-    -> ?width:[ `Fixed of int | `Expand ]
-    -> integer
-    -> integer t
-  (** TODO: better distinction here *)
 
   (** {1:combinators Combining segments} *)
 
