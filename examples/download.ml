@@ -39,8 +39,9 @@ let run () =
 
   let bottom_line =
     Line.(
-      lpad 8 (ticker ())
-      ++ constf " / %d files downloaded, elapsed: " total_files
+      spacer 4
+      ++ ticker_to ~sep:(const " / ") total_files
+      ++ const " files downloaded, elapsed: "
       ++ elapsed ())
   in
   let display =

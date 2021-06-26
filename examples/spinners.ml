@@ -1,5 +1,5 @@
 open Progress
-module Ansi = Internals.Ansi
+module Ansi = Terminal.Style
 
 let apply_color color s = Ansi.(code color) ^ s ^ Ansi.(code none)
 

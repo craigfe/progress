@@ -6,7 +6,11 @@ let[@ocamlformat "disable"] bar_styles =
   [ ("ASCII"    , ascii |> with_color (ansi `cyan) |> with_empty_color (ansi `blue))
   ; ("arrow"    , v ~delims:brackets ~color:(ansi `red) [ "="; ">"; " " ])
   ; ("dots"     , v ~delims:brackets ~color:(ansi `magenta) [ "." ])
-  ; ("digits"   , v ~delims:brackets [ "9"; "8"; "7"; "6"; "5"; "4"; "3"; "2"; "1"; "0"])
+  ; ("digits1"  , v ~delims:brackets (List.init 10 @@ fun i -> string_of_int (9 - i)))
+  ; ("digits2"  , v ~delims:brackets (List.concat @@
+                                      List.init 10 @@ fun i ->
+                                      List.init 10 @@ fun j ->
+                                      Printf.sprintf "«%d%d»" (9 - i) (9 - j)))
   ; ("UTF8"     , utf8 |> with_color (ansi `green))
   ; ("rough bar", v ~delims:bars ~color:(hex "#DC2F02") [ "█"; " " ])
   ; ("fine bar" , v ~delims:bars ~color:(hex "#E85D04") [ "█"; "▉"; "▊"; "▋"; "▌"; "▍"; "▎"; "▏"; " " ] )
@@ -26,7 +30,7 @@ let layout =
   Progress.Multi.(blank ++ lines bars ++ blank)
 
 let run () =
-  Progress.with_reporters ~config:(Progress.Config.v ~max_width:(Some 50) ())
+  Progress.with_reporters ~config:(Progress.Config.v ~max_width:(Some 51) ())
     layout (fun reporters ->
       for _ = 0 to 1000 do
         List.iter (fun f -> f 1) reporters;

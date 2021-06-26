@@ -49,7 +49,7 @@ let bar =
            (bar
               ~style:(`Custom (Bar_style.v [ "="; ">"; " " ]))
               ~width:(`Fixed 57) total))
-    ; using fst (count_up_to total) (* TODO: provide ticker_up_to *)
+    ; ticker_to total
     ; using snd string
     ]
 
