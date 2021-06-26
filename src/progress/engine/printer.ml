@@ -5,8 +5,6 @@
 
 open! Import
 
-(** TODO: keep distinction between display columns and string length. *)
-
 external unsafe_blit_string : string -> int -> bytes -> int -> int -> unit
   = "caml_blit_string"
   [@@noalloc]
@@ -15,18 +13,18 @@ external unsafe_blit_string : string -> int -> bytes -> int -> int -> unit
 type 'a t =
   { write : 'a -> into:bytes -> pos:int -> unit
   ; write_len : int
+  ; width : int
   ; to_string : 'a -> string
   ; pp : 'a pp
   }
 
-let create ?pp ~to_string ~string_len () =
+let create ?width ?pp ~to_string ~string_len () =
   let write x ~into ~pos =
     unsafe_blit_string (to_string x) 0 into pos string_len
   in
+  let width = match width with None -> string_len | Some width -> width in
   let pp = match pp with None -> Fmt.of_to_string to_string | Some pp -> pp in
-  { write; write_len = string_len; to_string; pp }
-
-(** TODO: handle overflows *)
+  { write; write_len = string_len; width; to_string; pp }
 
 let integer (type a) ~width (module Integer : Integer.S with type t = a) : a t =
   let to_string x =
@@ -68,17 +66,17 @@ let string ~width =
 
 let to_pp { pp; _ } = pp
 
-let using ~f { write; write_len; to_string; pp } =
+let using ~f { write; write_len; to_string; pp; width } =
   let write x ~into ~pos = write (f x) ~into ~pos in
   let pp = Fmt.using f pp in
   let to_string x = to_string (f x) in
-  { write; write_len; to_string; pp }
+  { write; write_len; to_string; pp; width }
 
 let to_line_printer { write; write_len; _ } =
   Line_buffer.lift_write ~len:write_len ~write
 
 let to_to_string { to_string; _ } = to_string
-let print_width { write_len; _ } = write_len
+let print_width { width; _ } = width
 
 module Internals = struct
   let integer = integer

@@ -11,8 +11,8 @@ type -'a t
     {i rendered} length in terminals (i.e. after accounting for UTF-8 encoding
     and ANSI escapes).
 
-    Most users don't need this module, and can use the pre-provided {!Line}
-    segments and {!Units} printers. *)
+    {b Most users don't need this module, and can use the pre-provided {!Line}
+       segments and {!Units} printers directly.} *)
 
 (** {1 Constructing printers} *)
 
@@ -36,14 +36,27 @@ val string : width:int -> string t
     {b Note:}
     {i this printer uses a heuristic function ({!Uucp.tty_width_hint}) to guess
        the rendered length of supplied strings. This function is not guaranteed
-       to be correct on all UTF08 codepoints, and so certain "unusual" string
+       to be correct on all UTF-8 codepoints, and so certain "unusual" string
        inputs can cause progress bar rendering to go awry.} *)
 
 val using : f:('b -> 'a) -> 'a t -> 'b t
 (** [using ~f t] prints values [v] by passing [f v] to the printer [t]. *)
 
 val create :
-  ?pp:'a pp -> to_string:('a -> string) -> string_len:int -> unit -> 'a t
+     ?width:int
+  -> ?pp:'a pp
+  -> to_string:('a -> string)
+  -> string_len:int
+  -> unit
+  -> 'a t
+(** [create ~to_string ~string_len ()] is a printer that uses [to_string] to
+    render values in [string_len]-many bytes.
+
+    The rendered width of the output (when displayed in a terminal) is assumed
+    to also be [string_len] (i.e. the output string is assumed to be ASCII), but
+    this can be assumption can be overridden by passing an explicit [~width]
+    (e.g. if the printer emits non-ASCII UTF-8 characters or ANSI escape
+    sequences). *)
 
 (** {1 Consuming printers} *)
 
