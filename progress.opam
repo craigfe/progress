@@ -6,16 +6,17 @@ A progress bar library for OCaml, featuring a DSL for declaratively specifying
 progress bar formats. Supports rendering multiple progress bars simultaneously."""
 maintainer: ["Craig Ferguson <me@craigfe.io>"]
 authors: ["Craig Ferguson <me@craigfe.io>"]
+license: "MIT"
 homepage: "https://github.com/CraigFe/progress"
 doc: "https://CraigFe.github.io/progress/"
 bug-reports: "https://github.com/CraigFe/progress/issues"
 depends: [
   "dune" {>= "2.7"}
-  "ocaml" {>= "4.03.0"}
+  "ocaml" {>= "4.08.0"}
   "terminal" {= version}
-  "fmt"
+  "fmt" {>= "0.8.4"}
   "logs" {>= "0.7.0"}
-  "mtime"
+  "mtime" {>= "1.1.0"}
   "uucp"
   "uutf"
   "vector"

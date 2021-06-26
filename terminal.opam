@@ -3,18 +3,19 @@ opam-version: "2.0"
 synopsis: "Basic utilities for interacting with terminals"
 maintainer: ["Craig Ferguson <me@craigfe.io>"]
 authors: ["Craig Ferguson <me@craigfe.io>"]
+license: "MIT"
 homepage: "https://github.com/CraigFe/progress"
 bug-reports: "https://github.com/CraigFe/progress/issues"
 depends: [
   "dune" {>= "2.7"}
   "ocaml" {>= "4.03.0"}
-  "uucp"
+  "uucp" {>= "1.1.0"}
   "uutf"
   "stdlib-shims"
-  "alcotest" {with-test}
+  "alcotest" {with-test & >= "1.4.0"}
   "fmt" {with-test}
   "astring" {with-test}
-  "mtime" {with-test}
+  "mtime" {with-test & >= "1.1.0"}
   "odoc" {with-doc}
 ]
 build: [

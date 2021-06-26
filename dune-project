@@ -1,9 +1,10 @@
-(lang dune 2.7.1)
+(lang dune 2.7)
 (name progress)
 (implicit_transitive_deps false)
 
 (generate_opam_files true)
 (source (github CraigFe/progress))
+(license MIT)
 (maintainers "Craig Ferguson <me@craigfe.io>")
 (authors "Craig Ferguson <me@craigfe.io>")
 
@@ -18,9 +19,9 @@ progress bar formats. Supports rendering multiple progress bars simultaneously.\
  (depends
   (ocaml (>= 4.08.0))
   (terminal (= :version))
-  fmt
+  (fmt (>= 0.8.4))
   (logs (>= 0.7.0))
-  mtime
+  (mtime (>= 1.1.0))
   uucp
   uutf
   vector
@@ -33,10 +34,10 @@ progress bar formats. Supports rendering multiple progress bars simultaneously.\
  (synopsis "Basic utilities for interacting with terminals")
  (depends
   (ocaml (>= 4.03.0))
-  uucp
+  (uucp (>= 1.1.0))
   uutf
   stdlib-shims
-  (alcotest :with-test)
+  (alcotest (and :with-test (>= 1.4.0)))
   (fmt :with-test)
   (astring :with-test)
-  (mtime :with-test)))
+  (mtime (and :with-test (>= 1.1.0)))))
