@@ -6,7 +6,7 @@ let ( let@ ) f x = f x
 
 let config =
   Progress.Config.v ~ppf:Format.str_formatter ~hide_cursor:false
-    ~persistent:true ~min_interval:None ()
+    ~persistent:true ~max_width:(Some 50) ~min_interval:None ()
 
 let read_bar () =
   Format.flush_str_formatter ()
@@ -144,6 +144,23 @@ let test_progress_bar_width () =
   Alcotest.check_raises "Overly small progress bar"
     (Failure "Not enough space for a progress bar") (fun () -> check_width 2)
 
+let test_preprovided_counter () =
+  let pp = Progress.Printer.(using ~f:Int64.to_int (int ~width:3)) in
+  let@ report = Progress.counter ~pp 999L |> Progress.with_reporter ~config in
+  check_bar ~__POS__ "  0 00:00 [---------------------------------]   0%";
+  report 1L;
+  check_bar ~__POS__ "  1 00:00 [---------------------------------]   0%";
+  report 1L;
+  check_bar ~__POS__ "  2 00:00 [---------------------------------]   0%";
+  report 10L;
+  check_bar ~__POS__ " 12 00:00 [---------------------------------]   1%";
+  report 100L;
+  check_bar ~__POS__ "112 00:00 [###------------------------------]  11%";
+  report 886L;
+  check_bar ~__POS__ "998 00:00 [################################-]  99%";
+  report 1L;
+  check_bar ~__POS__ "999 00:00 [#################################] 100%"
+
 module Boxes = struct
   let unsized =
     Progress.Line.Internals.alpha_unsized ~initial:(`Val ())
@@ -176,6 +193,7 @@ let () =
         ; test_case "Unicode bar" `Quick test_unicode_bar
         ; test_case "Progress bar lifecycle" `Quick test_progress_bar_lifecycle
         ; test_case "Progress bar width" `Quick test_progress_bar_width
+        ; test_case "Pre-provided counter" `Quick test_preprovided_counter
         ] )
     ; ( "boxes"
       , [ test_case "Unsized element not in box" `Quick
