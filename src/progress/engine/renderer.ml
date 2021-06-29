@@ -373,15 +373,17 @@ module Make (Platform : Platform.S) = struct
         (at_exit cleanup;
          Platform.Terminal_width.set_changed_callback handle_width_change)
 
+    let signals =
+      let open Sys in
+      [ sigint; sigterm; sigsegv ] @ if win32 then [] else [ sigquit ]
+
     let set_active_exn display =
       if is_active () then
         failwith "Can't run more than one progress bar renderer simultaneously";
 
       Lazy.force init_handlers;
 
-      ListLabels.iter
-        Sys.[ sigint; sigquit; sigterm; sigsegv ]
-        ~f:(fun code ->
+      ListLabels.iter signals ~f:(fun code ->
           let prev_handler = Sys.signal code (Signal_handle handle_signal) in
           (* Until the previous signal is added to the hashtable, there's a short
              period of time in which the {i previous} signal handler might be
