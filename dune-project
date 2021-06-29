@@ -19,11 +19,11 @@ progress bar formats. Supports rendering multiple progress bars simultaneously.\
  (depends
   (ocaml (>= 4.08.0))
   (terminal (= :version))
-  (fmt (>= 0.8.4))
+  (fmt (>= 0.8.5))
   (logs (>= 0.7.0))
   (mtime (>= 1.1.0))
-  uucp
-  uutf
+  (uucp (>= 2.0.0))
+  (uutf (>= 1.0.0))
   vector
   (optint (>= 0.1.0))
   (alcotest (and :with-test (>= 1.4.0)))
@@ -36,8 +36,8 @@ progress bar formats. Supports rendering multiple progress bars simultaneously.\
  (documentation https://CraigFe.github.io/progress/)
  (depends
   (ocaml (>= 4.03.0))
-  (uucp (>= 1.1.0))
-  uutf
+  (uucp (>= 2.0.0))
+  (uutf (>= 1.0.0))
   stdlib-shims
   (alcotest (and :with-test (>= 1.4.0)))
   (fmt :with-test)
