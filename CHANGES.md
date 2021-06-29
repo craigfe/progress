@@ -1,3 +1,12 @@
+### 0.2.1 (2021-06-29)
+
+- Fix the count segment of `Progress.counter` (when `pp` is passed) to show the
+  running total rather than the latest reported value. (#19; @CraigFe, report
+  by @Ngoguey42)
+- Fix `Terminal` stubs on MacOS. (#13; @CraigFe, report by @Ngoguey42)
+- Fix package tests on Windows. `Progress` does not yet support the Windows and
+  Cygwin terminals; this is tracked by #16. (#15; @emillon)
+
 ### 0.2.0 (2021-06-26)
 
 Major update of the API, including a number of new features:
