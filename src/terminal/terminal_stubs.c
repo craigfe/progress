@@ -10,7 +10,7 @@
 
 // Detect platform
 #if defined(_WIN32) || defined (_WIN64)
-#define OCAML_ALCOTEST_WINDOWS
+#define OCAML_TERMINAL_WINDOWS
 #elif defined(__unix__) || defined(__unix)
 #include <unistd.h>
 #if defined(_POSIX_VERSION)
