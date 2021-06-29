@@ -7,6 +7,6 @@ docs:
 	dune build @doc
 	cp -fr docs/{odoc.css,fonts} _build/default/_doc/_html
 
-.PHONY: download-example
+.PHONY: example
 example:
 	@dune exec examples/main.exe -- $(name)
