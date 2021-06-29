@@ -31,6 +31,8 @@ let () =
   Fmt.set_style_renderer Fmt.stderr `Ansi_tty;
   match Sys.argv with
   | [| _ |] | [| _; "-h" | "-help" | "--help" |] -> usage ()
+  | [| _; "--list" |] ->
+      ListLabels.iter ~f:(fun (name, _, _) -> print_endline name) examples
   | [| _; name |] -> (
       match
         List.find_opt

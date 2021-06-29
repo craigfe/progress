@@ -10,3 +10,10 @@ docs:
 .PHONY: example
 example:
 	@dune exec examples/main.exe -- $(name)
+
+.PHONY: examples
+examples:
+	@for example in $(shell dune exec -- examples/main.exe --list); do \
+     echo "*** $$example"; \
+     dune exec -- examples/main.exe $$example; \
+   done
