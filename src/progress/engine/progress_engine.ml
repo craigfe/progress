@@ -42,7 +42,7 @@ module Make (Platform : Platform) = struct
     let open Line.Using_int64 in
     list
       [ map_option message ~f:const
-      ; map_option pp ~f:of_printer
+      ; map_option pp ~f:(fun pp -> sum ~pp ~width:(Printer.print_width pp) ())
       ; elapsed ()
       ; bar ~style total
       ; percentage_of total
