@@ -122,6 +122,7 @@ module Display : sig
 
   (* Bar-specific functions *)
   val add_line : ?above:int -> t -> _ Bar_renderer.t -> unit
+  val remove_line : t -> Bar_id.t -> unit
   val rerender_line : t -> Bar_id.t -> Bar_renderer.contents -> unit
   val finalise_line : t -> Bar_id.t -> unit
 end = struct
@@ -131,7 +132,7 @@ end = struct
     | E :
         { renderer : _ Bar_renderer.t
         ; mutable latest_width : int
-        ; mutable position : int
+        ; position : int ref
         }
         -> some_bar
 
@@ -139,6 +140,7 @@ end = struct
     { config : Config.t
     ; uid : Unique_id.t
     ; bars : (Bar_id.t, some_bar) Hashtbl.t
+    ; positions : (Bar_id.t, int ref option) Hashtbl.t
     ; rows : some_bar option Vector.t
     }
 
@@ -149,7 +151,8 @@ end = struct
     let rows =
       let f i = function
         | None -> None
-        | Some renderer -> Some (E { renderer; latest_width = 0; position = i })
+        | Some renderer ->
+            Some (E { renderer; latest_width = 0; position = ref i })
       in
       Bar_list.mapi bars ~f:{ f } |> Vector.of_list ~dummy:None
     in
@@ -159,8 +162,10 @@ end = struct
       ~f:
         (Option.iter (fun (E { renderer; _ } as t) ->
              Hashtbl.add bars ~key:(Bar_renderer.id renderer) ~data:t));
-
-    { config; uid; bars; rows }
+    let positions = Hashtbl.create bar_count in
+    Hashtbl.iter bars ~f:(fun ~key ~data:(E { position; _ }) ->
+        Hashtbl.add positions ~key ~data:(Some position));
+    { config; uid; bars; positions; rows }
 
   let uid { uid; _ } = uid
 
@@ -223,7 +228,9 @@ end = struct
     match data with
     | `Clean _ -> ()
     | `Dirty data ->
-        let distance_from_base = Vector.length rows - bar.position - 1 in
+        let distance_from_base =
+          Vector.length rows - bar.position.contents - 1
+        in
 
         (* NOTE: we add an initial carriage return to avoid overflowing the line if
            the user has typed into the terminal between renders. *)
@@ -239,13 +246,15 @@ end = struct
 
   let add_line ?(above = 0) t renderer =
     let position = Vector.length t.rows - above in
+    let position_ref = ref position in
     let key = Bar_renderer.id renderer in
-    let bar = E { renderer; latest_width = 0; position } in
+    let bar = E { renderer; latest_width = 0; position = position_ref } in
     Hashtbl.add t.bars ~key ~data:bar;
+    Hashtbl.add t.positions ~key ~data:(Some position_ref);
 
     Vector.insert t.rows position (Some bar);
     Vector.iteri_from (position + 1) t.rows ~f:(fun i -> function
-      | None -> () | Some (E bar) -> bar.position <- i);
+      | None -> () | Some (E bar) -> bar.position.contents <- i);
 
     (* The cursor is now one line above the bottom. Move to the correct starting
        position for a re-render of the affected suffix of the display. *)
@@ -253,6 +262,26 @@ end = struct
     Terminal.Ansi.move_up t.config.ppf above;
     rerender_all_from_top ~stage:`update ~starting_at:position
       ~unconditional:true t
+
+  let remove_line t key =
+    let exception Line_not_found in
+    match Hashtbl.find t.positions key with
+    | exception Not_found -> raise Line_not_found
+    | None -> () (* Already removed *)
+    | Some { contents = position } ->
+        if Hashtbl.mem t.bars key then Hashtbl.remove t.bars key;
+        Hashtbl.add t.positions ~key ~data:None;
+        Vector.remove t.rows position;
+        Vector.iteri_from position t.rows ~f:(fun i -> function
+          | None -> () | Some (E bar) -> bar.position.contents <- i);
+
+        (* The cursor is now one line below the bottom. Move to the correct starting
+           position for a re-render of the affected suffix of the display. *)
+        Format.pp_print_string t.config.ppf Terminal.Ansi.erase_display_suffix;
+        Terminal.Ansi.move_up t.config.ppf 1;
+        Terminal.Ansi.move_up t.config.ppf (Vector.length t.rows - position - 1);
+        rerender_all_from_top ~stage:`update ~starting_at:position
+          ~unconditional:true t
 
   let ceil_div x y = (x + y - 1) / y
 
@@ -509,6 +538,12 @@ module Make (Platform : Platform.S) = struct
           let report = reporter_of_bar d bar in
           let update = updater_of_bar d bar in
           { display = Display.uid d; uid; report; update }
+
+    let remove_line t (reporter : _ Reporter.t) =
+      match Global.find_display t.uid with
+      | Error `finalised ->
+          failwith "Cannot remove a line to a finalised display"
+      | Ok d -> Display.remove_line d reporter.uid
 
     let finalise t =
       match Global.find_display t.uid with

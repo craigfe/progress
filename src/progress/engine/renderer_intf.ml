@@ -154,6 +154,11 @@ module type S = sig
         ([above = 0]); the [~above] argument can be passed to add the line above
         some number of existing lines. *)
 
+    val remove_line : (_, _) t -> _ Reporter.t -> unit
+    (** Remove a line to an ongoing display, from its reporting function.
+        Removing an existing line is idempotent, but removing a line that was
+        not at point point part of the display will raise an error. *)
+
     val finalise : (_, _) t -> unit
     (** Terminate the given progress bar display. Raises [Failure] if the
         display has already been finalised. *)
