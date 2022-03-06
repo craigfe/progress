@@ -34,6 +34,13 @@ end
 type t = { mutable active_workers : Worker.t list; mutable files : int list }
 
 let run () =
+  let remove_lines =
+    (* Run with [REMOVE_LINES=true] to see bars being removed from the
+       display after the download is done. *)
+    match Sys.getenv_opt "REMOVE_LINES" with
+    | None | Some "false" -> false
+    | Some _ -> true
+  in
   let total_files = 18 in
   let files = List.init total_files (fun _ -> Random.int 100_000_000) in
 
@@ -51,7 +58,9 @@ let run () =
   let nb_workers = 5 in
   let finish_item (worker : Worker.t) =
     Reporter.finalise (Option.get worker.reporter);
-    completed ()
+    completed ();
+    if remove_lines then
+      Display.remove_line display (Option.get worker.reporter)
   in
   let pick_item t (worker : Worker.t) =
     match t.files with
