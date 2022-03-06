@@ -28,6 +28,12 @@ module Vector = struct
     done;
     Vector.set t k v
 
+  let remove t k =
+    for i = k to Vector.length t - 2 do
+      Vector.set t i (Vector.get t (succ i))
+    done;
+    ignore (Vector.pop t)
+
   let get_exn = get
   let get = `shadowed
 end
