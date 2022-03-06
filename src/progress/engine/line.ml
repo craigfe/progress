@@ -586,8 +586,7 @@ module Make (Platform : Platform.S) = struct
         in
         let width = Printer.print_width pp_val + 2 in
         acc
-        @@ Primitives.contramap
-             ~f:(Acc.flow_meter >> Flow_meter.per_second >> Integer.to_float)
+        @@ Primitives.contramap ~f:(Acc.flow_meter >> Flow_meter.per_second)
         @@ Primitives.alpha ~width ~initial:(`Val 0.) pp_rate
 
       let bytes_per_sec = rate Units.Bytes.of_float
@@ -613,14 +612,13 @@ module Make (Platform : Platform.S) = struct
         @@ Primitives.contramap ~f:(fun acc ->
                let per_second = Flow_meter.per_second (Acc.flow_meter acc) in
                let acc = Acc.accumulator acc in
-               if Integer.(equal zero) per_second then Mtime.Span.max_span
+               if Float.equal 0. per_second then Mtime.Span.max_span
                else
                  let todo = Integer.(to_float (sub total acc)) in
                  if Float.(todo <= 0.) then Mtime.Span.zero
                  else
                    Mtime.Span.of_uint64_ns
-                     (Int64.of_float
-                        (todo /. Integer.to_float per_second *. 1_000_000_000.)))
+                     (Int64.of_float (todo /. per_second *. 1_000_000_000.)))
         @@ span_segment
 
       let elapsed ?(pp = Units.Duration.mm_ss) () =
