@@ -625,6 +625,7 @@ module Make (Platform : Platform.S) = struct
 
       let elapsed ?(pp = Units.Duration.mm_ss) () =
         let print_time = Staged.prj (Printer.Internals.to_line_printer pp) in
+        let width = Printer.print_width pp in
         let segment =
           Primitives.stateful (fun () ->
               let elapsed = Clock.counter () in
@@ -639,7 +640,7 @@ module Make (Platform : Platform.S) = struct
                 | `rerender | `finish -> ());
                 print_time buf !latest
               in
-              Primitives.theta ~width:5 pp)
+              Primitives.theta ~width pp)
         in
         Basic segment
 
