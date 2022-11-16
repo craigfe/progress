@@ -286,9 +286,11 @@ end = struct
     rerender_all_from_top ~stage:`tick ~starting_at:0 ~unconditional:false t
 
   let interject_with ({ config = { ppf; _ }; rows; _ } as t) f =
-    Format.fprintf ppf "%a%s%!" Terminal.Ansi.move_up
-      (Vector.length rows - 1)
-      Terminal.Ansi.erase_line;
+    Format.fprintf ppf "%s%!" Terminal.Ansi.erase_line;
+    for _ = 1 to Vector.length rows - 1 do
+      Format.fprintf ppf "%a%s%!" Terminal.Ansi.move_up 1
+        Terminal.Ansi.erase_line
+    done;
     Fun.protect f ~finally:(fun () ->
         rerender_all_from_top ~stage:`update ~starting_at:0 ~unconditional:true
           t)
