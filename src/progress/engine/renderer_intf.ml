@@ -154,6 +154,9 @@ module type S = sig
         ([above = 0]); the [~above] argument can be passed to add the line above
         some number of existing lines. *)
 
+    val pause : (_, _) t -> unit
+    val resume : (_, _) t -> unit
+
     val finalise : (_, _) t -> unit
     (** Terminate the given progress bar display. Raises [Failure] if the
         display has already been finalised. *)
