@@ -164,6 +164,9 @@ module type S = sig
         [Failure]. Also raises [Failure] if the display has already been
         finalised. *)
 
+    val pause : (_, _) t -> unit
+    val resume : (_, _) t -> unit
+
     val finalise : (_, _) t -> unit
     (** Terminate the given progress bar display. Raises [Failure] if the
         display has already been finalised. *)
