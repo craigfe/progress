@@ -5,6 +5,12 @@
 
 include Stdlib_ext
 
+module Mtime = struct
+  include Mtime
+
+  let span_to_s span = Mtime.Span.to_float_ns span *. 1e-9
+end
+
 module Vector = struct
   include Vector
 

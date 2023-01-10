@@ -2,6 +2,7 @@
    Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
    Distributed under the MIT license. See terms at the end of this file.
   ————————————————————————————————————————————————————————————————————————————*)
+open! Import
 
 type 'a t =
   { data : 'a array
@@ -75,7 +76,7 @@ let per_second : type a. a t -> a =
     let interval =
       let start_time = t.timestamps.(oldest_index) in
       let end_time = t.timestamps.(t.most_recently_added) in
-      Mtime.Span.to_s (Mtime.span start_time end_time)
+      Mtime.span_to_s (Mtime.span start_time end_time)
     in
     if Float.compare interval Float.epsilon < 0 then Integer.zero
     else
