@@ -21,7 +21,7 @@ progress bar formats. Supports rendering multiple progress bars simultaneously.\
   (terminal (= :version))
   (fmt (>= 0.8.5))
   (logs (>= 0.7.0))
-  (mtime (>= 1.1.0))
+  (mtime (>= 2.0.0))
   (uucp (>= 2.0.0))
   (uutf (>= 1.0.0))
   vector
@@ -42,4 +42,4 @@ progress bar formats. Supports rendering multiple progress bars simultaneously.\
   (alcotest (and :with-test (>= 1.4.0)))
   (fmt :with-test)
   (astring :with-test)
-  (mtime (and :with-test (>= 1.1.0)))))
+  (mtime (and :with-test (>= 2.0.0)))))

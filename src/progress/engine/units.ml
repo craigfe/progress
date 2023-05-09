@@ -69,7 +69,7 @@ end
 module Duration = struct
   let mm_ss =
     let to_string span =
-      let seconds = Mtime.Span.to_s span in
+      let seconds = Mtime.span_to_s span in
       if Float.compare seconds 0. < 0 then "--:--"
       else
         Printf.sprintf "%02.0f:%02.0f"
@@ -80,7 +80,7 @@ module Duration = struct
 
   let hh_mm_ss =
     let to_string span =
-      let seconds = Mtime.Span.to_s span in
+      let seconds = Mtime.span_to_s span in
       if Float.compare seconds 0. < 0 then "--:--:--"
       else
         Printf.sprintf "%02.0f:%02.0f:%02.0f"
