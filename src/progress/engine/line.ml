@@ -213,18 +213,7 @@ module Integer_independent (Platform : Platform.S) = struct
 
     let default =
       v ~final_frame:(Some "✔️") ~width:1
-        ~frames:
-          [| "⠋"
-           ; "⠙"
-           ; "⠹"
-           ; "⠸"
-           ; "⠼"
-           ; "⠴"
-           ; "⠦"
-           ; "⠧"
-           ; "⠇"
-           ; "⠏"
-          |]
+        ~frames:[| "⠋"; "⠙"; "⠹"; "⠸"; "⠼"; "⠴"; "⠦"; "⠧"; "⠇"; "⠏" |]
 
     let stage_count t = Array.length t.frames
   end
@@ -297,8 +286,7 @@ module Bar_style = struct
     { delimiters = Some ("│", "│")
     ; blank_space = " "
     ; full_space = "█"
-    ; in_progress_stages =
-        [| " "; "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉" |]
+    ; in_progress_stages = [| " "; "▏"; "▎"; "▍"; "▌"; "▋"; "▊"; "▉" |]
     ; color = None
     ; color_empty = None
     ; total_delimiter_width = 2
@@ -611,8 +599,10 @@ module Make (Platform : Platform.S) = struct
             fun ppf event x ->
               match event with
               | `finish -> pp ppf Mtime.Span.max_span (* renders as [--:--] *)
-              | `report | `rerender | `tick
-              (* TODO: tick should cause the estimate to be re-evaluated. *) ->
+              | `report | `rerender
+              | `tick
+                (* TODO: tick should cause the estimate to be re-evaluated. *)
+                ->
                   pp ppf x
           in
           let width = Printer.print_width Units.Duration.mm_ss in
