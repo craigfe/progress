@@ -11,8 +11,8 @@ open! Import
 module Bar_id = Unique_id ()
 
 (* TODO: this module should probably be inlined with the
-  [Line_primitives.Compiled.t] types: since those values only ever correspond to
-  exactly one [Bar_renderer], and both are responsible for state management. *)
+   [Line_primitives.Compiled.t] types: since those values only ever correspond to
+   exactly one [Bar_renderer], and both are responsible for state management. *)
 module Bar_renderer : sig
   type 'a t
 

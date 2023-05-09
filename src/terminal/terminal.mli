@@ -14,9 +14,9 @@ module Color : sig
 
       Colours built using {!ansi} will be rendered using the standard
       {{:https://en.wikipedia.org/wiki/ANSI_escape_code#3-bit_and_4-bit} 4-bit
-      ANSI escape codes} for terminals. The actual colours displayed to the user
-      depend on their terminal configuration / theme, ensuring that they look
-      natural in context. *)
+        ANSI escape codes} for terminals. The actual colours displayed to the
+      user depend on their terminal configuration / theme, ensuring that they
+      look natural in context. *)
 
   type plain =
     [ `black | `blue | `cyan | `green | `magenta | `red | `white | `yellow ]
