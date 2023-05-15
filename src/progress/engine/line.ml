@@ -630,6 +630,7 @@ module Make (Platform : Platform.S) = struct
               let elapsed = Clock.counter () in
               let latest = ref Mtime.Span.zero in
               let finished = ref false in
+              let width = Printer.print_width pp in
               let pp buf e =
                 (match e with
                 | `tick | `report -> latest := Clock.count elapsed
@@ -639,7 +640,7 @@ module Make (Platform : Platform.S) = struct
                 | `rerender | `finish -> ());
                 print_time buf !latest
               in
-              Primitives.theta ~width:5 pp)
+              Primitives.theta ~width pp)
         in
         Basic segment
 
