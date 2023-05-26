@@ -1,3 +1,9 @@
+### 0.2.2 (2023-05-26)
+
+- Fix lower bounds on UTF-8 libraries (@craigfe, 42759d5)
+- Fix removed functions in `mtime.2.0.0` (@patricoferris, #31)
+- Use actual printer width for elapsed segment (@lsdch, #28)
+
 ### 0.2.1 (2021-06-29)
 
 - Fix the count segment of `Progress.counter` (when `pp` is passed) to show the
