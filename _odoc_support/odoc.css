@@ -1,55 +1,19 @@
 @charset "UTF-8";
 /* Copyright (c) 2016 The odoc contributors. All rights reserved.
    Distributed under the ISC license, see terms at the end of the file.
-   %%NAME%% %%VERSION%% */
+   odoc 2.1.1 */
 
 /* Fonts */
+@import url('https://fonts.googleapis.com/css?family=Fira+Mono:400,500');
+@import url('https://fonts.googleapis.com/css?family=Noticia+Text:400,400i,700');
+@import url('https://fonts.googleapis.com/css?family=Fira+Sans:400,400i,500,500i,600,600i,700,700i');
 
-@font-face {
-  font-family: "JetBrainsMono";
-  src: url("./fonts/JetBrainsMono-Regular.woff2") format("woff2"),
-    url("./fonts/JetBrainsMono-Regular.woff") format("woff");
+:root,
+.light:root {
+   --main-background: #FFFFFF;
 
-  font-weight: normal;
-  font-style: normal;
-}
-
-@import url("https://rsms.me/inter/inter.css");
-
-@font-face {
-  font-family: "Lato";
-  font-style: normal;
-  font-weight: 400;
-  src: url("./fonts/lato-v17-latin-regular.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Lato";
-  font-style: normal;
-  font-weight: 700;
-  src: url("./fonts/lato-v17-latin-700.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Lato";
-  font-style: italic;
-  font-weight: 400;
-  src: url("./fonts/lato-v17-latin-italic.woff2") format("woff2");
-}
-
-@import url("https://fonts.googleapis.com/css?family=Noticia+Text:400,400i,700");
-@import url("https://fonts.googleapis.com/css?family=Fira+Sans:400,400i,500,500i,600,600i,700,700i");
-
-:root {
-  --font-code: JetBrainsMono, courier;
-  --font: Lato, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
-    Ubuntu, Cantarell, Open Sans, Helvetica Neue, Helvetica, Arial, sans-serif;
-
-  --font-heading: Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto,
-    Oxygen, Ubuntu, Cantarell, Open Sans, Helvetica Neue, Helvetica, Arial,
-    sans-serif;
-
-  --link-color: #3d8fd1;
+  --color: #333333;
+  --link-color: #2C94BD;
   --anchor-hover: #555;
   --anchor-color: #d5d5d5;
   --xref-shadow: #cc6666;
@@ -60,6 +24,14 @@
   --target-shadow: rgba(187, 239, 253, 0.8);
   --pre-border-color: #eee;
   --code-background: #f6f8fa;
+
+  --li-code-background: #f6f8fa;
+  --li-code-color: #0d2b3e;
+  --toc-color: #1F2D3D;
+  --toc-before-color: #777;
+  --toc-background: #f6f8fa;
+  --toc-list-border: #ccc;
+
   --spec-summary-border-color: #5c9cf5;
   --spec-summary-background: var(--code-background);
   --spec-summary-hover-background: #ebeff2;
@@ -67,94 +39,96 @@
   --spec-details-after-shadow: rgba(204, 204, 204, 0.53);
 }
 
+.dark:root {
+  --main-background: #202020;
+  --code-background: #222;
+  --line-numbers-background: rgba(0, 0, 0, 0.125);
+  --navbar-background: #202020;
+
+  --color: #bebebe;
+  --dirname-color: #666;
+  --underline-color: #444;
+  --visited-color: #002800;
+  --visited-number-color: #252;
+  --unvisited-color: #380000;
+  --unvisited-number-color: #622;
+  --somevisited-color: #303000;
+  --highlight-color: #303e3f;
+  --line-number-color: rgba(230, 230, 230, 0.3);
+  --unvisited-margin-color: #622;
+  --border: #333;
+  --navbar-border: #333;
+  --code-color: #ccc;
+
+  --li-code-background: #373737;
+  --li-code-color: #999;
+  --toc-color: #777;
+  --toc-background: #252525;
+
+  --hljs-link: #999;
+  --hljs-keyword: #cda869;
+  --hljs-regexp: #f9ee98;
+  --hljs-title: #dcdcaa;
+  --hljs-type: #ac885b;
+  --hljs-meta: #82aaff;
+  --hljs-variable: #cf6a4c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --main-background: #202020;
+    --code-background: #333;
+    --line-numbers-background: rgba(0, 0, 0, 0.125);
+    --navbar-background: #202020;
+
+    --meter-unvisited-color: #622;
+    --meter-visited-color: #252;
+    --meter-separator-color: black;
+
+    --color: #bebebe;
+    --dirname-color: #666;
+    --underline-color: #444;
+    --visited-color: #002800;
+    --visited-number-color: #252;
+    --unvisited-color: #380000;
+    --unvisited-number-color: #622;
+    --somevisited-color: #303000;
+    --highlight-color: #303e3f;
+    --line-number-color: rgba(230, 230, 230, 0.3);
+    --unvisited-margin-color: #622;
+    --border: #333;
+    --navbar-border: #333;
+    --code-color: #ccc;
+    --by-name-nav-link-color: var(--color);
+
+    --li-code-background: #373737;
+    --li-code-color: #999;
+    --toc-color: #777;
+    --toc-before-color: #777;
+    --toc-background: #252525;
+    --toc-list-border: #ccc;
+    --spec-summary-hover-background: #ebeff2;
+    --spec-details-after-background: rgba(0, 4, 15, 0.05);
+    --spec-details-after-shadow: rgba(204, 204, 204, 0.53);
+
+    --hljs-link: #999;
+    --hljs-keyword: #cda869;
+    --hljs-regexp: #f9ee98;
+    --hljs-title: #dcdcaa;
+    --hljs-type: #ac885b;
+    --hljs-meta: #82aaff;
+    --hljs-variable: #cf6a4c;
+  }
+}
+
 /* Reset a few things. */
 
-html,
-body,
-div,
-span,
-applet,
-object,
-iframe,
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
-p,
-blockquote,
-pre,
-a,
-abbr,
-acronym,
-address,
-big,
-cite,
-code,
-del,
-dfn,
-em,
-img,
-ins,
-kbd,
-q,
-s,
-samp,
-small,
-strike,
-strong,
-sub,
-sup,
-tt,
-var,
-b,
-u,
-i,
-center,
-dl,
-dt,
-dd,
-ol,
-ul,
-li,
-fieldset,
-form,
-label,
-legend,
-table,
-caption,
-tbody,
-tfoot,
-thead,
-tr,
-th,
-td,
-article,
-aside,
-canvas,
-details,
-embed,
-figure,
-figcaption,
-footer,
-header,
-hgroup,
-menu,
-nav,
-output,
-ruby,
-section,
-summary,
-time,
-mark,
-audio,
-video {
-  margin: 0;
+html, body, div, span, applet, object, iframe, h1, h2, h3, h4, h5, h6, p, blockquote, pre, a, abbr, acronym, address, big, cite, code, del, dfn, em, img, ins, kbd, q, s, samp, small, strike, strong, sub, sup, tt, var, b, u, i, center, dl, dt, dd, ol, ul, li, fieldset, form, label, legend, table, caption, tbody, tfoot, thead, tr, th, td, article, aside, canvas, details, embed, figure, figcaption, footer, header, hgroup, menu, nav, output, ruby, section, summary, time, mark, audio, video {
   padding: 0;
   border: 0;
   font: inherit;
   vertical-align: baseline;
+
 }
 
 table {
@@ -162,9 +136,7 @@ table {
   border-spacing: 0;
 }
 
-*,
-*:before,
-*:after {
+*, *:before, *:after {
   box-sizing: border-box;
 }
 
@@ -174,18 +146,18 @@ html {
 
 body {
   text-align: left;
-  background: #ffffff;
+  background: #FFFFFF;
   color: var(--color);
   background-color: var(--main-background);
 }
 
 body {
-  max-width: 90ex;
+  max-width: 100ex;
   margin-left: calc(10vw + 20ex);
   margin-right: 4ex;
   margin-top: 20px;
   margin-bottom: 50px;
-  font-family: var(--font);
+  font-family: "Noticia Text", Georgia, serif;
   line-height: 1.5;
 }
 
@@ -194,13 +166,12 @@ header {
 }
 
 nav {
-  font-family: var(--font);
+  font-family: "Fira Sans", Helvetica, Arial, sans-serif;
 }
 
 /* Basic markup elements */
 
-b,
-strong {
+b, strong {
   font-weight: bold;
 }
 
@@ -208,13 +179,11 @@ i {
   font-style: italic;
 }
 
-em,
-i em.odd {
+em, i em.odd{
   font-style: italic;
 }
 
-em.odd,
-i em {
+em.odd, i em {
   font-style: normal;
 }
 
@@ -226,39 +195,26 @@ sub {
   vertical-align: sub;
 }
 
-sup,
-sub {
+sup, sub {
   font-size: 12px;
   line-height: 0;
   margin-left: 0.2ex;
 }
 
-pre {
-  margin-top: 0.8em;
-  margin-bottom: 1.2em;
+ul, ol {
+  list-style-position: outside
 }
 
-p,
-ul,
-ol {
-  margin-top: 0.5em;
-  margin-bottom: 1em;
-}
-ul,
-ol {
-  list-style-position: outside;
-}
-
-ul > li {
+ul>li {
   margin-left: 22px;
 }
 
-ol > li {
+ol>li {
   margin-left: 27.2px;
 }
 
-li > *:first-child {
-  margin-top: 0;
+li>*:first-child {
+  margin-top: 0
 }
 
 /* Text alignements, this should be forbidden. */
@@ -279,19 +235,15 @@ li > *:first-child {
 
 a {
   text-decoration: none;
-  color: #2c5cbd;
   color: var(--link-color);
 }
 
 a:hover {
-  box-shadow: 0 1px 0 0 #2c5cbd;
   box-shadow: 0 1px 0 0 var(--link-color);
 }
 
 /* Linked highlight */
 *:target {
-  background-color: rgba(187, 239, 253, 0.3) !important;
-  box-shadow: 0 0px 0 1px rgba(187, 239, 253, 0.8) !important;
   background-color: var(--target-background) !important;
   box-shadow: 0 0px 0 1px var(--target-shadow) !important;
   border-radius: 1px;
@@ -308,7 +260,6 @@ a.anchor:before {
 a.anchor:hover {
   box-shadow: none;
   text-decoration: none;
-  color: #555;
   color: var(--anchor-hover);
 }
 
@@ -323,7 +274,6 @@ a.anchor {
   padding-right: 0.4em;
   padding-left: 0.4em;
   /* To remain selectable */
-  color: #d5d5d5;
   color: var(--anchor-color);
 }
 
@@ -333,10 +283,9 @@ a.anchor {
 }
 
 .xref-unresolved {
-  color: #2c94bd;
+  color: #2C94BD;
 }
 .xref-unresolved:hover {
-  box-shadow: 0 1px 0 0 #cc6666;
   box-shadow: 0 1px 0 0 var(--xref-shadow);
 }
 
@@ -344,95 +293,59 @@ a.anchor {
    Until at least 4.03 many of the modules of the stdlib start at .h7,
    we restart the sequence there like h2  */
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
-.h7,
-.h8,
-.h9,
-.h10 {
-  font-family: var(--font-heading);
-  font-weight: 500;
-  margin: 0.5em 0 0.5em 0;
+h1, h2, h3, h4, h5, h6, .h7, .h8, .h9, .h10 {
+  font-family: "Fira Sans", Helvetica, Arial, sans-serif;
+  font-weight: 400;
   padding-top: 0.1em;
   line-height: 1.2;
   overflow-wrap: break-word;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
-.spec {
-  scroll-margin-top: 50px;
-}
-
 h1 {
   font-weight: 500;
   font-size: 2.441em;
-  margin-top: 1.214em;
 }
 
 h1 {
   font-weight: 500;
   font-size: 1.953em;
-  box-shadow: 0 1px 0 0 #ddd;
   box-shadow: 0 1px 0 0 var(--header-shadow);
 }
 
 h2 {
-  text-transform: uppercase;
-  font-weight: 600;
-  font-size: 1.263em;
-  margin-top: 1.7em;
-  margin-left: 0.5em;
-  margin-bottom: 1em;
+  font-size: 1.563em;
 }
 
 h3 {
-  margin-top: 1.4em;
   font-size: 1.25em;
 }
 
-h4 {
-  margin-top: 1em;
-  margin-bottom: 0.7em;
-}
-
-small,
-.font_small {
+small, .font_small {
   font-size: 0.8em;
 }
 
-h1 code,
-h1 tt {
-  font-size: 95%;
+h1 code, h1 tt {
+  font-size: inherit;
   font-weight: inherit;
 }
 
-h2 code,
-h2 tt {
-  font-size: 95%;
+h2 code, h2 tt {
+  font-size: inherit;
   font-weight: inherit;
 }
 
-h3 code,
-h3 tt {
-  font-size: 95%;
+h3 code, h3 tt {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+h3 code, h3 tt {
+  font-size: inherit;
   font-weight: inherit;
 }
 
 h4 {
   font-size: 1.12em;
-}
-
-.spec-doc {
-  margin-bottom: 2em;
 }
 
 /* Comment delimiters, hidden but accessible to screen readers and 
@@ -454,16 +367,13 @@ h4 {
 
 /* Preformatted and code */
 
-tt,
-code,
-pre {
-  font-family: var(--font-code);
+tt, code, pre {
+  font-family: "Fira Mono", courier;
   font-weight: 400;
 }
 
 pre {
   padding: 0.1em;
-  border: 1px solid #eee;
   border: 1px solid var(--pre-border-color);
   border-radius: 5px;
   overflow-x: auto;
@@ -471,8 +381,6 @@ pre {
 
 p code,
 li code {
-  background-color: #f6f8fa;
-  color: #0d2b3e;
   background-color: var(--li-code-background);
   color: var(--li-code-color);
   border-radius: 3px;
@@ -480,20 +388,17 @@ li code {
 }
 
 p a > code {
-  color: #2c5cbd;
   color: var(--link-color);
+}
+
+code {
+  white-space: pre-wrap;
 }
 
 /* Code blocks (e.g. Examples) */
 
-code {
+pre code {
   font-size: 0.893rem;
-}
-
-:not(pre):not(h1) > code {
-  background: var(--code-background);
-  border-radius: 2px;
-  padding: 2px 4px;
 }
 
 /* Code lexemes */
@@ -502,9 +407,7 @@ code {
   font-weight: 500;
 }
 
-.arrow {
-  white-space: nowrap;
-}
+.arrow { white-space: nowrap }
 
 /* Module member specification */
 
@@ -516,9 +419,13 @@ code {
   padding: 0.35em 0.5em;
 }
 
-div.spec,
 .def-doc {
-  margin-bottom: 15px;
+  margin-bottom: 10px;
+}
+
+/* Spacing between items */
+div.odoc-spec,.odoc-include {
+  margin-bottom: 2em;
 }
 
 .spec.type .variant {
@@ -542,12 +449,12 @@ div.def {
   padding-left: 2ex;
 }
 
-div.def + div.def-doc {
+div.def+div.def-doc {
   margin-left: 1ex;
-  margin-top: 2.5px;
+  margin-top: 2.5px
 }
 
-div.def-doc > *:first-child {
+div.def-doc>*:first-child {
   margin-top: 0;
 }
 
@@ -555,6 +462,10 @@ div.def-doc > *:first-child {
 
 .odoc-include details {
   position: relative;
+}
+
+.odoc-include.shadowed-include {
+  display: none;
 }
 
 .odoc-include details:after {
@@ -567,15 +478,13 @@ div.def-doc > *:first-child {
   top: 1px;
   bottom: 1px;
   width: 15px;
-  background: rgba(0, 4, 15, 0.05);
-  box-shadow: 0 0px 0 1px rgba(204, 204, 204, 0.53);
-  background: var(--spec-details-after-background);
-  box-shadow: 0 0px 0 1px var(--spec-details-after-shadow);
+  background: var(--spec-details-after-background, rgba(0, 4, 15, 0.05));
+  box-shadow: 0 0px 0 1px var(--spec-details-after-shadow, rgba(204, 204, 204, 0.53));
 }
 
 .odoc-include summary {
   position: relative;
-  margin-bottom: 20px;
+  margin-bottom: 1em;
   cursor: pointer;
   outline: none;
 }
@@ -612,81 +521,41 @@ td.def-doc *:first-child {
 
 /* Lists of @tags */
 
-.at-tags {
-  list-style-type: none;
-  margin-left: -3ex;
-}
-.at-tags li {
-  padding-left: 3ex;
-  text-indent: -3ex;
-}
-.at-tags .at-tag {
-  text-transform: capitalize;
-}
+.at-tags { list-style-type: none; margin-left: -3ex; }
+.at-tags li { padding-left: 3ex; text-indent: -3ex; }
+.at-tags .at-tag { text-transform: capitalize }
 
 /* Lists of modules */
 
-.modules {
-  list-style-type: none;
-  margin-left: -3ex;
-}
-.modules li {
-  padding-left: 3ex;
-  text-indent: -3ex;
-  margin-top: 5px;
-}
-.modules .synopsis {
-  padding-left: 1ch;
-}
+.modules { list-style-type: none; margin-left: -3ex; }
+.modules li { padding-left: 3ex; text-indent: -3ex; margin-top: 5px }
+.modules .synopsis { padding-left: 1ch; }
 
 /* Odig package index */
 
-.packages {
-  list-style-type: none;
-  margin-left: -3ex;
-}
-.packages li {
-  padding-left: 3ex;
-  text-indent: -3ex;
-}
-.packages li a.anchor {
-  padding-right: 0.5ch;
-  padding-left: 3ch;
-}
-.packages .version {
-  font-size: 10px;
-  color: var(--by-name-version-color);
-}
-.packages .synopsis {
-  padding-left: 1ch;
-}
+.packages { list-style-type: none; margin-left: -3ex; }
+.packages li { padding-left: 3ex; text-indent: -3ex }
+.packages li a.anchor { padding-right: 0.5ch; padding-left: 3ch; }
+.packages .version { font-size: 10px; color: var(--by-name-version-color); }
+.packages .synopsis { padding-left: 1ch }
 
 .by-name nav a {
   text-transform: uppercase;
   font-size: 18px;
   margin-right: 1ex;
-  color: #222;
-  color: var(--by-name-nav-link-color);
+  color: var(--by-name-nav-link-color,);
   display: inline-block;
 }
 
 .by-tag nav a {
   margin-right: 1ex;
-  color: #222;
   color: var(--by-name-nav-link-color);
   display: inline-block;
 }
 
-.by-tag ol {
-  list-style-type: none;
-}
-.by-tag ol.tags li {
-  margin-left: 1ch;
-  display: inline-block;
-}
-.by-tag td:first-child {
-  text-transform: uppercase;
-}
+.by-tag ol { list-style-type: none; }
+.by-tag ol.tags li { margin-left: 1ch; display: inline-block }
+.by-tag td:first-child { text-transform: uppercase; }
 
 /* Odig package page */
 
@@ -721,8 +590,7 @@ td.def-doc *:first-child {
   margin-right: 1ex;
 }
 
-#info-authors li,
-#info-maintainers li {
+#info-authors li, #info-maintainers li {
   display: block;
 }
 
@@ -732,10 +600,9 @@ td.def-doc *:first-child {
   display: block;
   content: "Contents";
   text-transform: uppercase;
-  font-size: 1.1em;
+  font-size: 1em;
   margin: 1.414em 0 0.5em;
-  font-weight: 800;
-  color: #777;
+  font-weight: 500;
   color: var(--toc-before-color);
   line-height: 1.2;
 }
@@ -748,10 +615,8 @@ td.def-doc *:first-child {
   max-width: 30ex;
   min-width: 26ex;
   width: 20%;
-  background: #f6f8fa;
   background: var(--toc-background);
   overflow: auto;
-  color: #1f2d3d;
   color: var(--toc-color);
   padding-left: 2ex;
   padding-right: 2ex;
@@ -760,7 +625,6 @@ td.def-doc *:first-child {
 .odoc-toc ul li a {
   font-family: "Fira Sans", sans-serif;
   font-size: 0.95em;
-  color: #333;
   color: var(--color);
   font-weight: 400;
   line-height: 1.6em;
@@ -774,7 +638,7 @@ td.def-doc *:first-child {
 
 /* First level titles */
 
-.odoc-toc > ul > li > a {
+.odoc-toc>ul>li>a {
   font-weight: 500;
 }
 
@@ -789,12 +653,11 @@ td.def-doc *:first-child {
 .odoc-toc ul li {
   margin: 0;
 }
-.odoc-toc > ul > li {
+.odoc-toc>ul>li {
   margin-bottom: 0.3em;
 }
 
 .odoc-toc ul li li {
-  border-left: 1px solid #ccc;
   border-left: 1px solid var(--toc-list-border);
   margin-left: 5px;
   padding-left: 12px;
@@ -803,9 +666,6 @@ td.def-doc *:first-child {
 /* Mobile adjustements. */
 
 @media only screen and (max-width: 95ex) {
-  body {
-    margin-left: 4ex;
-  }
   .odoc-content {
     margin: auto;
     padding: 2em;
@@ -837,10 +697,8 @@ td.def-doc *:first-child {
 
 .hljs {
   display: block;
-  background: white;
   background: var(--code-background);
   padding: 0.5em;
-  color: #333333;
   color: var(--color);
   overflow-x: auto;
 }
