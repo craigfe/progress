@@ -91,6 +91,11 @@ CAMLprim value ocaml_terminal_get_terminal_dimensions(value unit)
 // Unsupported platform
 #else
 
+CAMLprim value ocaml_terminal_get_sigwinch()
+{
+  return Val_int(0);
+}
+
 CAMLprim value ocaml_terminal_get_terminal_dimensions(value unit)
 {
 	CAMLparam1(unit);
