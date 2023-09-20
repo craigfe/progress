@@ -80,21 +80,6 @@ module Ansi : sig
   val erase_display_suffix : string
 end
 
-module Size : sig
-  val sigwinch : int option
-  (** The number of the signal used to indicate terminal size changes. [None] on
-      Windows. *)
-
-  (** Functions for getting the size of the terminal to which [stdout] is
-      attached (provided [stdout] is a TTY). *)
-
-  type dimensions = { rows : int; columns : int }
-
-  val get_dimensions : unit -> dimensions option
-  val get_columns : unit -> int option
-  val get_rows : unit -> int option
-end
-
 val guess_printed_width : string -> int
 (** [guess_printed_width s] returns an estimate of the number of terminal
     columns that the UTF-8 encoded string [s] would occupy if displayed in a

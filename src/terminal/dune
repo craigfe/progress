@@ -1,7 +1,4 @@
 (library
  (name terminal)
  (public_name terminal)
- (foreign_stubs
-  (language c)
-  (names terminal_stubs))
  (libraries stdlib-shims uutf uucp))
