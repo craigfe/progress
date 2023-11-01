@@ -155,9 +155,11 @@ module type S = sig
         some number of existing lines. *)
 
     val remove_line : (_, _) t -> _ Reporter.t -> unit
-    (** Remove a line to an ongoing display, from its reporting function.
-        Removing an existing line is idempotent, but removing a line that was
-        not at point point part of the display will raise an error. *)
+    (** Remove a line from an ongoing display, identified by the reporting
+        function that was returned by [add_line]. Removing an existing line is
+        idempotent, but removing a line that was not at some point part of the
+        display will raise [Failure]. Also raises [Failure] if the display has
+        already been finalised. *)
 
     val finalise : (_, _) t -> unit
     (** Terminate the given progress bar display. Raises [Failure] if the

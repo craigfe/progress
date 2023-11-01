@@ -264,9 +264,8 @@ end = struct
       ~unconditional:true t
 
   let remove_line t key =
-    let exception Line_not_found in
     match Hashtbl.find t.positions key with
-    | exception Not_found -> raise Line_not_found
+    | exception Not_found -> failwith "No such line in display"
     | None -> () (* Already removed *)
     | Some { contents = position } ->
         if Hashtbl.mem t.bars key then Hashtbl.remove t.bars key;
@@ -542,7 +541,8 @@ module Make (Platform : Platform.S) = struct
     let remove_line t (reporter : _ Reporter.t) =
       match Global.find_display t.uid with
       | Error `finalised ->
-          failwith "Cannot remove a line to a finalised display"
+          failwith
+            "Cannot remove a line from a display that is already finalised"
       | Ok d -> Display.remove_line d reporter.uid
 
     let finalise t =
