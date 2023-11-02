@@ -38,11 +38,11 @@ module Vector = struct
     done;
     Vector.set t k v
 
-  let remove t k =
+  let remove (type a) (t : a t) k =
     for i = k to Vector.length t - 2 do
       Vector.set t i (Vector.get t (succ i))
     done;
-    ignore (Vector.pop t)
+    ignore (Vector.pop t : a)
 
   let get_exn = get
   let get = `shadowed
