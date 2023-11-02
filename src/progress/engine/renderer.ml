@@ -132,7 +132,7 @@ end = struct
     | E :
         { renderer : _ Bar_renderer.t
         ; mutable latest_width : int
-        ; position : int ref
+        ; mutable position : int
         }
         -> some_bar
 
@@ -140,7 +140,6 @@ end = struct
     { config : Config.t
     ; uid : Unique_id.t
     ; bars : (Bar_id.t, some_bar) Hashtbl.t
-    ; positions : (Bar_id.t, int ref option) Hashtbl.t
     ; rows : some_bar option Vector.t
     }
 
@@ -151,8 +150,7 @@ end = struct
     let rows =
       let f i = function
         | None -> None
-        | Some renderer ->
-            Some (E { renderer; latest_width = 0; position = ref i })
+        | Some renderer -> Some (E { renderer; latest_width = 0; position = i })
       in
       Bar_list.mapi bars ~f:{ f } |> Vector.of_list ~dummy:None
     in
@@ -162,10 +160,8 @@ end = struct
       ~f:
         (Option.iter (fun (E { renderer; _ } as t) ->
              Hashtbl.add bars ~key:(Bar_renderer.id renderer) ~data:t));
-    let positions = Hashtbl.create bar_count in
-    Hashtbl.iter bars ~f:(fun ~key ~data:(E { position; _ }) ->
-        Hashtbl.add positions ~key ~data:(Some position));
-    { config; uid; bars; positions; rows }
+
+    { config; uid; bars; rows }
 
   let uid { uid; _ } = uid
 
@@ -228,9 +224,7 @@ end = struct
     match data with
     | `Clean _ -> ()
     | `Dirty data ->
-        let distance_from_base =
-          Vector.length rows - bar.position.contents - 1
-        in
+        let distance_from_base = Vector.length rows - bar.position - 1 in
 
         (* NOTE: we add an initial carriage return to avoid overflowing the line if
            the user has typed into the terminal between renders. *)
@@ -246,15 +240,13 @@ end = struct
 
   let add_line ?(above = 0) t renderer =
     let position = Vector.length t.rows - above in
-    let position_ref = ref position in
     let key = Bar_renderer.id renderer in
-    let bar = E { renderer; latest_width = 0; position = position_ref } in
+    let bar = E { renderer; latest_width = 0; position } in
     Hashtbl.add t.bars ~key ~data:bar;
-    Hashtbl.add t.positions ~key ~data:(Some position_ref);
 
     Vector.insert t.rows position (Some bar);
     Vector.iteri_from (position + 1) t.rows ~f:(fun i -> function
-      | None -> () | Some (E bar) -> bar.position.contents <- i);
+      | None -> () | Some (E bar) -> bar.position <- i);
 
     (* The cursor is now one line above the bottom. Move to the correct starting
        position for a re-render of the affected suffix of the display. *)
@@ -264,23 +256,35 @@ end = struct
       ~unconditional:true t
 
   let remove_line t key =
-    match Hashtbl.find t.positions key with
-    | exception Not_found -> failwith "No such line in display"
-    | None -> () (* Already removed *)
-    | Some { contents = position } ->
-        if Hashtbl.mem t.bars key then Hashtbl.remove t.bars key;
-        Hashtbl.add t.positions ~key ~data:None;
-        Vector.remove t.rows position;
-        Vector.iteri_from position t.rows ~f:(fun i -> function
-          | None -> () | Some (E bar) -> bar.position.contents <- i);
+    let (E { position; _ }) =
+      match Hashtbl.find_opt t.bars key with
+      | Some bar -> bar
+      | None -> (
+          (* This can either mean that the line has already been finalised, or
+             that this key is unknown. *)
+          match
+            Vector.find_map t.rows ~f:(function
+              | None -> None
+              | Some (E bar as some_bar) ->
+                  if Bar_id.equal key (Bar_renderer.id bar.renderer) then
+                    Some some_bar
+                  else None)
+          with
+          | Some bar -> bar
+          | None -> failwith "No such line in display")
+    in
+    if Hashtbl.mem t.bars key then Hashtbl.remove t.bars key;
+    Vector.remove t.rows position;
+    Vector.iteri_from position t.rows ~f:(fun i -> function
+      | None -> () | Some (E bar) -> bar.position <- i);
 
-        (* The cursor is now one line below the bottom. Move to the correct starting
-           position for a re-render of the affected suffix of the display. *)
-        Format.pp_print_string t.config.ppf Terminal.Ansi.erase_display_suffix;
-        Terminal.Ansi.move_up t.config.ppf 1;
-        Terminal.Ansi.move_up t.config.ppf (Vector.length t.rows - position - 1);
-        rerender_all_from_top ~stage:`update ~starting_at:position
-          ~unconditional:true t
+    (* The cursor is now one line below the bottom. Move to the correct starting
+       position for a re-render of the affected suffix of the display. *)
+    Format.pp_print_string t.config.ppf Terminal.Ansi.erase_display_suffix;
+    Terminal.Ansi.move_up t.config.ppf 1;
+    Terminal.Ansi.move_up t.config.ppf (Vector.length t.rows - position - 1);
+    rerender_all_from_top ~stage:`update ~starting_at:position
+      ~unconditional:true t
 
   let ceil_div x y = (x + y - 1) / y
 

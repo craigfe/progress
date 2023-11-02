@@ -21,6 +21,16 @@ module Vector = struct
       f i (unsafe_get t i)
     done
 
+  let rec find_map_from i t ~f =
+    if i >= length t - 1 then None
+    else
+      let a = unsafe_get t i in
+      match f a with
+      | Some _ as some -> some
+      | None -> find_map_from (i + 1) t ~f
+
+  let find_map t ~f = find_map_from 0 t ~f
+
   let insert t k v =
     Vector.push t v (* Dummy insertion to expand *);
     for i = Vector.length t - 1 downto k + 1 do
