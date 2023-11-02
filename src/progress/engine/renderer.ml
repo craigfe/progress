@@ -265,9 +265,9 @@ end = struct
           match
             Vector.find_map t.rows ~f:(function
               | None -> None
-              | Some (E bar as some_bar) ->
+              | Some (E bar) as some_bar ->
                   if Bar_id.equal key (Bar_renderer.id bar.renderer) then
-                    Some some_bar
+                    some_bar
                   else None)
           with
           | Some bar -> bar
