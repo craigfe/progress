@@ -22,7 +22,7 @@ module Vector = struct
     done
 
   let rec find_map_from i t ~f =
-    if i >= length t - 1 then None
+    if i >= length t then None
     else
       let a = unsafe_get t i in
       match f a with
