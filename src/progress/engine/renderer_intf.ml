@@ -154,6 +154,16 @@ module type S = sig
         ([above = 0]); the [~above] argument can be passed to add the line above
         some number of existing lines. *)
 
+    val remove_line : (_, _) t -> _ Reporter.t -> unit
+    (** Remove a line from an ongoing display, identified by the reporting
+        function that was returned by [add_line]. Lines may be removed either
+        before they are finalised (for example if some task has been cancelled)
+        or after being finalised. In both cases, the line will be removed from
+        the display, thus retrieving some space in the terminal. Attempting to
+        remove a line that has already been removed from the display will raise
+        [Failure]. Also raises [Failure] if the display has already been
+        finalised. *)
+
     val finalise : (_, _) t -> unit
     (** Terminate the given progress bar display. Raises [Failure] if the
         display has already been finalised. *)

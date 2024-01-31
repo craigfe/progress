@@ -122,6 +122,7 @@ module Display : sig
 
   (* Bar-specific functions *)
   val add_line : ?above:int -> t -> _ Bar_renderer.t -> unit
+  val remove_line : t -> Bar_id.t -> unit
   val rerender_line : t -> Bar_id.t -> Bar_renderer.contents -> unit
   val finalise_line : t -> Bar_id.t -> unit
 end = struct
@@ -251,6 +252,37 @@ end = struct
        position for a re-render of the affected suffix of the display. *)
     Format.pp_force_newline t.config.ppf ();
     Terminal.Ansi.move_up t.config.ppf above;
+    rerender_all_from_top ~stage:`update ~starting_at:position
+      ~unconditional:true t
+
+  let remove_line t key =
+    let (E { position; _ }) =
+      match Hashtbl.find_opt t.bars key with
+      | Some bar -> bar
+      | None -> (
+          (* This can either mean that the line has already been finalised, or
+             that this key is unknown. *)
+          match
+            Vector.find_map t.rows ~f:(function
+              | None -> None
+              | Some (E bar) as some_bar ->
+                  if Bar_id.equal key (Bar_renderer.id bar.renderer) then
+                    some_bar
+                  else None)
+          with
+          | Some bar -> bar
+          | None -> failwith "No such line in display")
+    in
+    if Hashtbl.mem t.bars key then Hashtbl.remove t.bars key;
+    Vector.remove t.rows position;
+    Vector.iteri_from position t.rows ~f:(fun i -> function
+      | None -> () | Some (E bar) -> bar.position <- i);
+
+    (* The cursor is now one line below the bottom. Move to the correct starting
+       position for a re-render of the affected suffix of the display. *)
+    Format.pp_print_string t.config.ppf Terminal.Ansi.erase_display_suffix;
+    Terminal.Ansi.move_up t.config.ppf 1;
+    Terminal.Ansi.move_up t.config.ppf (Vector.length t.rows - position - 1);
     rerender_all_from_top ~stage:`update ~starting_at:position
       ~unconditional:true t
 
@@ -511,6 +543,13 @@ module Make (Platform : Platform.S) = struct
           let report = reporter_of_bar d bar in
           let update = updater_of_bar d bar in
           { display = Display.uid d; uid; report; update }
+
+    let remove_line t (reporter : _ Reporter.t) =
+      match Global.find_display t.uid with
+      | Error `finalised ->
+          failwith
+            "Cannot remove a line from a display that is already finalised"
+      | Ok d -> Display.remove_line d reporter.uid
 
     let finalise t =
       match Global.find_display t.uid with
