@@ -116,6 +116,8 @@ module Display : sig
   val initial_render : t -> unit
   val tick : t -> unit
   val handle_width_change : t -> int -> unit
+  val pause : t -> unit
+  val resume : t -> unit
   val interject_with : t -> (unit -> 'a) -> 'a
   val cleanup : t -> unit
   val finalise : t -> unit
@@ -285,15 +287,19 @@ end = struct
     Terminal.Ansi.move_up ppf (Vector.length rows - 1);
     rerender_all_from_top ~stage:`tick ~starting_at:0 ~unconditional:false t
 
-  let interject_with ({ config = { ppf; _ }; rows; _ } as t) f =
+  let pause { config = { ppf; _ }; rows; _ } =
     Format.fprintf ppf "%s%!" Terminal.Ansi.erase_line;
     for _ = 1 to Vector.length rows - 1 do
       Format.fprintf ppf "%a%s%!" Terminal.Ansi.move_up 1
         Terminal.Ansi.erase_line
-    done;
-    Fun.protect f ~finally:(fun () ->
-        rerender_all_from_top ~stage:`update ~starting_at:0 ~unconditional:true
-          t)
+    done
+
+  let resume t =
+    rerender_all_from_top ~stage:`update ~starting_at:0 ~unconditional:true t
+
+  let interject_with t f =
+    pause t;
+    Fun.protect f ~finally:(fun () -> resume t)
 
   let cleanup { config; _ } =
     if config.hide_cursor then
@@ -525,6 +531,16 @@ module Make (Platform : Platform.S) = struct
       | Ok d -> Display.tick d
 
     let reporters t = t.initial_reporters
+
+    let pause t =
+      match Global.find_display t.uid with
+      | Error `finalised -> failwith "Cannot pause a finalised display"
+      | Ok d -> Display.pause d
+
+    let resume t =
+      match Global.find_display t.uid with
+      | Error `finalised -> failwith "Cannot pause a finalised display"
+      | Ok d -> Display.resume d
   end
 
   let with_reporters ?config t f =
