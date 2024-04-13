@@ -165,7 +165,12 @@ module type S = sig
         finalised. *)
 
     val pause : (_, _) t -> unit
+    (** Suspends the rendering of any active progress bar display. It can be
+        useful to compose with the [Logs] library and avoid interference when
+        printing to [stdout] / [stderr] from the rendering of progress bars. *)
+
     val resume : (_, _) t -> unit
+    (** Resume the rendering of progress bar display. *)
 
     val finalise : (_, _) t -> unit
     (** Terminate the given progress bar display. Raises [Failure] if the
