@@ -11,7 +11,7 @@ type nonrec t = t
 
 let equal = Mtime.Span.equal
 let compare = Mtime.Span.compare
-let compare_zero (f : int -> int -> _) a b = f (compare a b) 0 [@@inlined]
+let compare_zero (f : int -> int -> _) a b = f (compare a b) 0
 let ( + ) = Mtime.Span.add
 let ( < ) = compare_zero ( < )
 let ( <= ) = compare_zero ( <= )
