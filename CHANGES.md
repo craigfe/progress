@@ -1,3 +1,11 @@
+### 0.3.0 (2024-04-13)
+
+- Be compatible with MirageOS and remove `ocaml_terminal_get_sigwinch` (@art-w, #38)
+- Clear all lines in `interject_with` (@Gbury, #30)
+- Add `Display.remove_line` (@mbarbin, #26)
+- Fix compilation for OCaml 5.2 (reported by @Gbury, fixed by @dinosaure, #40)
+- Add `Display.{pause,resume}` (@Gbury, #37)
+
 ### 0.2.2 (2023-05-26)
 
 - Fix lower bounds on UTF-8 libraries (@craigfe, 42759d5)
