@@ -61,7 +61,7 @@ let fold =
 let per_second : type a. a t -> float =
  fun t ->
   let (module Integer) = t.elt in
-  if is_empty t then 0.
+  if is_empty t then Float.zero
   else
     (* Sum all values in the window {i except the first one} and divide by the
        time interval. We can think of the first value as representing work done
@@ -78,7 +78,7 @@ let per_second : type a. a t -> float =
       let end_time = t.timestamps.(t.most_recently_added) in
       Mtime.span_to_s (Mtime.span start_time end_time)
     in
-    if Float.compare interval Float.epsilon < 0 then 0.
+    if Float.compare interval Float.epsilon < 0 then Float.zero
     else Integer.to_float sum /. interval
 
 (*————————————————————————————————————————————————————————————————————————————

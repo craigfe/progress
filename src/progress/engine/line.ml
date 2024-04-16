@@ -612,7 +612,7 @@ module Make (Platform : Platform.S) = struct
         @@ Primitives.contramap ~f:(fun acc ->
                let per_second = Flow_meter.per_second (Acc.flow_meter acc) in
                let acc = Acc.accumulator acc in
-               if Float.equal 0. per_second then Mtime.Span.max_span
+               if Float.(equal zero) per_second then Mtime.Span.max_span
                else
                  let todo = Integer.(to_float (sub total acc)) in
                  if Float.(todo <= 0.) then Mtime.Span.zero
