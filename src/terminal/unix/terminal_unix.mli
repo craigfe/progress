@@ -3,18 +3,15 @@
    Distributed under the MIT license. See terms at the end of this file.
   ————————————————————————————————————————————————————————————————————————————*)
 
-let latest_width = ref None
-let refresh () = latest_width := Terminal_unix.get_columns ()
-let initialize = lazy (refresh ())
+(** Functions for getting the size of the terminal to which [stdout] is attached
+    (provided [stdout] is a TTY). *)
 
-let get () =
-  Lazy.force initialize;
-  !latest_width
+type dimensions = { rows : int; columns : int }
 
-let set_changed_callback on_change =
-  Terminal_unix.set_changed_callback (fun () ->
-      refresh ();
-      on_change !latest_width)
+val get_dimensions : unit -> dimensions option
+val get_columns : unit -> int option
+val get_rows : unit -> int option
+val set_changed_callback : (unit -> unit) -> unit
 
 (*————————————————————————————————————————————————————————————————————————————
    Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>
