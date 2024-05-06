@@ -3,12 +3,39 @@
    Distributed under the MIT license. See terms at the end of this file.
   ————————————————————————————————————————————————————————————————————————————*)
 
-module Color = Color
-module Style = Style
-module Ansi = Ansi
+include Terminal_ansi
 
-let guess_printed_width, truncate_to_width =
-  Ansi.(guess_printed_width, truncate_to_width)
+module Size = struct
+  external sigwinch : unit -> int option = "ocaml_terminal_get_sigwinch"
+  (** The number of the signal used to indicate terminal size changes. [None] on
+      Windows. *)
+
+  type dimensions = { rows : int; columns : int }
+
+  external get_dimensions : unit -> dimensions option
+    = "ocaml_terminal_get_terminal_dimensions"
+
+  let get_columns () =
+    match get_dimensions () with
+    | Some { columns; _ } -> Some columns
+    | None -> None
+
+  let get_rows () =
+    match get_dimensions () with Some { rows; _ } -> Some rows | None -> None
+
+  let on_change = ref (fun _ -> ())
+
+  let initialise =
+    let handle_signal _ = !on_change () in
+    lazy
+      (match sigwinch () with
+      | None -> ()
+      | Some n -> Sys.set_signal n (Signal_handle handle_signal))
+
+  let set_changed_callback f =
+    Lazy.force initialise;
+    on_change := f
+end
 
 (*————————————————————————————————————————————————————————————————————————————
    Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>

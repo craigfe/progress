@@ -4,7 +4,7 @@
   ————————————————————————————————————————————————————————————————————————————*)
 
 let latest_width = ref None
-let refresh () = latest_width := Terminal_unix.get_columns ()
+let refresh () = latest_width := Terminal.Size.get_columns ()
 let initialize = lazy (refresh ())
 
 let get () =
@@ -12,7 +12,7 @@ let get () =
   !latest_width
 
 let set_changed_callback on_change =
-  Terminal_unix.set_changed_callback (fun () ->
+  Terminal.Size.set_changed_callback (fun () ->
       refresh ();
       on_change !latest_width)
 

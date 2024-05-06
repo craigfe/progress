@@ -13,7 +13,7 @@ module type S = sig
 
       Some basic types used throughout the rest of the library: *)
 
-  module Color = Terminal.Color
+  module Color = Terminal_ansi.Color
   module Duration = Duration
   module Printer = Printer
   module Units = Units

@@ -3,6 +3,7 @@
    Distributed under the MIT license. See terms at the end of this file.
   ————————————————————————————————————————————————————————————————————————————*)
 
+open! Import
 include Progress_engine_intf
 
 module type Platform = Platform.S

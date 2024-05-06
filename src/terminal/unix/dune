@@ -1,7 +1,0 @@
-(library
-  (public_name terminal.unix)
-  (name terminal_unix)
-  (foreign_stubs
-   (language c)
-   (names terminal_stubs))
-  (libraries unix))

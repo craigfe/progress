@@ -4,7 +4,6 @@
  (libraries
   (re_export progress.engine)
   (re_export terminal)
-  terminal.unix
   mtime.clock.os
   fmt
   unix))
