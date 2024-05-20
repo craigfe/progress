@@ -14,7 +14,7 @@ let gen_test_state () =
   let check pos v =
     Alcotest.(check ~pos int)
       "Expected flow rate" v
-      (Flow_meter.per_second flow_meter)
+      (Flow_meter.per_second flow_meter |> Int.of_float)
   in
   (record, check)
 

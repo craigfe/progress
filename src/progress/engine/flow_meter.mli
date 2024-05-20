@@ -21,7 +21,7 @@ val create :
 val record : 'a t -> 'a -> unit
 (** Add a value to the ring buffer. *)
 
-val per_second : 'a t -> 'a
+val per_second : 'a t -> float
 (** Estimate the rate of change of recorded values per second. *)
 
 (*————————————————————————————————————————————————————————————————————————————
