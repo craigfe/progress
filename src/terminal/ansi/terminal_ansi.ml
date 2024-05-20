@@ -3,8 +3,12 @@
    Distributed under the MIT license. See terms at the end of this file.
   ————————————————————————————————————————————————————————————————————————————*)
 
-val get : unit -> int option
-val set_changed_callback : (int option -> unit) -> unit
+module Color = Color
+module Style = Style
+module Ansi = Ansi
+
+let guess_printed_width, truncate_to_width =
+  Ansi.(guess_printed_width, truncate_to_width)
 
 (*————————————————————————————————————————————————————————————————————————————
    Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>

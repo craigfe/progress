@@ -4,6 +4,7 @@
   ————————————————————————————————————————————————————————————————————————————*)
 
 include Stdlib_ext
+module Terminal = Terminal_ansi
 
 module Mtime = struct
   include Mtime

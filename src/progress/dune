@@ -1,9 +1,6 @@
 (library
  (name progress)
  (public_name progress)
- (foreign_stubs
-  (language c)
-  (names terminal_stubs))
  (libraries
   (re_export progress.engine)
   (re_export terminal)

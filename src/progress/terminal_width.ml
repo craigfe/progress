@@ -3,42 +3,18 @@
    Distributed under the MIT license. See terms at the end of this file.
   ————————————————————————————————————————————————————————————————————————————*)
 
-external sigwinch : unit -> int option = "ocaml_terminal_get_sigwinch"
-(** The number of the signal used to indicate terminal size changes. [None] on
-    Windows. *)
-
-type dimensions = { rows : int; columns : int }
-
-external get_dimensions : unit -> dimensions option
-  = "ocaml_terminal_get_terminal_dimensions"
-
-let get_columns () =
-  match get_dimensions () with
-  | Some { columns; _ } -> Some columns
-  | None -> None
-
-let on_change = ref (fun _ -> ())
 let latest_width = ref None
-
-let initialise =
-  let handle_signal _ =
-    let width = get_columns () in
-    latest_width := width;
-    !on_change width
-  in
-  lazy
-    (latest_width := get_columns ();
-     match sigwinch () with
-     | None -> ()
-     | Some n -> Sys.set_signal n (Signal_handle handle_signal))
-
-let set_changed_callback f =
-  Lazy.force initialise;
-  on_change := f
+let refresh () = latest_width := Terminal.Size.get_columns ()
+let initialize = lazy (refresh ())
 
 let get () =
-  Lazy.force_val initialise;
+  Lazy.force initialize;
   !latest_width
+
+let set_changed_callback on_change =
+  Terminal.Size.set_changed_callback (fun () ->
+      refresh ();
+      on_change !latest_width)
 
 (*————————————————————————————————————————————————————————————————————————————
    Copyright (c) 2020–2021 Craig Ferguson <me@craigfe.io>

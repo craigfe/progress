@@ -1,0 +1,4 @@
+(library
+ (name terminal_ansi)
+ (public_name terminal.ansi)
+ (libraries stdlib-shims uutf uucp))

@@ -1,4 +1,9 @@
 (library
- (name terminal)
  (public_name terminal)
- (libraries stdlib-shims uutf uucp))
+ (name terminal)
+ (foreign_stubs
+  (language c)
+  (names terminal_stubs))
+ (libraries
+  (re_export terminal_ansi)
+  unix))
