@@ -4,7 +4,17 @@
   ————————————————————————————————————————————————————————————————————————————*)
 
 (** This library provides a small set of standard utility functions for
-    interacting with terminals. *)
+    interacting with terminals.
+
+    Note that this module does not depend on the [unix] library. There is
+    therefore a way to use [Terminal_ansi] and [progress.engine] in a context
+    other than a POSIX system (such as a unikernel). To do this, you need to
+    compose [Terminal_ansi] with a library that looks like [terminal.unix]
+    (which should allow you to obtain the size of a TTY). It would then be
+    sufficient to compose the latter (just as the [terminal] library does) to
+    then be able to use [Progess_engine.Make] with the result of this
+    composition.
+*)
 
 module Color : sig
   type t
