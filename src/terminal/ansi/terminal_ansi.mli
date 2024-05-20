@@ -13,8 +13,7 @@
     (which should allow you to obtain the size of a TTY). It would then be
     sufficient to compose the latter (just as the [terminal] library does) to
     then be able to use [Progess_engine.Make] with the result of this
-    composition.
-*)
+    composition. *)
 
 module Color : sig
   type t
