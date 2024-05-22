@@ -1,3 +1,9 @@
+### 0.4.0 (2024-20-05)
+
+- Revert the `terminal` API and keep an "happy" path to get size of a tty
+  and be compatible with MirageOS (@art-w, @msprotz, #42, #43)
+- Use a `float` instead of a `int` in `flow_meter per-second` (@mbarbin, #23, #27)
+
 ### 0.3.0 (2024-04-13)
 
 - Be compatible with MirageOS and remove `ocaml_terminal_get_sigwinch` (@art-w, #38)
