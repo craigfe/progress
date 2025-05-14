@@ -69,12 +69,14 @@ end
 module Duration = struct
   let mm_ss =
     let to_string span =
-      let seconds = Mtime.span_to_s span in
-      if Float.compare seconds 0. < 0 then "--:--"
-      else
-        Printf.sprintf "%02.0f:%02.0f"
-          (Float.div seconds 60. |> Float.floor)
-          (Float.rem seconds 60. |> Float.floor)
+      let span_s = Mtime.span_to_s span in
+      let minutes = Float.div span_s 60. |> Float.floor in
+      let seconds = Float.rem span_s 60. |> Float.floor in
+      (* Reasonable values correctly, but Mtime.Span.max_span must
+         print to "--:--" as {!Line.eta} relies on it. *)
+      if Float.compare span_s 0. < 0 || Float.compare minutes 1e4 > 0 then
+        "--:--"
+      else Printf.sprintf "%02.0f:%02.0f" minutes seconds
     in
     Printer.create ~string_len:5 ~to_string ()
 
