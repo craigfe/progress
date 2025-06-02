@@ -53,6 +53,8 @@ let test_duration () =
     expect "01:00" D.(min 1 + ms 400);
     expect "99:00" D.(min 99);
     expect "99:59" D.(min 99 + sec 59);
+    (* [eta] relies on this: *)
+    expect "--:--" Mtime.Span.max_span;
     (* Fail gracefully: *)
     expect ~relaxed_length:() "100:00" D.(min 100)
   in
