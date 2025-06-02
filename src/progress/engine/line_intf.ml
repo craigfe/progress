@@ -94,8 +94,8 @@ module type DSL = sig
 
   val percentage_of : integer -> integer t
   (** [percentage_of target] renders the running total as a percentage of
-      [target], i.e. [42%]. Values outside the range [\[0, 100\]] will be
-      clamped to either [0] or [100]. *)
+      [target], i.e. [42%]. Values outside the range [[0, 100]] will be clamped
+      to either [0] or [100]. *)
 
   val sum : ?pp:integer printer -> width:int -> unit -> integer t
   (** [sum ~width ()] displays a running total of reported values using
@@ -110,7 +110,7 @@ module type DSL = sig
 
     val ascii : t
     (** The style used by [bar ~style:`ASCII] (which is the default). Generates
-        bars of the form [\[######---\]]. *)
+        bars of the form [[######---]]. *)
 
     val utf8 : t
     (** {!utf8} is the style used by [bar ~style:`UTF8]. Uses the UTF-8 block
@@ -142,9 +142,9 @@ module type DSL = sig
 
         {2 Examples}
 
-        - [v \[ "#" \]] renders like "[#######   ]";
-        - [v \[ "="; ">"; " " \]] renders like "[======>    ]";
-        - [v \[ "4"; "3"; "2"; "1"; "0" \]] renders like "[444444410000]";
+        - [v [ "#" ]] renders like "[#######   ]";
+        - [v [ "="; ">"; " " ]] renders like "[======>    ]";
+        - [v [ "4"; "3"; "2"; "1"; "0" ]] renders like "[444444410000]";
         - ... see [examples/bar_styles.ml] in the source repository for more.
 
         {2 Specifics}
@@ -152,7 +152,7 @@ module type DSL = sig
         Each segment of a rendering progress bar is in one of three states:
         full, empty or in-progress. At any given time, either the bar is
         entirely full or or there is exactly one in-progress segment. Given the
-        style [v \[s1; s2; ... sN\]], these states are rendered as follows:
+        style [v [s1; s2; ... sN]], these states are rendered as follows:
 
         - {b full}: rendered as [s1];
         - {b empty}: rendered as [sN] if [N >= 1], otherwise [' '];
@@ -181,7 +181,7 @@ module type DSL = sig
     -> integer
     -> integer t
   (** [bar total] is a progress bar of the form:
-      [\[#################...............\]]
+      [[#################...............]]
 
       The proportion of the bar that is filled is given by
       [<reported_so_far> / total]. Optional parameters are as follows:
@@ -221,7 +221,8 @@ module type DSL = sig
       - [?frames] alters the sequence of frames rendered by the spinner;
       - [?color] causes each frame to be rendered with the given colour;
       - [?min_interval] is the minimum time interval between frame transitions
-        of the spinner (i.e. a debounce threshold). The default is [Some 80ms]. *)
+        of the spinner (i.e. a debounce threshold). The default is [Some 80ms].
+  *)
 
   (** {2:time Time-sensitive segments} *)
 
@@ -268,7 +269,7 @@ module type DSL = sig
   (** [parens t] is [const "(" ++ t ++ const ")"]. *)
 
   val brackets : 'a t -> 'a t
-  (** [brackets t] is [const "\[" ++ t ++ const "\]"]. *)
+  (** [brackets t] is [const "[" ++ t ++ const "]"]. *)
 
   val braces : 'a t -> 'a t
   (** [braces t] is [const "{" ++ t ++ const "}"]. *)

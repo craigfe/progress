@@ -4,7 +4,8 @@
   ————————————————————————————————————————————————————————————————————————————*)
 
 (** The core of the progress bar rendering logic. Consumes the {!Line} DSL and
-    emits rendering functions that put {!Ansi} escape codes in the right places. *)
+    emits rendering functions that put {!Ansi} escape codes in the right places.
+*)
 
 include Renderer_intf
 open! Import
@@ -248,7 +249,8 @@ end = struct
 
     Vector.insert t.rows position (Some bar);
     Vector.iteri_from (position + 1) t.rows ~f:(fun i -> function
-      | None -> () | Some (E bar) -> bar.position <- i);
+      | None -> ()
+      | Some (E bar) -> bar.position <- i);
 
     (* The cursor is now one line above the bottom. Move to the correct starting
        position for a re-render of the affected suffix of the display. *)
@@ -278,7 +280,8 @@ end = struct
     if Hashtbl.mem t.bars key then Hashtbl.remove t.bars key;
     Vector.remove t.rows position;
     Vector.iteri_from position t.rows ~f:(fun i -> function
-      | None -> () | Some (E bar) -> bar.position <- i);
+      | None -> ()
+      | Some (E bar) -> bar.position <- i);
 
     (* The cursor is now one line below the bottom. Move to the correct starting
        position for a re-render of the affected suffix of the display. *)
@@ -512,8 +515,8 @@ module Make (Platform : Platform.S) = struct
     type ('a, 'b) t =
       { uid : Display.Unique_id.t; initial_reporters : ('a, 'b) Reporters.t }
 
-    let start :
-        type a b. ?config:Config.user_supplied -> (a, b) Multi.t -> (a, b) t =
+    let start : type a b.
+        ?config:Config.user_supplied -> (a, b) Multi.t -> (a, b) t =
      fun ?(config = Config.v ()) bars ->
       let config = Config.apply_defaults config in
       let bars = Bar_list.of_multi config bars in

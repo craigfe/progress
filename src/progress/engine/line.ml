@@ -28,8 +28,7 @@ module Acc = struct
     ; flow_meter : 'a Flow_meter.t
     }
 
-  let wrap :
-      type a.
+  let wrap : type a.
          elt:(module Integer.S with type t = a)
       -> clock:(unit -> Mtime.t)
       -> should_update:(unit -> bool)
@@ -149,7 +148,10 @@ module Integer_independent (Platform : Platform.S) = struct
   let string =
     let segment =
       Primitives.alpha_unsized ~initial:(`Val "") (fun ~width buf _ s ->
-          let output_len = width () - 1 (* XXX: why is -1 necessary? *) in
+          let output_len =
+            width () - 1
+            (* XXX: why is -1 necessary? *)
+          in
           if output_len <= 0 then 0
           else
             let pp =

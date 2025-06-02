@@ -56,10 +56,11 @@ module type S = sig
       ]}
 
       where each reported value contributes cumulatively towards an eventual
-      total of [total]. [?style] specifies the {{!Line.Bar_style.t}
-      [Bar_style.t]} to use for rendering the bar, and [?pp] is used to
-      pretty-print the [<count>] segment, if passed. (For example,
-      {!Units.Bytes.of_int64} can be used for totals measured in bytes.) *)
+      total of [total]. [?style] specifies the
+      {{!Line.Bar_style.t} [Bar_style.t]} to use for rendering the bar, and
+      [?pp] is used to pretty-print the [<count>] segment, if passed. (For
+      example, {!Units.Bytes.of_int64} can be used for totals measured in
+      bytes.) *)
 
   (** {1 Rendering}
 

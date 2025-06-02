@@ -382,68 +382,66 @@ let apply_padding dir width =
           outer_width)
 
 let report compiled =
-  let rec aux :
-      type a.
+  let rec aux : type a.
          [ `report | `finish ]
       -> a Compiled.t
       -> (Line_buffer.t -> a -> int) Staged.t =
    fun typ -> function
-    | Noop -> Staged.inj (fun _ _ -> 0)
-    | Theta { pp } -> Staged.inj (fun buf (_ : a) -> pp buf `report)
-    | Alpha pp ->
-        Staged.inj (fun buf x ->
-            pp.latest <- (fun buf -> pp.pp buf `rerender x);
-            pp.pp buf (typ :> event) x)
-    | Contramap (t, f) ->
-        let$ inner = aux typ t in
-        fun buf a -> inner buf (f a)
-    | On_finalise { inner; _ } -> aux typ inner
-    | Cond t as _elt ->
-        let$ then_ = aux typ t.then_ in
-        fun buf x ->
-          t.latest <- Some x;
-          if t.if_ x then (
-            let start = Line_buffer.current_position buf in
-            let _reported_width = then_ buf x in
-            let finish = Line_buffer.current_position buf in
-            t.latest_span <- Line_buffer.Span.between_marks start finish;
-            let width = Sta_dyn.get t.width in
-            (* TODO: Since dynamic widths aren't memoized over a single run,
+     | Noop -> Staged.inj (fun _ _ -> 0)
+     | Theta { pp } -> Staged.inj (fun buf (_ : a) -> pp buf `report)
+     | Alpha pp ->
+         Staged.inj (fun buf x ->
+             pp.latest <- (fun buf -> pp.pp buf `rerender x);
+             pp.pp buf (typ :> event) x)
+     | Contramap (t, f) ->
+         let$ inner = aux typ t in
+         fun buf a -> inner buf (f a)
+     | On_finalise { inner; _ } -> aux typ inner
+     | Cond t as _elt ->
+         let$ then_ = aux typ t.then_ in
+         fun buf x ->
+           t.latest <- Some x;
+           if t.if_ x then (
+             let start = Line_buffer.current_position buf in
+             let _reported_width = then_ buf x in
+             let finish = Line_buffer.current_position buf in
+             t.latest_span <- Line_buffer.Span.between_marks start finish;
+             let width = Sta_dyn.get t.width in
+             (* TODO: Since dynamic widths aren't memoized over a single run,
                it's possible for this to fail due to changing width in the
                middle of a render, which isn't a bug in user code. Should fix
                the race condition and then be more defensive here. *)
-            (* if reported_width <> width then
+             (* if reported_width <> width then
              *   Fmt.failwith
              *     "Conditional segment not respecting stated width: expected %a, \
              *      reported %d. Segment:@,\
              *      %a"
              *     (Sta_dyn.pp Fmt.int) t.width reported_width Compiled.pp_dump elt; *)
-            width)
-          else (
-            Line_buffer.skip buf t.latest_span;
-            Sta_dyn.get t.width)
-    | Group g ->
-        let reporters = Array.map g ~f:(aux typ >> Staged.prj) in
-        Staged.inj (fun buf v ->
-            ArrayLabels.fold_left reporters ~f:(fun a f -> a + f buf v) ~init:0)
-    | Pair { left; sep; right } ->
-        let$ left = aux typ left
-        and$ sep = aux typ sep
-        and$ right = aux typ right in
-        fun buf (v_left, v_right) ->
-          let x = left buf v_left in
-          let y = sep buf () in
-          let z = right buf v_right in
-          x + y + z
-    | Pad { contents; dir; width } ->
-        let$ contents = aux typ contents and$ pad = apply_padding dir width in
-        fun buf x -> pad (fun buf -> contents buf x) buf
+             width)
+           else (
+             Line_buffer.skip buf t.latest_span;
+             Sta_dyn.get t.width)
+     | Group g ->
+         let reporters = Array.map g ~f:(aux typ >> Staged.prj) in
+         Staged.inj (fun buf v ->
+             ArrayLabels.fold_left reporters ~f:(fun a f -> a + f buf v) ~init:0)
+     | Pair { left; sep; right } ->
+         let$ left = aux typ left
+         and$ sep = aux typ sep
+         and$ right = aux typ right in
+         fun buf (v_left, v_right) ->
+           let x = left buf v_left in
+           let y = sep buf () in
+           let z = right buf v_right in
+           x + y + z
+     | Pad { contents; dir; width } ->
+         let$ contents = aux typ contents and$ pad = apply_padding dir width in
+         fun buf x -> pad (fun buf -> contents buf x) buf
   in
   aux compiled
 
 let update top =
-  let rec aux :
-      type a.
+  let rec aux : type a.
          a Compiled.t
       -> (bool -> [ `rerender | `tick | `finish ] -> Line_buffer.t -> int)
          Staged.t = function
