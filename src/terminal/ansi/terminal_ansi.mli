@@ -23,7 +23,7 @@ module Color : sig
 
       Colours built using {!ansi} will be rendered using the standard
       {{:https://en.wikipedia.org/wiki/ANSI_escape_code#3-bit_and_4-bit} 4-bit
-        ANSI escape codes} for terminals. The actual colours displayed to the
+       ANSI escape codes} for terminals. The actual colours displayed to the
       user depend on their terminal configuration / theme, ensuring that they
       look natural in context. *)
 
@@ -43,7 +43,7 @@ module Color : sig
   val rgb : int -> int -> int -> t
   (** [rgb r g b] is the RGB24 colour with the given red, green and blue colour
       components respectively. Raises [Invalid_argument] if any of the
-      components are outside the range [\[0, 255\]]. *)
+      components are outside the range [[0, 255]]. *)
 
   val hex : string -> t
   (** [hex s] is the RGB24 colour given by the

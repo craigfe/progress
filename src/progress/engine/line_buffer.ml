@@ -7,7 +7,7 @@ open! Import
 
 external unsafe_blit_string : string -> int -> bytes -> int -> int -> unit
   = "caml_blit_string"
-  [@@noalloc]
+[@@noalloc]
 (** Polyfill for pre-4.09.0 *)
 
 type t =

@@ -25,7 +25,7 @@ end
       1.      ↦  "100%"
     ]}
 
-    {b Note:} values will be clamped into the range [\[0., 1.\]]. *)
+    {b Note:} values will be clamped into the range [[0., 1.]]. *)
 module Percentage : sig
   val of_float : float Printer.t
 end

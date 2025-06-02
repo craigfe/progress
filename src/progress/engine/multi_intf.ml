@@ -25,8 +25,8 @@ module type S = sig
         (int64 reporter -> (string * float) reporter -> 'b, 'b) t
       ]}
 
-      These reporting functions are supplied when beginning the {{!rendering}
-      rendering} process. *)
+      These reporting functions are supplied when beginning the
+      {{!rendering} rendering} process. *)
 
   val line : 'a line -> ('a reporter -> 'b, 'b) t
   (** Construct a multiple-line layout from a single progress bar line. *)
