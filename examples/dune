@@ -3,7 +3,7 @@
  (modules
   (:standard \ main))
  (libraries progress unix logs logs.fmt logs.threaded fmt fmt.tty mtime
-   mtime.clock.os vector threads.posix))
+   mtime.clock.os threads.posix))
 
 (executable
  (name main)
