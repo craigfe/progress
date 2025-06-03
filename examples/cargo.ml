@@ -1,3 +1,5 @@
+open Utils
+
 let packages =
   [ ("0install-solver", "2.17")
   ; ("afl-persistent", "1.3")
@@ -31,7 +33,7 @@ let packages =
   ; ("yojson", "1.7.0")
   ; ("zarith", "1.9.1")
   ]
-  |> Vector.of_list ~dummy:("", "")
+  |> Dynlist.of_list
 
 let setup_logs () =
   let reporter = Progress.logs_reporter () in
@@ -41,7 +43,7 @@ let setup_logs () =
 
 let bar =
   let open Progress.Line in
-  let total = Vector.length packages in
+  let total = Dynlist.length packages in
   list
     [ constf "    %a" Fmt.(styled `Cyan string) "Building"
     ; using fst
@@ -54,9 +56,9 @@ let bar =
     ]
 
 let rec package_worker (active_packages, reporter) =
-  match Vector.pop packages with
-  | exception Vector.Empty -> ()
-  | package, version ->
+  match Dynlist.pop_opt packages with
+  | None -> ()
+  | Some (package, version) ->
       active_packages := package :: !active_packages;
       Logs.app (fun f ->
           f "   %a %s %s" Fmt.(styled `Green string) "Compiling" package version);
