@@ -7,5 +7,4 @@
   fmt
   logs
   logs.fmt
-  terminal_ansi
-  vector))
+  terminal_ansi))

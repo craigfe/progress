@@ -1,5 +1,5 @@
-let ( .%() ) v i = Vector.get v i
-let ( .%()<- ) v i x = Vector.set v i x
+let ( .%() ) v i = Dynarray.get v i
+let ( .%()<- ) v i x = Dynarray.set v i x
 
 let shuffle_vector =
   let shuffle_subvector rand_int v i j =
@@ -10,7 +10,7 @@ let shuffle_vector =
       v.%(k) <- tmp
     done
   in
-  fun v -> shuffle_subvector Random.int v 0 (Vector.length v)
+  fun v -> shuffle_subvector Random.int v 0 (Dynarray.length v)
 
 let colors =
   (* import matplotlib.cm
