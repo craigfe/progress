@@ -7,8 +7,8 @@ let iteri_from ~f i t =
     f i (get t i)
   done
 
-let of_list ~dummy:_ l = Dynarray.of_list l  
-  
+let of_list ~dummy:_ l = Dynarray.of_list l
+
 let rec find_map_from i t ~f =
   if i >= length t then None
   else
