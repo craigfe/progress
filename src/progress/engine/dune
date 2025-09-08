@@ -6,6 +6,7 @@
   (copy# pvector.dynarray.ml %{target})))
 
 (rule
+ (target pvector.ml)
  (enabled_if
   (< %{ocaml_version} "5.2"))
  (action
