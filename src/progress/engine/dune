@@ -1,3 +1,16 @@
+(rule
+ (target pvector.ml)
+ (enabled_if
+  (>= %{ocaml_version} "5.2"))
+ (action
+  (copy# pvector.dynarray.ml %{target})))
+
+(rule
+ (enabled_if
+  (< %{ocaml_version} "5.2"))
+ (action
+  (copy# pvector.vector.ml %{target})))
+
 (library
  (name progress_engine)
  (public_name progress.engine)
@@ -7,9 +20,4 @@
   fmt
   logs
   logs.fmt
-  terminal_ansi
-  (select
-   pvector.ml
-   from
-   (vector -> pvector.vector.ml)
-   (!vector -> pvector.dynarray.ml))))
+  terminal_ansi))
