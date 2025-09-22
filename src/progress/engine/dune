@@ -1,6 +1,43 @@
+; We use two different implementations of vectors depending on the availability of Dynarray in the standard library (starting OCaml 5.2).
+; This reduces dependencies fo users of the newer OCaml versions, and reduces clashes with the ecosystem (https://github.com/craigfe/progress/pull/50).
+
+; Rules for OCaml 5.2 and later
+
+(rule
+ (enabled_if
+  (>= %{ocaml_version} "5.2"))
+ (action
+  (copy# pvector.dynarray.ml pvector.ml)))
+
+(library
+ (name pvector)
+ (public_name progress.vector)
+ (enabled_if
+  (>= %{ocaml_version} "5.2"))
+ (modules pvector))
+
+; Rules for OCaml versions after 5.2
+
+(rule
+ (enabled_if
+  (< %{ocaml_version} "5.2"))
+ (action
+  (copy# pvector.vector.ml pvector.ml)))
+
+(library
+ (name pvector)
+ (public_name progress.vector)
+ (enabled_if
+  (< %{ocaml_version} "5.2"))
+ (modules pvector)
+ (libraries vector))
+
+; Main library
+
 (library
  (name progress_engine)
  (public_name progress.engine)
+ (modules :standard \ pvector)
  (libraries
   (re_export mtime)
   (re_export optint)
@@ -8,4 +45,4 @@
   logs
   logs.fmt
   terminal_ansi
-  vector))
+  progress.vector))

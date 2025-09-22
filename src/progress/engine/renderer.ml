@@ -143,7 +143,7 @@ end = struct
     { config : Config.t
     ; uid : Unique_id.t
     ; bars : (Bar_id.t, some_bar) Hashtbl.t
-    ; rows : some_bar option Vector.t
+    ; rows : some_bar option Pvector.t
     }
 
   let config t = t.config
@@ -155,11 +155,11 @@ end = struct
         | None -> None
         | Some renderer -> Some (E { renderer; latest_width = 0; position = i })
       in
-      Bar_list.mapi bars ~f:{ f } |> Vector.of_list ~dummy:None
+      Bar_list.mapi bars ~f:{ f } |> Pvector.of_list ~dummy:None
     in
     let bar_count = Bar_list.length bars in
     let bars = Hashtbl.create bar_count in
-    Vector.iter rows
+    Pvector.iter rows
       ~f:
         (Option.iter (fun (E { renderer; _ } as t) ->
              Hashtbl.add bars ~key:(Bar_renderer.id renderer) ~data:t));
@@ -190,8 +190,8 @@ end = struct
 
   let rerender_all_from_top ~stage ~starting_at ~unconditional
       ({ config = { ppf; _ }; rows; _ } as t) =
-    let total_rows = Vector.length rows in
-    Vector.iteri_from starting_at rows ~f:(fun idx slot ->
+    let total_rows = Pvector.length rows in
+    Pvector.iteri_from starting_at rows ~f:(fun idx slot ->
         let is_last = idx = total_rows - 1 in
         let () =
           match slot with
@@ -227,7 +227,7 @@ end = struct
     match data with
     | `Clean _ -> ()
     | `Dirty data ->
-        let distance_from_base = Vector.length rows - bar.position - 1 in
+        let distance_from_base = Pvector.length rows - bar.position - 1 in
 
         (* NOTE: we add an initial carriage return to avoid overflowing the line if
            the user has typed into the terminal between renders. *)
@@ -242,13 +242,13 @@ end = struct
     Hashtbl.remove t.bars uid
 
   let add_line ?(above = 0) t renderer =
-    let position = Vector.length t.rows - above in
+    let position = Pvector.length t.rows - above in
     let key = Bar_renderer.id renderer in
     let bar = E { renderer; latest_width = 0; position } in
     Hashtbl.add t.bars ~key ~data:bar;
 
-    Vector.insert t.rows position (Some bar);
-    Vector.iteri_from (position + 1) t.rows ~f:(fun i -> function
+    Pvector.insert t.rows position (Some bar);
+    Pvector.iteri_from (position + 1) t.rows ~f:(fun i -> function
       | None -> ()
       | Some (E bar) -> bar.position <- i);
 
@@ -267,7 +267,7 @@ end = struct
           (* This can either mean that the line has already been finalised, or
              that this key is unknown. *)
           match
-            Vector.find_map t.rows ~f:(function
+            Pvector.find_map t.rows ~f:(function
               | None -> None
               | Some (E bar) as some_bar ->
                   if Bar_id.equal key (Bar_renderer.id bar.renderer) then
@@ -278,8 +278,8 @@ end = struct
           | None -> failwith "No such line in display")
     in
     if Hashtbl.mem t.bars key then Hashtbl.remove t.bars key;
-    Vector.remove t.rows position;
-    Vector.iteri_from position t.rows ~f:(fun i -> function
+    Pvector.remove t.rows position;
+    Pvector.iteri_from position t.rows ~f:(fun i -> function
       | None -> ()
       | Some (E bar) -> bar.position <- i);
 
@@ -287,7 +287,7 @@ end = struct
        position for a re-render of the affected suffix of the display. *)
     Format.pp_print_string t.config.ppf Terminal.Ansi.erase_display_suffix;
     Terminal.Ansi.move_up t.config.ppf 1;
-    Terminal.Ansi.move_up t.config.ppf (Vector.length t.rows - position - 1);
+    Terminal.Ansi.move_up t.config.ppf (Pvector.length t.rows - position - 1);
     rerender_all_from_top ~stage:`update ~starting_at:position
       ~unconditional:true t
 
@@ -298,10 +298,10 @@ end = struct
 
   let handle_width_change ({ config = { ppf; _ }; rows; _ } as display)
       new_width =
-    let row_count = Vector.length rows in
+    let row_count = Pvector.length rows in
     let latest_widths =
       Array.init row_count ~f:(fun i ->
-          Vector.get_exn rows i
+          Pvector.get_exn rows i
           |> Option.fold ~none:0 ~some:(fun (E t) -> t.latest_width))
     in
     let overflows =
@@ -319,12 +319,12 @@ end = struct
       display
 
   let tick ({ config = { ppf; _ }; rows; _ } as t) =
-    Terminal.Ansi.move_up ppf (Vector.length rows - 1);
+    Terminal.Ansi.move_up ppf (Pvector.length rows - 1);
     rerender_all_from_top ~stage:`tick ~starting_at:0 ~unconditional:false t
 
   let pause { config = { ppf; _ }; rows; _ } =
     Format.fprintf ppf "%s%!" Terminal.Ansi.erase_line;
-    for _ = 1 to Vector.length rows - 1 do
+    for _ = 1 to Pvector.length rows - 1 do
       Format.fprintf ppf "%a%s%!" Terminal.Ansi.move_up 1
         Terminal.Ansi.erase_line
     done
@@ -342,7 +342,7 @@ end = struct
 
   let finalise
       ({ config = { ppf; hide_cursor; persistent; _ }; rows; _ } as display) =
-    Terminal.Ansi.move_up ppf (Vector.length rows - 1);
+    Terminal.Ansi.move_up ppf (Pvector.length rows - 1);
     if persistent then (
       rerender_all_from_top ~stage:`finalise ~starting_at:0 ~unconditional:true
         display;
