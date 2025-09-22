@@ -1,3 +1,15 @@
+### 0.5.0 (2025-09-19)
+
+- Update to `ocamlformat.0.27.0` (@dinosaure, #49)
+- Fix on `Line.eta` (@gasche, #48)
+- Remove the `Vector` module and use the `Dynarray` module when it's available
+
+  **breaking change**: `progress` provides a new sub-library `progress.vector`
+  which, depending on the OCaml version, corresponds to the `vector` opam
+  package for OCaml < 5.2.0 or `Stdlib.Dynarray` for OCaml >= 5.2.0. It unlocks
+  the ability to link `progress` with some projects which define their own
+  `Vector` module.
+
 ### 0.4.0 (2024-20-05)
 
 - Revert the `terminal` API and keep an "happy" path to get size of a tty
